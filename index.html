@@ -38,7 +38,7 @@
 <body class="min-h-screen flex flex-col justify-between selection:bg-accent selection:text-white">
 
     <!-- Верхняя шапка -->
-    <header class="sticky top-0 z-40 bg-darkBg/80 backdrop-blur-md border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
+    <header class="sticky top-0 z-40 bg-darkBg/85 backdrop-blur-md border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
         <div class="flex items-center space-x-2">
             <h1 id="shop-title" class="text-lg font-bold tracking-wide">VLD VAPE</h1>
             <span id="role-badge" class="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Пользователь</span>
@@ -163,7 +163,7 @@
                     </div>
                 </div>
                 <div class="flex items-center space-x-2">
-                    <input type="checkbox" id="p-featured" class="w-4 h-4 accent-accent">
+                    <input type="checkbox" id="p-featured" class="w-4 h-4 accent-accent" checked>
                     <label class="text-sm text-zinc-300">Показывать на Главной</label>
                 </div>
                 <div>
@@ -175,6 +175,31 @@
                 </div>
             </div>
             <button onclick="saveProduct()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition">Сохранить товар</button>
+        </div>
+    </div>
+
+    <!-- 5. Управление скидкой/акцией товара (Интерфейс вместо модального окна браузера) -->
+    <div id="modal-discount-form" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold">Управление скидкой</h3>
+                <button onclick="closeModal('modal-discount-form')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <input type="hidden" id="discount-product-id">
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Текущая (старая) розничная цена</label>
+                    <div id="discount-old-price-text" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-400 select-none">0 ₽</div>
+                </div>
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Новая акционная цена (₽)</label>
+                    <input type="number" id="discount-new-price" placeholder="Оставьте пустым для отмены акции" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                </div>
+            </div>
+            <div class="flex space-x-2 pt-2">
+                <button onclick="saveDiscount(true)" class="flex-1 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl text-xs font-medium transition text-red-400">Убрать акцию</button>
+                <button onclick="saveDiscount(false)" class="flex-1 bg-accent hover:bg-accentHover py-2.5 rounded-xl text-xs font-medium transition text-white">Сохранить</button>
+            </div>
         </div>
     </div>
 
@@ -208,6 +233,7 @@
             products: [],
             orders: [],
             adminStatsFilter: 'all', 
+            adminHomeSubTab: 'stats',
             catalogCategory: 'жидкость',
             catalogSubcategory: 'all',
             searchQuery: '',
@@ -327,18 +353,56 @@
             }
         });
 
+        // Загрузка товаров с автоматической группировкой одинаковых названий и объединением вкусов
         async function fetchProducts() {
             try {
                 const { data, error } = await supabaseClient.from('products').select('*, product_variants(*)');
                 if (!error && data) {
-                    state.products = data;
+                    const map = {};
                     for (const p of data) {
-                        if (!p.product_variants || p.product_variants.length === 0) {
+                        const key = p.name.trim().toLowerCase();
+                        if (!map[key]) {
+                            // Клонируем структуру товара и объединяем внутри одинаковые вкусы/цвета
+                            const varMap = {};
+                            if (p.product_variants) {
+                                for (const v of p.product_variants) {
+                                    const vKey = v.value.trim().toLowerCase();
+                                    if (!varMap[vKey]) {
+                                        varMap[vKey] = { ...v };
+                                    } else {
+                                        varMap[vKey].quantity += Number(v.quantity || 0);
+                                        // Удаляем дубликат из базы
+                                        await supabaseClient.from('product_variants').delete().eq('id', v.id);
+                                    }
+                                }
+                            }
+                            map[key] = { ...p, product_variants: Object.values(varMap) };
+                        } else {
+                            // Если карточка товара дублируется целиком в базе, объединяем в первую
+                            for (const v of (p.product_variants || [])) {
+                                const vKey = v.value.trim().toLowerCase();
+                                const existingVar = map[key].product_variants.find(item => item.value.trim().toLowerCase() === vKey);
+                                if (existingVar) {
+                                    existingVar.quantity += Number(v.quantity || 0);
+                                    await supabaseClient.from('product_variants').delete().eq('id', v.id);
+                                } else {
+                                    await supabaseClient.from('product_variants').update({ product_id: map[key].id }).eq('id', v.id);
+                                    map[key].product_variants.push(v);
+                                }
+                            }
                             await supabaseClient.from('products').delete().eq('id', p.id);
                         }
                     }
-                    const { data: refreshed } = await supabaseClient.from('products').select('*, product_variants(*)');
-                    if (refreshed) state.products = refreshed;
+                    
+                    // Обновляем остатки и дубликаты вариантов в основном объекте для чистоты
+                    for (const mainKey of Object.keys(map)) {
+                        const prod = map[mainKey];
+                        if (!prod.product_variants || prod.product_variants.length === 0) {
+                            await supabaseClient.from('products').delete().eq('id', prod.id);
+                            delete map[mainKey];
+                        }
+                    }
+                    state.products = Object.values(map);
                 }
             } catch (e) {
                 console.error(e);
@@ -464,6 +528,17 @@
 
             container.innerHTML = `
                 <div class="space-y-4">
+                    <!-- Красивая главная страница с пузырем приветствия -->
+                    <div class="bg-gradient-to-r from-accent/30 via-cardBg to-accent/20 border border-zinc-700/60 rounded-2xl p-4 shadow-xl flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-xl bg-accent flex items-center justify-center text-white shrink-0 shadow-lg shadow-accent/40">
+                            <i data-lucide="sparkles" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-bold tracking-wide text-zinc-100">Добро пожаловать в VLD VAPE!</h2>
+                            <p class="text-xs text-zinc-400 mt-0.5">Лучший выбор жидкостей, устройств и всего остального</p>
+                        </div>
+                    </div>
+
                     <div class="relative">
                         <input type="text" oninput="state.searchQuery=this.value; renderUserHomeSearch(this.value);" placeholder="Поиск товаров..." value="${state.searchQuery}" class="w-full bg-cardBg border border-zinc-700 rounded-2xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-accent">
                         <i data-lucide="search" class="w-4 h-4 text-zinc-400 absolute left-3.5 top-3.5"></i>
@@ -490,15 +565,20 @@
         }
 
         function renderProductCard(p) {
+            const hasDiscount = p.old_price && p.old_price > p.retail_price;
             return `
-                <div class="bg-cardBg border border-zinc-800 rounded-2xl p-3 flex flex-col justify-between hover:border-zinc-700 transition">
+                <div class="bg-cardBg border border-zinc-800 rounded-2xl p-3 flex flex-col justify-between hover:border-zinc-700 transition relative">
+                    ${hasDiscount ? '<span class="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">АКЦИЯ</span>' : ''}
                     <div>
                         <img src="${p.image_url || 'https://via.placeholder.com/150'}" alt="${p.name}" class="w-full h-36 object-cover rounded-xl mb-3">
                         <h4 class="font-semibold text-sm line-clamp-1">${p.name}</h4>
                         <p class="text-xs text-zinc-400">${p.subcategory || ''}</p>
                     </div>
                     <div class="flex items-center justify-between mt-3">
-                        <span class="font-bold text-sm text-accent">${p.retail_price} ₽</span>
+                        <div class="flex flex-col">
+                            ${hasDiscount ? `<span class="text-[11px] text-zinc-500 line-through">${p.old_price} ₽</span>` : ''}
+                            <span class="font-bold text-sm text-accent">${p.retail_price} ₽</span>
+                        </div>
                         <button onclick="openVariantModal(${p.id})" class="w-8 h-8 rounded-full bg-accent hover:bg-accentHover flex items-center justify-center text-white transition">
                             <i data-lucide="plus" class="w-4 h-4"></i>
                         </button>
@@ -540,22 +620,30 @@
                 return '<p class="col-span-2 text-center text-zinc-500 py-10">Товары не найдены</p>';
             }
 
-            return variantCards.map(item => `
-                <div class="bg-cardBg border border-zinc-800 rounded-2xl p-3 flex flex-col justify-between hover:border-zinc-700 transition">
-                    <div>
-                        <img src="${item.product.image_url || 'https://via.placeholder.com/150'}" alt="${item.product.name}" class="w-full h-36 object-cover rounded-xl mb-3">
-                        <h4 class="font-semibold text-sm line-clamp-1">${item.product.name}</h4>
-                        <p class="text-xs text-zinc-400">${item.product.subcategory || ''}</p>
-                        <p class="text-xs font-medium text-purple-300 mt-1">${item.variant.type === 'flavor' ? 'Вкус' : 'Цвет'}: ${item.variant.value}</p>
+            return variantCards.map(item => {
+                const p = item.product;
+                const hasDiscount = p.old_price && p.old_price > p.retail_price;
+                return `
+                    <div class="bg-cardBg border border-zinc-800 rounded-2xl p-3 flex flex-col justify-between hover:border-zinc-700 transition relative">
+                        ${hasDiscount ? '<span class="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">АКЦИЯ</span>' : ''}
+                        <div>
+                            <img src="${p.image_url || 'https://via.placeholder.com/150'}" alt="${p.name}" class="w-full h-36 object-cover rounded-xl mb-3">
+                            <h4 class="font-semibold text-sm line-clamp-1">${p.name}</h4>
+                            <p class="text-xs text-zinc-400">${p.subcategory || ''}</p>
+                            <p class="text-xs font-medium text-purple-300 mt-1">${item.variant.type === 'flavor' ? 'Вкус' : 'Цвет'}: ${item.variant.value}</p>
+                        </div>
+                        <div class="flex items-center justify-between mt-3">
+                            <div class="flex flex-col">
+                                ${hasDiscount ? `<span class="text-[11px] text-zinc-500 line-through">${p.old_price} ₽</span>` : ''}
+                                <span class="font-bold text-sm text-accent">${p.retail_price} ₽</span>
+                            </div>
+                            <button onclick="addToCart(${p.id}, ${item.variant.id})" class="w-8 h-8 rounded-full bg-accent hover:bg-accentHover flex items-center justify-center text-white transition">
+                                <i data-lucide="plus" class="w-4 h-4"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div class="flex items-center justify-between mt-3">
-                        <span class="font-bold text-sm text-accent">${item.product.retail_price} ₽</span>
-                        <button onclick="addToCart(${item.product.id}, ${item.variant.id})" class="w-8 h-8 rounded-full bg-accent hover:bg-accentHover flex items-center justify-center text-white transition">
-                            <i data-lucide="plus" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         function renderUserCatalog(container) {
@@ -772,7 +860,32 @@
 
         // --- АДМИНСКИЕ ВКЛАДКИ ---
 
+        function setAdminHomeSubTab(subTab) {
+            state.adminHomeSubTab = subTab;
+            render();
+        }
+
         function renderAdminHome(container) {
+            container.innerHTML = `
+                <div class="space-y-4">
+                    <div class="flex space-x-1 bg-cardBg p-1 rounded-2xl border border-zinc-800">
+                        <button onclick="setAdminHomeSubTab('stats')" class="flex-1 py-2 rounded-xl text-xs font-medium transition ${state.adminHomeSubTab === 'stats' ? 'bg-accent text-white' : 'text-zinc-400'}">Статистика</button>
+                        <button onclick="setAdminHomeSubTab('product')" class="flex-1 py-2 rounded-xl text-xs font-medium transition ${state.adminHomeSubTab === 'product' ? 'bg-accent text-white' : 'text-zinc-400'}">Товар (Главная у пользователя)</button>
+                    </div>
+                    
+                    <div id="admin-home-subcontent"></div>
+                </div>
+            `;
+
+            const subContainer = document.getElementById('admin-home-subcontent');
+            if (state.adminHomeSubTab === 'product') {
+                renderUserHome(subContainer);
+            } else {
+                renderAdminStats(subContainer);
+            }
+        }
+
+        function renderAdminStats(container) {
             const filteredOrders = (state.orders || []).filter(o => {
                 if (state.adminStatsFilter === 'today') {
                     return new Date(o.created_at).toDateString() === new Date().toDateString();
@@ -788,6 +901,7 @@
 
             const completedOrders = filteredOrders.filter(o => o.status === 'completed' || o.status === 'archived');
             const inProgressOrders = (state.orders || []).filter(o => o.status === 'in_progress');
+            const featured = (state.products || []).filter(p => p.is_featured);
 
             const revenue = completedOrders.reduce((sum, o) => sum + Number(o.total_retail), 0);
             const wholesaleCost = completedOrders.reduce((sum, o) => sum + Number(o.total_wholesale), 0);
@@ -829,6 +943,21 @@
                         <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4">
                             <span class="text-xs text-zinc-400 block mb-1">В РАБОТЕ</span>
                             <span class="text-xl font-bold text-amber-400">${inProgressOrders.length}</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                        <h3 class="text-sm font-bold">Товары на главной странице (${featured.length})</h3>
+                        <div class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                            ${featured.length === 0 ? '<p class="col-span-2 text-xs text-zinc-500">Нет товаров на главной</p>' : featured.map(p => `
+                                <div class="bg-zinc-900/60 border border-zinc-800 rounded-xl p-2 flex items-center space-x-2">
+                                    <img src="${p.image_url || 'https://via.placeholder.com/150'}" class="w-10 h-10 object-cover rounded-lg">
+                                    <div class="overflow-hidden">
+                                        <h4 class="text-xs font-semibold truncate">${p.name}</h4>
+                                        <p class="text-[10px] text-accent">${p.retail_price} ₽</p>
+                                    </div>
+                                </div>
+                            `).join('')}
                         </div>
                     </div>
 
@@ -989,12 +1118,20 @@
                                     <div>
                                         <h4 class="font-semibold text-sm">${p.name}</h4>
                                         <p class="text-xs text-zinc-400">${p.category} | ${p.subcategory || ''}</p>
-                                        <p class="text-xs text-accent mt-0.5">Розн: ${p.retail_price} ₽ | Опт: ${p.wholesale_price} ₽</p>
+                                        <p class="text-xs text-accent mt-0.5">Розн: ${p.retail_price} ₽ ${p.old_price && p.old_price > p.retail_price ? `<span class="text-zinc-500 line-through text-[10px]">(${p.old_price} ₽)</span>` : ''} | Опт: ${p.wholesale_price} ₽</p>
                                     </div>
                                 </div>
-                                <div class="flex space-x-2">
-                                    <button onclick="editProduct(${p.id})" class="w-8 h-8 bg-zinc-800 hover:bg-zinc-700 rounded-xl flex items-center justify-center text-zinc-300"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
-                                    <button onclick="deleteProduct(${p.id})" class="w-8 h-8 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl flex items-center justify-center"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                <div class="flex space-x-1.5 items-center">
+                                    <!-- Кнопка акции слева от карандашика -->
+                                    <button onclick="openDiscountModal(${p.id})" title="Управление акцией/скидкой" class="w-8 h-8 ${p.old_price && p.old_price > p.retail_price ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-zinc-800 text-zinc-400'} hover:bg-zinc-700 rounded-xl flex items-center justify-center transition">
+                                        <i data-lucide="tag" class="w-4 h-4"></i>
+                                    </button>
+                                    <button onclick="editProduct(${p.id})" title="Редактировать" class="w-8 h-8 bg-zinc-800 hover:bg-zinc-700 rounded-xl flex items-center justify-center text-zinc-300 transition">
+                                        <i data-lucide="edit-2" class="w-4 h-4"></i>
+                                    </button>
+                                    <button onclick="deleteProduct(${p.id})" title="Удалить" class="w-8 h-8 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl flex items-center justify-center transition">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
                                 </div>
                             </div>
                         `).join('')}
@@ -1038,6 +1175,43 @@
                 document.getElementById('image-preview-container').classList.remove('hidden');
             };
             reader.readAsDataURL(file);
+        }
+
+        // --- ЛОГИКА СКИДОК / АКЦИЙ ---
+
+        function openDiscountModal(productId) {
+            const product = (state.products || []).find(p => p.id === productId);
+            if (!product) return;
+
+            document.getElementById('discount-product-id').value = product.id;
+            const originalPrice = product.old_price && product.old_price > product.retail_price ? product.old_price : product.retail_price;
+            document.getElementById('discount-old-price-text').textContent = originalPrice + ' ₽';
+            document.getElementById('discount-new-price').value = product.old_price && product.old_price > product.retail_price ? product.retail_price : '';
+            
+            openModal('modal-discount-form');
+        }
+
+        async function saveDiscount(clearDiscount) {
+            const productId = document.getElementById('discount-product-id').value;
+            const product = (state.products || []).find(p => p.id == productId);
+            if (!product) return;
+
+            const oldPrice = product.old_price && product.old_price > product.retail_price ? product.old_price : product.retail_price;
+            let newRetailPrice = Number(document.getElementById('discount-new-price').value);
+
+            if (clearDiscount || !newRetailPrice || newRetailPrice >= oldPrice) {
+                // Снимаем акцию, возвращаем оригинальную цену
+                await supabaseClient.from('products').update({ retail_price: oldPrice, old_price: null }).eq('id', productId);
+                showToast('Акция успешно убрана');
+            } else {
+                // Устанавливаем акцию (old_price становится старой ценой, retail_price — новой)
+                await supabaseClient.from('products').update({ retail_price: newRetailPrice, old_price: oldPrice }).eq('id', productId);
+                showToast('Акция и скидка успешно применены!');
+            }
+
+            closeModal('modal-discount-form');
+            await fetchProducts();
+            render();
         }
 
         // --- ЛОГИКА ТОВАРОВ И КОРЗИНЫ ---
@@ -1193,23 +1367,30 @@
             showToast('Заказ успешно оформлен!');
         }
 
+        // Отмена заказа с возвратом и объединением одинаковых вкусов/цветов в ту же карточку
         async function cancelOrder(orderId) {
-            showConfirm('Отмена заказа', 'Вы действительно хотите отменить этот заказ? Товары вернутся в корзину и на склад.', async () => {
+            showConfirm('Отмена заказа', 'Вы действительно хотите отменить этот заказ? Товары вернутся в корзину и на склад с объединением одинаковых вкусов.', async () => {
                 const order = (state.orders || []).find(o => String(o.id) === String(orderId));
                 if (!order) return;
 
                 for (const item of (order.order_items || [])) {
-                    const product = (state.products || []).find(p => p.id === item.product_id);
-                    let targetVariantId = item.variant_id;
+                    let product = (state.products || []).find(p => p.id === item.product_id);
+                    if (!product) {
+                        product = (state.products || []).find(p => p.name.trim().toLowerCase() === item.product_name.trim().toLowerCase());
+                    }
+
+                    let targetVariantId;
+                    let targetProductId;
 
                     if (product) {
-                        const variant = (product.product_variants || []).find(v => v.id === item.variant_id || v.value === item.variant_name);
+                        targetProductId = product.id;
+                        const variant = (product.product_variants || []).find(v => v.id === item.variant_id || v.value.trim().toLowerCase() === item.variant_name.trim().toLowerCase());
                         if (variant) {
                             targetVariantId = variant.id;
                             await supabaseClient.from('product_variants').update({ quantity: variant.quantity + item.quantity }).eq('id', variant.id);
                         } else {
                             const { data: newVar } = await supabaseClient.from('product_variants').insert({
-                                product_id: item.product_id,
+                                product_id: product.id,
                                 type: product.category === 'железо' ? 'color' : 'flavor',
                                 value: item.variant_name,
                                 quantity: item.quantity
@@ -1220,18 +1401,18 @@
                         }
                     } else {
                         const { data: newProd } = await supabaseClient.from('products').insert({
-                            id: item.product_id,
                             name: item.product_name,
                             category: 'жидкость',
                             subcategory: 'Восстановленный',
                             retail_price: item.price,
                             wholesale_price: item.wholesale_price || 0,
-                            is_featured: false
+                            is_featured: true
                         }).select().single();
 
                         if (newProd) {
+                            targetProductId = newProd.id;
                             const { data: newVar } = await supabaseClient.from('product_variants').insert({
-                                product_id: item.product_id,
+                                product_id: newProd.id,
                                 type: 'flavor',
                                 value: item.variant_name,
                                 quantity: item.quantity
@@ -1240,16 +1421,22 @@
                         }
                     }
 
-                    state.cart.push({
-                        productId: item.product_id,
-                        variantId: targetVariantId,
-                        name: item.product_name,
-                        variantName: item.variant_name,
-                        price: item.price,
-                        wholesalePrice: item.wholesale_price || 0,
-                        qty: item.quantity,
-                        maxQty: 99
-                    });
+                    // Проверяем, есть ли уже такой вариант в корзине, чтобы объединить количество и там
+                    const existingCartIndex = state.cart.findIndex(ci => ci.productId === targetProductId && ci.variantName.trim().toLowerCase() === item.variant_name.trim().toLowerCase());
+                    if (existingCartIndex > -1) {
+                        state.cart[existingCartIndex].qty += item.quantity;
+                    } else {
+                        state.cart.push({
+                            productId: targetProductId,
+                            variantId: targetVariantId,
+                            name: item.product_name,
+                            variantName: item.variant_name,
+                            price: item.price,
+                            wholesalePrice: item.wholesale_price || 0,
+                            qty: item.quantity,
+                            maxQty: 99
+                        });
+                    }
                 }
 
                 localStorage.setItem('reflex_cart', JSON.stringify(state.cart));
@@ -1341,7 +1528,7 @@
             document.getElementById('p-name').value = product ? product.name : '';
             document.getElementById('p-category').value = product ? product.category : 'жидкость';
             document.getElementById('p-subcategory').value = product ? product.subcategory : '';
-            document.getElementById('p-retail').value = product ? product.retail_price : '';
+            document.getElementById('p-retail').value = product ? (product.old_price && product.old_price > product.retail_price ? product.old_price : product.retail_price) : '';
             document.getElementById('p-wholesale').value = product ? product.wholesale_price : '';
             
             const imgVal = product ? product.image_url : '';
@@ -1358,7 +1545,7 @@
                 if (fileInput) fileInput.value = '';
             }
 
-            document.getElementById('p-featured').checked = product ? product.is_featured : false;
+            document.getElementById('p-featured').checked = product ? product.is_featured : true;
 
             updateVariantLabel();
             const container = document.getElementById('variants-rows');
@@ -1389,6 +1576,7 @@
             lucide.createIcons();
         }
 
+        // Сохранение товара с автоматическим объединением одинаковых вкусов внутри формы
         async function saveProduct() {
             const id = document.getElementById('edit-product-id').value;
             const name = document.getElementById('p-name').value.trim();
@@ -1405,18 +1593,25 @@
             }
 
             const variantRows = document.querySelectorAll('.variant-row');
-            let variantsData = [];
+            let variantsMap = {};
             variantRows.forEach(row => {
                 const vName = row.querySelector('.v-name').value.trim();
                 const vQty = Number(row.querySelector('.v-qty').value);
                 if (vName) {
-                    variantsData.push({
-                        type: category === 'железо' ? 'color' : 'flavor',
-                        value: vName,
-                        quantity: vQty || 0
-                    });
+                    const key = vName.toLowerCase();
+                    if (!variantsMap[key]) {
+                        variantsMap[key] = {
+                            type: category === 'железо' ? 'color' : 'flavor',
+                            value: vName,
+                            quantity: vQty || 0
+                        };
+                    } else {
+                        variantsMap[key].quantity += (vQty || 0);
+                    }
                 }
             });
+
+            const variantsData = Object.values(variantsMap);
 
             if (variantsData.length === 0) {
                 showToast('Добавьте хотя бы один вариант (вкус/цвет)!', 'error');
@@ -1424,9 +1619,25 @@
             }
 
             let productId = id;
-            if (id) {
-                await supabaseClient.from('products').update({ name, category, subcategory, retail_price, wholesale_price, image_url, is_featured }).eq('id', id);
-                await supabaseClient.from('product_variants').delete().eq('product_id', id);
+            if (!productId) {
+                const existing = (state.products || []).find(p => p.name.trim().toLowerCase() === name.toLowerCase());
+                if (existing) {
+                    productId = existing.id;
+                }
+            }
+
+            if (productId) {
+                // Сохраняем текущую акцию, если она была задана
+                const existingProd = (state.products || []).find(p => p.id == productId);
+                let updateData = { name, category, subcategory, retail_price, wholesale_price, image_url, is_featured };
+                if (existingProd && existingProd.old_price && existingProd.old_price > existingProd.retail_price) {
+                    if (existingProd.old_price === retail_price) {
+                        updateData.old_price = null; // Сбрасываем акцию если цена совпала
+                    }
+                }
+
+                await supabaseClient.from('products').update(updateData).eq('id', productId);
+                await supabaseClient.from('product_variants').delete().eq('product_id', productId);
             } else {
                 const { data, error } = await supabaseClient.from('products').insert({ name, category, subcategory, retail_price, wholesale_price, image_url, is_featured }).select().single();
                 if (error) { showToast('Ошибка: ' + error.message, 'error'); return; }
