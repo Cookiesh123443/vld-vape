@@ -43,12 +43,13 @@
             <h1 id="shop-title" class="text-lg font-bold tracking-wide">VLD VAPE</h1>
             <span id="role-badge" class="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Пользователь</span>
         </div>
-        <div class="relative">
+        <div class="relative flex items-center space-x-2">
+            <div id="header-user-display" class="text-xs text-zinc-400 hidden sm:block"></div>
             <button onclick="toggleAdminMenu()" class="w-9 h-9 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 transition">
                 <i data-lucide="more-vertical" class="w-5 h-5"></i>
             </button>
-            <!-- Выпадающее меню -->
-            <div id="admin-dropdown" class="hidden absolute right-0 mt-2 w-48 bg-cardBg border border-zinc-700 rounded-xl shadow-xl overflow-hidden z-50">
+            <!-- Выпадающее меню (смещено под кнопку, не перекрывает её) -->
+            <div id="admin-dropdown" class="hidden absolute top-full right-0 mt-2 w-52 bg-cardBg border border-zinc-700 rounded-xl shadow-xl overflow-hidden z-50">
                 <div id="admin-login-menu-item">
                     <button onclick="openAdminLoginModal()" class="w-full text-left px-4 py-3 text-sm hover:bg-zinc-700/50 flex items-center space-x-2">
                         <i data-lucide="shield" class="w-4 h-4 text-accent"></i>
@@ -59,6 +60,12 @@
                     <button onclick="logoutAdmin()" class="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-zinc-700/50 flex items-center space-x-2">
                         <i data-lucide="log-out" class="w-4 h-4"></i>
                         <span>Выйти из админки</span>
+                    </button>
+                </div>
+                <div id="header-logout-container" class="hidden border-t border-zinc-800">
+                    <button onclick="logoutUser()" class="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-zinc-700/50 flex items-center space-x-2">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                        <span>Выйти из аккаунта</span>
                     </button>
                 </div>
             </div>
@@ -93,8 +100,8 @@
     <!-- Модальное окно: предупреждение о незаполненных данных при заказе -->
     <div id="modal-missing-contacts" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
-            <h3 class="text-lg font-bold">Контакты не указаны</h3>
-            <p class="text-sm text-zinc-400">У вас не указан username или номер телефона в профиле. Без них вы САМИ должны написать менеджеру.</p>
+            <h3 class="text-lg font-bold">Контакты для связи не указаны</h3>
+            <p class="text-sm text-zinc-400">У вас не указан юз или номер телефона в профиле. Без них вы САМИ должны написать менеджеру.</p>
             <div class="flex flex-col space-y-2 pt-2">
                 <button onclick="closeModal('modal-missing-contacts'); switchTab('profile');" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl text-sm font-medium transition text-white">Указать в профиле</button>
                 <button onclick="proceedCheckoutWithoutContacts()" class="w-full bg-zinc-800 hover:bg-zinc-700 py-3 rounded-xl text-sm font-medium transition text-zinc-300">Продолжить без указания</button>
@@ -111,55 +118,52 @@
                 <button onclick="closeModal('modal-select-manager')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
             <p class="text-xs text-zinc-400">Выберите менеджера, с которым хотите обсудить заказ <span id="ask-order-id-label" class="text-white font-bold"></span>:</p>
-            <div id="managers-list-container" class="space-y-2 max-h-60 overflow-y-auto">
-                <!-- Рендерится через JS -->
-            </div>
+            <div id="managers-list-container" class="space-y-2 max-h-60 overflow-y-auto"></div>
         </div>
     </div>
 
-    <!-- Модальное окно входа в админку (указывается ТОЛЬКО пароль, при этом юз и номер строго проверяются в профиле) -->
+    <!-- Модальное окно входа в админку -->
     <div id="modal-admin-login" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center">
                 <h3 class="text-lg font-bold">Вход для работников</h3>
                 <button onclick="closeModal('modal-admin-login')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
-            <p class="text-xs text-zinc-400">Введите пароль администратора (в вашем профиле предварительно обязательно должны быть указаны юз и номер телефона):</p>
+            <p class="text-xs text-zinc-400">Для входа вы должны быть зарегистрированы и войти в свой аккаунт, а также ввести пароль администратора:</p>
             <div class="space-y-3">
                 <div>
                     <label class="text-xs text-zinc-400 mb-1 block">Пароль администратора</label>
                     <div class="relative">
-                        <input type="password" id="admin-password-input" placeholder="Введите пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 pr-10 text-sm focus:outline-none focus:border-accent">
+                        <input type="password" id="admin-password-input" placeholder="Введите пароль админа" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 pr-10 text-sm focus:outline-none focus:border-accent">
                         <button type="button" onclick="togglePasswordVisibility('admin-password-input', 'eye-icon')" class="absolute right-3 top-3 text-zinc-400 hover:text-white transition">
                             <i id="eye-icon" data-lucide="eye" class="w-4 h-4"></i>
                         </button>
                     </div>
                 </div>
             </div>
-            <button onclick="submitAdminLogin()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Войти</button>
+            <button onclick="submitAdminLogin()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Войти в админку</button>
         </div>
     </div>
 
-    <!-- Модальное окно смены пароля (при смене пароля все роли админ меняются на пользователь) -->
+    <!-- Модальное окно смены пароля -->
     <div id="modal-change-password" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center">
-                <h3 class="text-lg font-bold">Смена пароля администратора</h3>
+                <h3 class="text-lg font-bold">Смена пароля аккаунта</h3>
                 <button onclick="closeModal('modal-change-password')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
-            <p class="text-xs text-yellow-400/90">Внимание: при смене пароля все существующие роли администраторов автоматически сбросятся на «пользователь»!</p>
+            <p class="text-xs text-zinc-400">Введите старый и новый пароль для вашего аккаунта:</p>
             <div class="space-y-3">
                 <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Старый пароль</label>
+                    <input type="password" id="old-acc-password" placeholder="Старый пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                </div>
+                <div>
                     <label class="text-xs text-zinc-400 mb-1 block">Новый пароль</label>
-                    <div class="relative">
-                        <input type="password" id="new-admin-password" placeholder="Введите новый пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 pr-10 text-sm focus:outline-none focus:border-accent">
-                        <button type="button" onclick="togglePasswordVisibility('new-admin-password', 'eye-icon-new')" class="absolute right-3 top-3.5 text-zinc-400 hover:text-white transition">
-                            <i id="eye-icon-new" data-lucide="eye" class="w-4 h-4"></i>
-                        </button>
-                    </div>
+                    <input type="password" id="new-acc-password" placeholder="Новый пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
                 </div>
             </div>
-            <button onclick="submitChangePassword()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Сменить пароль и сбросить админов</button>
+            <button onclick="submitChangePassword()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Сменить пароль</button>
         </div>
     </div>
 
@@ -174,7 +178,7 @@
         </div>
     </div>
 
-    <!-- Модальное окно добавления товара + ИИ кнопка -->
+    <!-- Модальное окно добавления/редактирования товара + ИИ кнопка -->
     <div id="modal-product-form" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-md rounded-2xl p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center">
@@ -252,7 +256,6 @@
                 </h3>
                 <button onclick="closeModal('modal-ai-import')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
-
             <div class="space-y-1.5">
                 <div class="flex justify-between items-center">
                     <label class="text-xs font-semibold text-zinc-300">1. Промпт для ИИ</label>
@@ -261,8 +264,7 @@
                         <span>Копировать промпт</span>
                     </button>
                 </div>
-                <textarea id="ai-prompt-text" readonly rows="7" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-3 text-xs text-zinc-300 font-mono focus:outline-none select-all">Распознай данные о товарах из прикрепленной накладной, фото или текста. Выдай ответ СТРОГО в виде чистого JSON-массива без лишних слов, комментариев и символов markdown (without ```json ... ```), чтобы я мог сразу вставить его в систему.
-
+                <textarea id="ai-prompt-text" readonly rows="7" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-3 text-xs text-zinc-300 font-mono focus:outline-none select-all">Распознай данные о товарах из прикрепленной накладной, фото или текста. Выдай ответ СТРОГО в виде чистого JSON-массива без лишних слов, комментариев и символов markdown (without ```json ... ```).
 Формат JSON:
 [
   {
@@ -276,17 +278,12 @@
       {"value": "Вкус или цвет 2", "quantity": 5}
     ]
   }
-]
-Примечания:
-- Категории строго: "жидкость", "железо", "одноразки", "снюс/пластинки".
-- Если количество не указано, ставь 1.</textarea>
+]</textarea>
             </div>
-
             <div class="space-y-1.5">
                 <label class="text-xs font-semibold text-zinc-300">2. Вставьте готовый JSON от ИИ сюда:</label>
                 <textarea id="ai-json-input" placeholder="[ { 'name': '...', ... } ]" rows="6" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-3 text-xs text-zinc-200 font-mono focus:outline-none focus:border-accent"></textarea>
             </div>
-
             <button onclick="processAiJsonImport()" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 py-3 rounded-xl font-medium transition text-white text-sm shadow-lg shadow-purple-900/40">
                 Добавить товары автоматически
             </button>
@@ -325,12 +322,13 @@
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let state = {
-            role: 'user', 
+            role: localStorage.getItem('reflex_role') || 'user', 
             activeTab: 'home', 
-            user: localStorage.getItem('reflex_username') || '',
+            login: localStorage.getItem('reflex_login') || '',
+            contactUser: localStorage.getItem('reflex_contact_user') || '',
             phone: localStorage.getItem('reflex_phone') || '',
             isProfileEditing: false, 
-            cart: JSON.parse(localStorage.getItem('reflex_cart') || '[]'),
+            cart: [],
             products: [],
             orders: [],
             managers: [],
@@ -496,19 +494,19 @@
                 try {
                     await supabaseClient.from('order_items').delete().not('id', 'is', null);
                     await supabaseClient.from('orders').delete().not('id', 'is', null);
-                    try { await supabaseClient.rpc('reset_orders_sequence'); } catch (err) {}
-
                     await supabaseClient.from('product_variants').delete().not('id', 'is', null);
                     await supabaseClient.from('products').delete().not('id', 'is', null);
                     await supabaseClient.from('managers').delete().not('id', 'is', null);
-                    await supabaseClient.from('user').delete().not('юз', 'is', null);
+                    await supabaseClient.from('user').delete().not('логин', 'is', null);
+                    await supabaseClient.from('cart_items').delete().not('id', 'is', null);
 
                     state.cart = [];
-                    localStorage.removeItem('reflex_cart');
                     state.searchQuery = '';
-                    state.user = '';
+                    state.login = '';
+                    state.contactUser = '';
                     state.phone = '';
-                    localStorage.removeItem('reflex_username');
+                    localStorage.removeItem('reflex_login');
+                    localStorage.removeItem('reflex_contact_user');
                     localStorage.removeItem('reflex_phone');
 
                     logoutAdmin();
@@ -525,7 +523,54 @@
             });
         }
 
-        function validateCartStock() {
+        // --- Управление корзиной ---
+        async function loadCartFromDb() {
+            if (!state.login) {
+                state.cart = JSON.parse(localStorage.getItem('reflex_cart') || '[]');
+                return;
+            }
+            try {
+                const { data, error } = await supabaseClient.from('cart_items').select('*').eq('user_identifier', state.login);
+                if (!error && data) {
+                    state.cart = data.map(i => ({
+                        productId: i.product_id,
+                        variantId: i.variant_id,
+                        name: i.name,
+                        variantName: i.variant_name,
+                        price: Number(i.price),
+                        qty: i.qty,
+                        image: i.image,
+                        maxQty: i.max_qty
+                    }));
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function saveCartToDb() {
+            if (!state.login) {
+                localStorage.setItem('reflex_cart', JSON.stringify(state.cart));
+                return;
+            }
+            try {
+                await supabaseClient.from('cart_items').delete().eq('user_identifier', state.login);
+                if (state.cart.length > 0) {
+                    const rows = state.cart.map(i => ({
+                        user_identifier: state.login,
+                        product_id: i.productId,
+                        variant_id: i.variantId,
+                        name: i.name,
+                        variant_name: i.variantName,
+                        price: i.price,
+                        qty: i.qty,
+                        image: i.image,
+                        max_qty: i.maxQty
+                    }));
+                    await supabaseClient.from('cart_items').insert(rows);
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function validateCartStock() {
             if (!state.cart || state.cart.length === 0) return;
             let removedFlavors = false;
             const updatedCart = [];
@@ -544,31 +589,28 @@
 
             if (removedFlavors) showToast('Некоторые вкусы или товары из вашей корзины закончились и были удалены', 'error');
             state.cart = updatedCart;
-            localStorage.setItem('reflex_cart', JSON.stringify(state.cart));
+            await saveCartToDb();
         }
 
-        // Проверка роли пользователя при старте приложения
         async function checkUserRoleOnStartup() {
             try {
-                if (state.user) {
-                    const { data: dbUser } = await supabaseClient.from('user').select('роль, номер').eq('юз', state.user).maybeSingle();
+                if (state.login) {
+                    const { data: dbUser } = await supabaseClient.from('user').select('*').eq('логин', state.login).maybeSingle();
                     if (dbUser) {
-                        if (dbUser.номер) {
-                            state.phone = dbUser.номер;
-                            localStorage.setItem('reflex_phone', dbUser.номер);
-                        }
-                        // Если в базе роль админ и при этом заполнены юз и номер — оставляем админа, иначе сбрасываем на пользователя
-                        if (dbUser.роль === 'админ' && state.user && state.phone) {
+                        state.contactUser = dbUser.contact_username || '';
+                        state.phone = dbUser.номер || '';
+                        localStorage.setItem('reflex_contact_user', state.contactUser);
+                        localStorage.setItem('reflex_phone', state.phone);
+
+                        if (dbUser.роль === 'админ') {
                             state.role = 'admin';
                             localStorage.setItem('reflex_role', 'admin');
                         } else {
                             state.role = 'user';
                             localStorage.setItem('reflex_role', 'user');
-                            await supabaseClient.from('user').update({ роль: 'пользователь' }).eq('юз', state.user);
                         }
                     } else {
-                        state.role = 'user';
-                        localStorage.setItem('reflex_role', 'user');
+                        logoutUser();
                     }
                 } else {
                     state.role = 'user';
@@ -576,8 +618,6 @@
                 }
             } catch (e) {
                 console.error(e);
-                state.role = 'user';
-                localStorage.setItem('reflex_role', 'user');
             }
         }
 
@@ -589,9 +629,10 @@
 
                 await checkUserRoleOnStartup();
                 await fetchProducts();
+                await loadCartFromDb();
                 await fetchOrders();
                 await fetchManagers();
-                validateCartStock();
+                await validateCartStock();
                 render();
 
                 setInterval(async () => {
@@ -661,7 +702,7 @@
                         }
                     }
                     state.products = Object.values(map);
-                    validateCartStock();
+                    await validateCartStock();
                 }
             } catch (e) { console.error(e); }
         }
@@ -685,11 +726,10 @@
                 const roleBadge = document.getElementById('role-badge');
                 const adminLogoutBtn = document.getElementById('admin-logout-btn');
                 const adminLoginMenuItem = document.getElementById('admin-login-menu-item');
-                
-                // Проверка ролей: если роль не admin, переводим пользователя на обычный сайт
+                const headerUserDisplay = document.getElementById('header-user-display');
+                const headerLogoutContainer = document.getElementById('header-logout-container');
+
                 if (state.role !== 'admin') {
-                    state.role = 'user';
-                    localStorage.setItem('reflex_role', 'user');
                     if (state.activeTab.startsWith('admin_')) state.activeTab = 'home';
                 }
 
@@ -705,6 +745,17 @@
                     if (adminLogoutBtn) adminLogoutBtn.classList.add('hidden');
                     if (adminLoginMenuItem) adminLoginMenuItem.classList.remove('hidden');
                     if (state.activeTab.startsWith('admin_')) state.activeTab = 'home';
+                }
+
+                if (state.login) {
+                    if (headerUserDisplay) {
+                        headerUserDisplay.textContent = state.login;
+                        headerUserDisplay.classList.remove('hidden');
+                    }
+                    if (headerLogoutContainer) headerLogoutContainer.classList.remove('hidden');
+                } else {
+                    if (headerUserDisplay) headerUserDisplay.classList.add('hidden');
+                    if (headerLogoutContainer) headerLogoutContainer.classList.add('hidden');
                 }
 
                 renderNav();
@@ -809,7 +860,6 @@
                             <p class="text-xs text-zinc-400 mt-0.5">Лучший выбор жидкостей и устройств</p>
                         </div>
                     </div>
-
                     <div class="relative">
                         <input type="text" oninput="state.searchQuery=this.value; renderUserHomeSearch(this.value);" placeholder="Поиск товаров..." value="${state.searchQuery}" class="w-full bg-cardBg border border-zinc-700 rounded-2xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-accent">
                         <i data-lucide="search" class="w-4 h-4 text-zinc-400 absolute left-3.5 top-3.5"></i>
@@ -963,6 +1013,90 @@
             }
         }
 
+        function openVariantModal(productId) {
+            const p = (state.products || []).find(item => item.id === productId);
+            if (!p || !p.product_variants) return;
+
+            document.getElementById('variant-modal-title').textContent = p.name;
+            const container = document.getElementById('variant-list-container');
+            
+            const availableVariants = p.product_variants.filter(v => v.quantity > 0);
+            if (availableVariants.length === 0) {
+                container.innerHTML = '<p class="text-xs text-zinc-500 text-center py-4">Нет в наличии</p>';
+            } else {
+                container.innerHTML = availableVariants.map(v => `
+                    <div onclick="addToCart(${p.id}, ${v.id}); closeModal('modal-variant-select');" class="bg-zinc-900 border border-zinc-800 hover:border-accent p-3 rounded-xl flex items-center justify-between cursor-pointer transition">
+                        <div>
+                            <span class="text-xs text-zinc-400 block">${v.type === 'flavor' ? 'Вкус' : 'Цвет'}</span>
+                            <h4 class="text-sm font-semibold text-zinc-200">${v.value}</h4>
+                        </div>
+                        <span class="text-xs font-bold text-accent">${p.retail_price} ₽</span>
+                    </div>
+                `).join('');
+            }
+            openModal('modal-variant-select');
+        }
+
+        async function addToCart(productId, variantId) {
+            const product = (state.products || []).find(p => p.id === productId);
+            if (!product) return;
+
+            const variant = (product.product_variants || []).find(v => v.id === variantId);
+            if (!variant || variant.quantity <= 0) {
+                showToast('Этот вариант закончился', 'error');
+                return;
+            }
+
+            const existingIndex = state.cart.findIndex(i => i.productId === productId && i.variantId === variantId);
+            if (existingIndex > -1) {
+                if (state.cart[existingIndex].qty < variant.quantity) {
+                    state.cart[existingIndex].qty++;
+                } else {
+                    showToast('Достигнут лимит остатка', 'error');
+                    return;
+                }
+            } else {
+                state.cart.push({
+                    productId: product.id,
+                    variantId: variant.id,
+                    name: product.name,
+                    variantName: variant.value,
+                    price: Number(product.retail_price),
+                    qty: 1,
+                    image: product.image_url,
+                    maxQty: variant.quantity
+                });
+            }
+
+            await saveCartToDb();
+            showToast('Товар добавлен в корзину');
+            renderNav();
+            if (state.activeTab === 'cart') render();
+        }
+
+        async function updateCartQty(index, delta) {
+            const item = state.cart[index];
+            if (!item) return;
+
+            const newQty = item.qty + delta;
+            if (newQty <= 0) {
+                state.cart.splice(index, 1);
+            } else {
+                const product = (state.products || []).find(p => p.id === item.productId);
+                const variant = product ? (product.product_variants || []).find(v => v.id === item.variantId) : null;
+                const max = variant ? variant.quantity : item.maxQty;
+
+                if (newQty > max) {
+                    showToast('Превышен доступный остаток', 'error');
+                    return;
+                }
+                item.qty = newQty;
+            }
+
+            await saveCartToDb();
+            render();
+        }
+
         function renderUserCart(container) {
             const total = state.cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
             container.innerHTML = `
@@ -991,19 +1125,19 @@
                         <div class="border-t border-zinc-800 pt-3 space-y-3">
                             <div class="bg-cardBg border border-zinc-700/60 rounded-2xl p-3.5 space-y-2">
                                 <div class="flex justify-between items-center">
-                                    <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Данные для заказа</span>
+                                    <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Контакты для связи</span>
                                     <button onclick="switchTab('profile')" class="text-xs text-accent hover:underline flex items-center space-x-1">
                                         <i data-lucide="edit-3" class="w-3.5 h-3.5"></i><span>Изменить</span>
                                     </button>
                                 </div>
                                 <div class="grid grid-cols-2 gap-2 text-xs pt-1">
                                     <div class="bg-zinc-900/60 p-2 rounded-xl border border-zinc-800">
-                                        <span class="text-zinc-500 block text-[10px]">Юз (username):</span>
-                                        <span class="font-medium text-zinc-200">${state.user || 'Не указан'}</span>
+                                        <span class="text-zinc-500 block text-[10px]">Юз:</span>
+                                        <span class="font-medium text-zinc-200">${state.contactUser || 'Не указано'}</span>
                                     </div>
                                     <div class="bg-zinc-900/60 p-2 rounded-xl border border-zinc-800">
                                         <span class="text-zinc-500 block text-[10px]">Телефон:</span>
-                                        <span class="font-medium text-zinc-200">${state.phone || 'Не указан'}</span>
+                                        <span class="font-medium text-zinc-200">${state.phone || 'Не указано'}</span>
                                     </div>
                                 </div>
                             </div>
@@ -1018,6 +1152,105 @@
                 </div>
             `;
             lucide.createIcons();
+        }
+
+        function checkoutOrder() {
+            if (!state.contactUser && !state.phone) {
+                openModal('modal-missing-contacts');
+                return;
+            }
+            executeCheckout();
+        }
+
+        function proceedCheckoutWithoutContacts() {
+            closeModal('modal-missing-contacts');
+            executeCheckout();
+        }
+
+        function cancelCheckout() {
+            closeModal('modal-missing-contacts');
+        }
+
+        async function executeCheckout() {
+            if (state.cart.length === 0) return;
+
+            let totalRetail = 0;
+            let totalWholesale = 0;
+            const itemsToInsert = [];
+
+            for (const item of state.cart) {
+                const product = (state.products || []).find(p => p.id === item.productId);
+                if (!product) continue;
+
+                totalRetail += item.price * item.qty;
+                totalWholesale += Number(product.wholesale_price || 0) * item.qty;
+
+                itemsToInsert.push({
+                    product_name: item.name,
+                    variant_name: item.variantName,
+                    quantity: item.qty,
+                    price: item.price
+                });
+
+                const { data: varData } = await supabaseClient.from('product_variants').select('quantity').eq('id', item.variantId).single();
+                if (varData) {
+                    const newQty = Math.max(0, varData.quantity - item.qty);
+                    await supabaseClient.from('product_variants').update({ quantity: newQty }).eq('id', item.variantId);
+                }
+            }
+
+            try {
+                const { data: orderData, error: orderErr } = await supabaseClient.from('orders').insert({
+                    username: state.contactUser || state.login || '@аноним',
+                    phone: state.phone || 'не указан',
+                    total_retail: totalRetail,
+                    total_wholesale: totalWholesale,
+                    status: 'in_progress'
+                }).select().single();
+
+                if (orderErr || !orderData) throw orderErr;
+
+                for (const item of itemsToInsert) {
+                    item.order_id = orderData.id;
+                    await supabaseClient.from('order_items').insert(item);
+                }
+
+                state.cart = [];
+                await saveCartToDb();
+                await fetchProducts();
+                await fetchOrders();
+                switchTab('orders');
+                showToast('Заказ успешно оформлен!');
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка при оформлении заказа', 'error');
+            }
+        }
+
+        async function cancelOrder(orderId) {
+            showConfirm('Отмена заказа', 'Вы уверены, что хотите отменить этот заказ?', async () => {
+                try {
+                    const order = (state.orders || []).find(o => o.id == orderId);
+                    if (order && order.order_items) {
+                        for (const item of order.order_items) {
+                            const prod = (state.products || []).find(p => p.name === item.product_name);
+                            if (prod && prod.product_variants) {
+                                const v = prod.product_variants.find(ev => ev.value === item.variant_name);
+                                if (v) {
+                                    await supabaseClient.from('product_variants').update({ quantity: v.quantity + item.quantity }).eq('id', v.id);
+                                }
+                            }
+                        }
+                    }
+                    await supabaseClient.from('orders').delete().eq('id', orderId);
+                    await fetchProducts();
+                    await fetchOrders();
+                    render();
+                    showToast('Заказ отменен');
+                } catch (e) {
+                    showToast('Ошибка отмены заказа', 'error');
+                }
+            });
         }
 
         function renderUserOrders(container) {
@@ -1109,115 +1342,515 @@
             window.open(tgUrl, '_blank');
         }
 
+        // --- Профиль / Авторизация ---
         function renderUserProfile(container) {
-            const isEditing = state.isProfileEditing;
-            container.innerHTML = `
-                <div class="space-y-4 max-w-sm mx-auto pt-6">
-                    <div class="flex justify-between items-center">
-                        <h2 class="text-lg font-bold">Профиль пользователя</h2>
-                        <button onclick="toggleProfileEdit()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-cardBg border border-zinc-700 hover:bg-zinc-800 text-accent transition">
-                            <i data-lucide="${isEditing ? 'x' : 'pencil'}" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-                    <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
-                        <div>
-                            <label class="text-xs text-zinc-400 mb-1 block">Ваш Юз (username) <span class="text-red-400">*</span></label>
-                            ${isEditing ? `
-                                <input type="text" id="profile-username" value="${state.user}" placeholder="@username" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-accent">
-                            ` : `
-                                <div class="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-200">${state.user || '<span class="text-zinc-600">Не указан</span>'}</div>
-                            `}
-                        </div>
-                        <div>
-                            <label class="text-xs text-zinc-400 mb-1 block">Номер телефона <span class="text-red-400">*</span></label>
-                            ${isEditing ? `
-                                <input type="tel" id="profile-phone" value="${state.phone}" placeholder="+7 (999) 000-00-00" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-accent">
-                            ` : `
-                                <div class="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-200">${state.phone || '<span class="text-zinc-600">Не указан</span>'}</div>
-                            `}
-                        </div>
-                        <p class="text-[11px] text-zinc-500">Примечание: Юз и номер строго обязательны для работников</p>
-                        ${isEditing ? `
-                            <button onclick="saveProfile()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Сохранить изменения</button>
-                        ` : ''}
-                    </div>
+            const isLoggedIn = Boolean(state.login);
 
-                    <div class="bg-cardBg border border-red-900/40 rounded-2xl p-4 space-y-2 mt-4">
-                        <h3 class="text-sm font-bold text-red-400">Удаление аккаунта</h3>
-                        <p class="text-xs text-zinc-400">Для удаления введите ваши данные ниже:</p>
-                        <input type="text" id="delete-confirm-username" placeholder="@username" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-red-500">
-                        <input type="tel" id="delete-confirm-phone" placeholder="+7 (999) 000-00-00" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-red-500">
-                        <button onclick="deleteAccount()" class="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-2.5 rounded-xl font-medium transition text-xs border border-red-500/30">Удалить аккаунт</button>
-                    </div>
+            container.innerHTML = `
+                <div class="space-y-4 max-w-sm mx-auto pt-4">
+                    <h2 class="text-lg font-bold">Профиль аккаунта</h2>
+                    
+                    ${!isLoggedIn ? `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <h3 class="text-sm font-bold text-accent">Вход / Регистрация</h3>
+                            <p class="text-xs text-zinc-400">Для регистрации требуется уникальный логин и пароль. Юз и номер необязательны и нужны только для связи.</p>
+                            
+                            <div>
+                                <label class="text-xs text-zinc-400 mb-1 block">Логин <span class="text-red-400">*</span></label>
+                                <input type="text" id="auth-login" placeholder="Уникальный логин" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                            </div>
+                            <div>
+                                <label class="text-xs text-zinc-400 mb-1 block">Пароль <span class="text-red-400">*</span></label>
+                                <div class="relative">
+                                    <input type="password" id="auth-password" placeholder="Пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 pr-10 text-sm focus:outline-none focus:border-accent">
+                                    <button type="button" onclick="togglePasswordVisibility('auth-password', 'eye-auth')" class="absolute right-3 top-3 text-zinc-400 hover:text-white transition">
+                                        <i id="eye-auth" data-lucide="eye" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-xs text-zinc-400 mb-1 block">Юз <span class="text-zinc-500">(необязательно)</span></label>
+                                <input type="text" id="auth-contact" placeholder="@username" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                            </div>
+                            <div>
+                                <label class="text-xs text-zinc-400 mb-1 block">Номер <span class="text-zinc-500">(необязательно)</span></label>
+                                <input type="tel" id="auth-phone" placeholder="+7 (999) 000-00-00" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                            </div>
+
+                            <button onclick="submitAuth()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white text-sm">Войти / Зарегистрироваться</button>
+                        </div>
+                    ` : `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-zinc-400">Логин аккаунта:</span>
+                                <span class="font-bold text-sm text-zinc-200">${state.login}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-zinc-400">Юз для связи:</span>
+                                <span class="font-medium text-sm text-zinc-200">${state.contactUser || 'Не указано'}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-zinc-400">Номер телефона:</span>
+                                <span class="font-medium text-sm text-zinc-200">${state.phone || 'Не указано'}</span>
+                            </div>
+                            <div class="flex justify-between items-center pt-2 border-t border-zinc-800">
+                                <span class="text-xs text-zinc-400">Роль:</span>
+                                <span class="text-xs px-2 py-0.5 rounded-full ${state.role === 'admin' ? 'bg-accent text-white' : 'bg-zinc-800 text-zinc-400'}">${state.role === 'admin' ? 'Администратор' : 'Пользователь'}</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <h3 class="text-sm font-bold">Управление аккаунтом</h3>
+                            <button onclick="openChangePasswordModal()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-3 rounded-xl font-medium transition text-xs flex items-center justify-center space-x-2">
+                                <i data-lucide="key" class="w-4 h-4 text-accent"></i><span>Сменить пароль</span>
+                            </button>
+                            <button onclick="logoutUser()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-red-400 py-3 rounded-xl font-medium transition text-xs flex items-center justify-center space-x-2">
+                                <i data-lucide="log-out" class="w-4 h-4"></i><span>Выйти из аккаунта</span>
+                            </button>
+                        </div>
+
+                        <div class="bg-cardBg border border-red-900/40 rounded-2xl p-4 space-y-3 mt-4">
+                            <h3 class="text-sm font-bold text-red-400">Удаление аккаунта</h3>
+                            <p class="text-xs text-zinc-400">Для удаления аккаунта введите ваш логин и пароль:</p>
+                            <input type="text" id="del-login" placeholder="Логин" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-red-500">
+                            <input type="password" id="del-password" placeholder="Пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-red-500">
+                            <button onclick="deleteAccount()" class="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-2.5 rounded-xl font-medium transition text-xs border border-red-500/30">Удалить аккаунт</button>
+                        </div>
+                    `}
                 </div>
             `;
             lucide.createIcons();
         }
 
-        function toggleProfileEdit() {
-            state.isProfileEditing = !state.isProfileEditing;
-            render();
-        }
+        async function submitAuth() {
+            const login = document.getElementById('auth-login').value.trim();
+            const password = document.getElementById('auth-password').value.trim();
+            let contact = document.getElementById('auth-contact').value.trim();
+            const phone = document.getElementById('auth-phone').value.trim();
 
-        async function saveProfile() {
-            let valUser = document.getElementById('profile-username').value.trim();
-            const valPhone = document.getElementById('profile-phone').value.trim();
-            
-            if (valUser && !valUser.startsWith('@')) valUser = '@' + valUser;
-
-            state.user = valUser;
-            state.phone = valPhone;
-            state.isProfileEditing = false;
-            
-            localStorage.setItem('reflex_username', valUser);
-            localStorage.setItem('reflex_phone', valPhone);
-
-            if (valUser) {
-                try {
-                    const { data: existing } = await supabaseClient.from('user').select('*').eq('юз', valUser).maybeSingle();
-                    if (existing) {
-                        await supabaseClient.from('user').update({ номер: valPhone, роль: existing.роль || 'пользователь' }).eq('юз', valUser);
-                    } else {
-                        await supabaseClient.from('user').insert({ юз: valUser, номер: valPhone, роль: 'пользователь' });
-                    }
-                } catch (e) { console.error(e); }
-            }
-
-            showToast('Данные успешно сохранены!');
-            render();
-        }
-
-        async function deleteAccount() {
-            let uInput = document.getElementById('delete-confirm-username').value.trim();
-            const pInput = document.getElementById('delete-confirm-phone').value.trim();
-
-            if (uInput && !uInput.startsWith('@')) uInput = '@' + uInput;
-
-            if (!uInput || !pInput) {
-                showToast('Введите юз и номер для подтверждения удаления!', 'error');
+            if (!login || !password) {
+                showToast('Введите логин и пароль!', 'error');
                 return;
             }
 
-            if (uInput !== state.user || pInput !== state.phone) {
-                showToast('Введенные данные не совпадают с вашим текущим профилем!', 'error');
+            if (contact && !contact.startsWith('@')) contact = '@' + contact;
+
+            try {
+                const { data: existingUser } = await supabaseClient.from('user').select('*').eq('логин', login).maybeSingle();
+
+                if (existingUser) {
+                    if (existingUser.пароль !== password) {
+                        showToast('Неверный пароль!', 'error');
+                        return;
+                    }
+                    await supabaseClient.from('user').update({
+                        contact_username: contact || existingUser.contact_username,
+                        номер: phone || existingUser.номер
+                    }).eq('логин', login);
+
+                    state.login = login;
+                    state.contactUser = contact || existingUser.contact_username || '';
+                    state.phone = phone || existingUser.номер || '';
+                    state.role = existingUser.роль === 'админ' ? 'admin' : 'user';
+
+                    showToast('Успешный вход в аккаунт!');
+                } else {
+                    const { error } = await supabaseClient.from('user').insert({
+                        логин: login,
+                        пароль: password,
+                        contact_username: contact,
+                        номер: phone,
+                        роль: 'пользователь'
+                    });
+
+                    if (error) {
+                        showToast('Ошибка регистрации (возможно, логин уже занят)', 'error');
+                        return;
+                    }
+
+                    state.login = login;
+                    state.contactUser = contact;
+                    state.phone = phone;
+                    state.role = 'user';
+
+                    showToast('Успешная регистрация и вход!');
+                }
+
+                localStorage.setItem('reflex_login', state.login);
+                localStorage.setItem('reflex_contact_user', state.contactUser);
+                localStorage.setItem('reflex_phone', state.phone);
+                localStorage.setItem('reflex_role', state.role);
+
+                await loadCartFromDb();
+                render();
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка авторизации', 'error');
+            }
+        }
+
+        function logoutUser() {
+            state.login = '';
+            state.contactUser = '';
+            state.phone = '';
+            state.role = 'user';
+            localStorage.removeItem('reflex_login');
+            localStorage.removeItem('reflex_contact_user');
+            localStorage.removeItem('reflex_phone');
+            localStorage.setItem('reflex_role', 'user');
+
+            state.cart = [];
+            render();
+            showToast('Вы вышли из аккаунта');
+        }
+
+        async function deleteAccount() {
+            const loginInput = document.getElementById('del-login').value.trim();
+            const passInput = document.getElementById('del-password').value.trim();
+
+            if (!loginInput || !passInput) {
+                showToast('Введите логин и пароль для подтверждения удаления', 'error');
+                return;
+            }
+
+            if (loginInput !== state.login) {
+                showToast('Логин не совпадает с текущим аккаунтом', 'error');
+                return;
+            }
+
+            try {
+                const { data: dbUser } = await supabaseClient.from('user').select('пароль').eq('логин', state.login).maybeSingle();
+                if (!dbUser || dbUser.пароль !== passInput) {
+                    showToast('Неверный пароль аккаунта!', 'error');
+                    return;
+                }
+            } catch (e) {
+                showToast('Ошибка проверки пароля', 'error');
                 return;
             }
 
             showConfirm('Удаление аккаунта', 'Вы уверены, что хотите удалить свой аккаунт?', async () => {
-                try { await supabaseClient.from('user').delete().eq('юз', state.user); } catch (e) {}
+                try {
+                    await supabaseClient.from('user').delete().eq('логин', state.login);
+                } catch (e) {}
 
-                state.user = '';
-                state.phone = '';
-                state.role = 'user';
-                localStorage.removeItem('reflex_username');
-                localStorage.removeItem('reflex_phone');
-                localStorage.setItem('reflex_role', 'user');
-
-                render();
+                logoutUser();
                 showToast('Аккаунт успешно удален');
             });
         }
 
+        function openChangePasswordModal() {
+            if (!state.login) {
+                showToast('Смена пароля доступна только при вошедшем аккаунте', 'error');
+                return;
+            }
+            document.getElementById('old-acc-password').value = '';
+            document.getElementById('new-acc-password').value = '';
+            openModal('modal-change-password');
+        }
+
+        async function submitChangePassword() {
+            const oldPass = document.getElementById('old-acc-password').value.trim();
+            const newPass = document.getElementById('new-acc-password').value.trim();
+
+            if (!oldPass || !newPass) {
+                showToast('Заполните оба поля', 'error');
+                return;
+            }
+
+            try {
+                const { data: dbUser } = await supabaseClient.from('user').select('пароль').eq('логин', state.login).maybeSingle();
+                if (!dbUser || dbUser.пароль !== oldPass) {
+                    showToast('Неверный старый пароль!', 'error');
+                    return;
+                }
+
+                await supabaseClient.from('user').update({ пароль: newPass }).eq('логин', state.login);
+                closeModal('modal-change-password');
+                showToast('Пароль успешно изменен!');
+            } catch (e) {
+                showToast('Ошибка смены пароля', 'error');
+            }
+        }
+
+        // --- Вход в админку ---
+        function openAdminLoginModal() {
+            if (!state.login) {
+                showToast('Сначала зарегистрируйтесь и войдите в аккаунт!', 'error');
+                switchTab('profile');
+                return;
+            }
+            document.getElementById('admin-password-input').value = '';
+            openModal('modal-admin-login');
+        }
+
+        async function submitAdminLogin() {
+            const adminPassInput = document.getElementById('admin-password-input').value.trim();
+            if (!adminPassInput) {
+                showToast('Введите пароль администратора', 'error');
+                return;
+            }
+
+            try {
+                const { data: settingData } = await supabaseClient.from('setting').select('value').eq('key', 'admin_password').maybeSingle();
+                const correctPassword = settingData ? settingData.value : 'admin';
+
+                if (adminPassInput !== correctPassword) {
+                    showToast('Неверный пароль администратора!', 'error');
+                    return;
+                }
+
+                await supabaseClient.from('user').update({ роль: 'админ' }).eq('логин', state.login);
+
+                state.role = 'admin';
+                localStorage.setItem('reflex_role', 'admin');
+
+                closeModal('modal-admin-login');
+                switchTab('admin_home');
+                showToast('Вы успешно вошли как администратор!');
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка входа в админку', 'error');
+            }
+        }
+
+        function logoutAdmin() {
+            if (state.login) {
+                supabaseClient.from('user').update({ роль: 'пользователь' }).eq('логин', state.login).then(() => {});
+            }
+            state.role = 'user';
+            localStorage.setItem('reflex_role', 'user');
+            switchTab('home');
+            showToast('Вы вышли из админки');
+        }
+
+        function toggleAdminMenu() {
+            const dropdown = document.getElementById('admin-dropdown');
+            if (dropdown) dropdown.classList.toggle('hidden');
+        }
+
+        // --- Восстановленная система управления товарами в админке ---
+        function openProductModal(productId = null) {
+            document.getElementById('edit-product-id').value = productId || '';
+            document.getElementById('product-form-title').textContent = productId ? 'Редактировать товар' : 'Добавить товар';
+            document.getElementById('p-name').value = '';
+            document.getElementById('p-category').value = 'жидкость';
+            document.getElementById('p-subcategory').value = '';
+            document.getElementById('p-retail').value = '';
+            document.getElementById('p-wholesale').value = '';
+            document.getElementById('p-image').value = '';
+            document.getElementById('image-preview').src = '';
+            document.getElementById('image-preview-container').classList.add('hidden');
+            document.getElementById('p-featured').checked = true;
+            document.getElementById('variants-rows').innerHTML = '';
+
+            if (productId) {
+                const product = (state.products || []).find(p => p.id === productId);
+                if (product) {
+                    document.getElementById('p-name').value = product.name || '';
+                    document.getElementById('p-category').value = product.category || 'жидкость';
+                    document.getElementById('p-subcategory').value = product.subcategory || '';
+                    document.getElementById('p-retail').value = product.retail_price || '';
+                    document.getElementById('p-wholesale').value = product.wholesale_price || '';
+                    document.getElementById('p-image').value = product.image_url || '';
+                    if (product.image_url) {
+                        document.getElementById('image-preview').src = product.image_url;
+                        document.getElementById('image-preview-container').classList.remove('hidden');
+                    }
+                    document.getElementById('p-featured').checked = product.is_featured !== false;
+                    
+                    if (product.product_variants && product.product_variants.length > 0) {
+                        product.product_variants.forEach(v => {
+                            addVariantRow(v.value, v.quantity);
+                        });
+                    }
+                }
+            } else {
+                addVariantRow('', 10);
+            }
+
+            updateVariantLabel();
+            openModal('modal-product-form');
+        }
+
+        function editProduct(id) {
+            openProductModal(id);
+        }
+
+        function addVariantRow(val = '', qty = 1) {
+            const container = document.getElementById('variants-rows');
+            if (!container) return;
+            const row = document.createElement('div');
+            row.className = 'flex items-center space-x-2 variant-row';
+            const category = document.getElementById('p-category').value;
+            const placeholder = category === 'железо' ? 'Цвет' : 'Вкус';
+            row.innerHTML = `
+                <input type="text" placeholder="${placeholder}" value="${val}" class="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent variant-value-input">
+                <input type="number" placeholder="Кол-во" value="${qty}" min="1" class="w-20 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent variant-qty-input">
+                <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-300 p-2"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+            `;
+            container.appendChild(row);
+            lucide.createIcons();
+        }
+
+        function updateVariantLabel() {
+            const category = document.getElementById('p-category').value;
+            const label = document.getElementById('variants-label');
+            if (label) {
+                label.textContent = category === 'железо' ? 'Цвета и количество' : 'Вкусы и количество';
+            }
+        }
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64 = e.target.result;
+                document.getElementById('p-image').value = base64;
+                document.getElementById('image-preview').src = base64;
+                document.getElementById('image-preview-container').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function saveProduct() {
+            const editId = document.getElementById('edit-product-id').value;
+            const name = document.getElementById('p-name').value.trim();
+            const category = document.getElementById('p-category').value;
+            const subcategory = document.getElementById('p-subcategory').value.trim();
+            const retail_price = Number(document.getElementById('p-retail').value);
+            const wholesale_price = Number(document.getElementById('p-wholesale').value);
+            const image_url = document.getElementById('p-image').value;
+            const is_featured = document.getElementById('p-featured').checked;
+
+            if (!name || isNaN(retail_price)) {
+                showToast('Заполните название и розничную цену!', 'error');
+                return;
+            }
+
+            const rowElements = document.querySelectorAll('.variant-row');
+            const variants = [];
+            rowElements.forEach(row => {
+                const val = row.querySelector('.variant-value-input').value.trim();
+                const qty = Number(row.querySelector('.variant-qty-input').value) || 0;
+                if (val) {
+                    variants.push({
+                        type: category === 'железо' ? 'color' : 'flavor',
+                        value: val,
+                        quantity: qty
+                    });
+                }
+            });
+
+            if (variants.length === 0) {
+                showToast('Добавьте хотя бы один вариант (вкус/цвет)!', 'error');
+                return;
+            }
+
+            try {
+                let productId = editId;
+
+                if (editId) {
+                    await supabaseClient.from('products').update({
+                        name, category, subcategory, retail_price, wholesale_price, image_url, is_featured
+                    }).eq('id', editId);
+
+                    await supabaseClient.from('product_variants').delete().eq('product_id', editId);
+                } else {
+                    const { data: newProd, error: prodErr } = await supabaseClient.from('products').insert({
+                        name, category, subcategory, retail_price, wholesale_price, image_url, is_featured
+                    }).select().single();
+
+                    if (prodErr || !newProd) throw prodErr;
+                    productId = newProd.id;
+                }
+
+                for (const v of variants) {
+                    await supabaseClient.from('product_variants').insert({
+                        product_id: productId,
+                        type: v.type,
+                        value: v.value,
+                        quantity: v.quantity
+                    });
+                }
+
+                closeModal('modal-product-form');
+                await fetchProducts();
+                render();
+                showToast(editId ? 'Товар успешно обновлен!' : 'Товар успешно добавлен!');
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка при сохранении товара', 'error');
+            }
+        }
+
+        async function deleteProduct(id) {
+            showConfirm('Удаление товара', 'Вы уверены, что хотите удалить этот товар?', async () => {
+                try {
+                    await supabaseClient.from('product_variants').delete().eq('product_id', id);
+                    await supabaseClient.from('products').delete().eq('id', id);
+                    await fetchProducts();
+                    render();
+                    showToast('Товар удален');
+                } catch (e) {
+                    showToast('Ошибка удаления товара', 'error');
+                }
+            });
+        }
+
+        function openDiscountModal(productId) {
+            const product = (state.products || []).find(p => p.id === productId);
+            if (!product) return;
+
+            document.getElementById('discount-product-id').value = product.id;
+            document.getElementById('discount-old-price-text').textContent = (product.old_price || product.retail_price) + ' ₽';
+            document.getElementById('discount-new-price').value = product.old_price ? product.retail_price : '';
+            openModal('modal-discount-form');
+        }
+
+        async function saveDiscount(remove) {
+            const productId = document.getElementById('discount-product-id').value;
+            const product = (state.products || []).find(p => p.id == productId);
+            if (!product) return;
+
+            if (remove) {
+                const oldPrice = product.old_price || product.retail_price;
+                await supabaseClient.from('products').update({
+                    retail_price: oldPrice,
+                    old_price: null
+                }).eq('id', productId);
+                closeModal('modal-discount-form');
+                await fetchProducts();
+                render();
+                showToast('Акция убрана');
+                return;
+            }
+
+            const newPrice = Number(document.getElementById('discount-new-price').value);
+            if (!newPrice || newPrice <= 0) {
+                showToast('Введите корректную новую цену', 'error');
+                return;
+            }
+
+            const currentOldPrice = product.old_price || product.retail_price;
+            if (newPrice >= currentOldPrice) {
+                showToast('Новая акционная цена должна быть меньше старой', 'error');
+                return;
+            }
+
+            await supabaseClient.from('products').update({
+                old_price: currentOldPrice,
+                retail_price: newPrice
+            }).eq('id', productId);
+
+            closeModal('modal-discount-form');
+            await fetchProducts();
+            render();
+            showToast('Акция успешно установлена!');
+        }
+
+        // --- Админские и остальные вкладки ---
         function setAdminHomeSubTab(subTab) {
             state.adminHomeSubTab = subTab;
             render();
@@ -1233,7 +1866,6 @@
                     <div id="admin-home-subcontent"></div>
                 </div>
             `;
-
             const subContainer = document.getElementById('admin-home-subcontent');
             if (state.adminHomeSubTab === 'product') renderUserHome(subContainer);
             else renderAdminStats(subContainer);
@@ -1355,12 +1987,11 @@
             container.innerHTML = `
                 <div class="space-y-4">
                     <h2 class="text-lg font-bold">Управление заказами</h2>
-                    
                     <div class="space-y-3">
                         <h3 class="text-sm font-semibold text-amber-400">В работе (${inProgress.length})</h3>
                         ${inProgress.length === 0 ? '<p class="text-xs text-zinc-600">Нет заказов в работе</p>' : inProgress.map(o => {
                             const cleanUsername = (o.username || '').replace('@', '');
-                            const phoneNum = o.phone || 'Не указан';
+                            const phoneNum = o.phone;
                             return `
                                 <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-2">
                                     <div class="flex justify-between text-xs text-zinc-400">
@@ -1368,8 +1999,8 @@
                                         <span>${new Date(o.created_at).toLocaleString()}</span>
                                     </div>
                                     <div class="bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-800 space-y-1 text-xs">
-                                        <div>Телефон: ${phoneNum !== 'Не указан' ? `<a href="tel:${phoneNum}" class="text-accent underline font-medium">${phoneNum}</a>` : '<span class="text-zinc-500">Не указан</span>'}</div>
-                                        <div>Telegram: ${cleanUsername && cleanUsername !== 'аноним' ? `<a href="https://t.me/${cleanUsername}" target="_blank" class="text-accent underline font-medium">@${cleanUsername}</a>` : '<span class="text-zinc-500">Не указан</span>'}</div>
+                                        <div>Телефон: ${phoneNum ? `<a href="tel:${phoneNum}" class="text-accent underline font-medium">${phoneNum}</a>` : '<span class="text-zinc-500">Не указано</span>'}</div>
+                                        <div>Telegram: ${cleanUsername && cleanUsername !== 'аноним' ? `<a href="https://t.me/${cleanUsername}" target="_blank" class="text-accent underline font-medium">@${cleanUsername}</a>` : '<span class="text-zinc-500">Не указано</span>'}</div>
                                     </div>
                                     <div class="space-y-1">
                                         ${(o.order_items || []).map(i => `<div class="text-sm flex justify-between"><span>${i.product_name} (${i.variant_name})</span><span>${i.quantity} шт. x ${i.price} ₽</span></div>`).join('')}
@@ -1388,33 +2019,39 @@
 
                     <div class="space-y-3 pt-4">
                         <h3 class="text-sm font-semibold text-emerald-400">Выполненные (${completed.length})</h3>
-                        ${completed.length === 0 ? '<p class="text-xs text-zinc-600">Нет выполненных заказов</p>' : completed.map(o => {
-                            const cleanUsername = (o.username || '').replace('@', '');
-                            const phoneNum = o.phone || 'Не указан';
-                            return `
-                                <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-2 opacity-75">
-                                    <div class="flex justify-between text-xs text-zinc-400">
-                                        <span>Заказ #${String(o.id).slice(0,6)} • <strong class="text-white">${o.username || 'Аноним'}</strong></span>
-                                        <span>${new Date(o.created_at).toLocaleDateString()}</span>
-                                    </div>
-                                    <div class="bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-800 space-y-1 text-xs">
-                                        <div>Телефон: ${phoneNum !== 'Не указан' ? `<a href="tel:${phoneNum}" class="text-accent underline font-medium">${phoneNum}</a>` : '<span class="text-zinc-500">Не указан</span>'}</div>
-                                        <div>Telegram: ${cleanUsername && cleanUsername !== 'аноним' ? `<a href="https://t.me/${cleanUsername}" target="_blank" class="text-accent underline font-medium">@${cleanUsername}</a>` : '<span class="text-zinc-500">Не указан</span>'}</div>
-                                    </div>
-                                    <div class="space-y-1">
-                                        ${(o.order_items || []).map(i => `<div class="text-sm flex justify-between"><span>${i.product_name} (${i.variant_name})</span><span>${i.quantity} шт.</span></div>`).join('')}
-                                    </div>
-                                    <div class="flex justify-between items-center pt-2 border-t border-zinc-800">
-                                        <span class="font-bold text-sm text-zinc-300">Итого: ${o.total_retail} ₽</span>
-                                        <button onclick="deleteCompletedOrder('${o.id}')" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded-lg transition">Удалить из списка</button>
-                                    </div>
+                        ${completed.length === 0 ? '<p class="text-xs text-zinc-600">Нет выполненных заказов</p>' : completed.map(o => `
+                            <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-2 opacity-75">
+                                <div class="flex justify-between text-xs text-zinc-400">
+                                    <span>Заказ #${String(o.id).slice(0,6)}</span>
+                                    <span>${new Date(o.created_at).toLocaleDateString()}</span>
                                 </div>
-                            `;
-                        }).join('')}
+                                <div class="space-y-1">
+                                    ${(o.order_items || []).map(i => `<div class="text-sm flex justify-between"><span>${i.product_name} (${i.variant_name})</span><span>${i.quantity} шт.</span></div>`).join('')}
+                                </div>
+                                <div class="flex justify-between items-center pt-2 border-t border-zinc-800">
+                                    <span class="font-bold text-sm text-zinc-300">Итого: ${o.total_retail} ₽</span>
+                                    <button onclick="deleteCompletedOrder('${o.id}')" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded-lg transition">Удалить из списка</button>
+                                </div>
+                            </div>
+                        `).join('')}
                     </div>
                 </div>
             `;
             lucide.createIcons();
+        }
+
+        async function completeOrder(orderId) {
+            await supabaseClient.from('orders').update({ status: 'completed' }).eq('id', orderId);
+            await fetchOrders();
+            render();
+            showToast('Заказ отмечен как выполненный');
+        }
+
+        async function deleteCompletedOrder(orderId) {
+            await supabaseClient.from('orders').delete().eq('id', orderId);
+            await fetchOrders();
+            render();
+            showToast('Заказ удален');
         }
 
         function renderAdminProducts(container) {
@@ -1434,11 +2071,11 @@
                                     <div>
                                         <h4 class="font-semibold text-sm">${p.name}</h4>
                                         <p class="text-xs text-zinc-400">${p.category} | ${p.subcategory || ''}</p>
-                                        <p class="text-xs text-accent mt-0.5">Розн: ${p.retail_price} ₽ ${p.old_price && p.old_price > p.retail_price ? `<span class="text-zinc-500 line-through text-[10px]">(${p.old_price} ₽)</span>` : ''} | Опт: ${p.wholesale_price} ₽</p>
+                                        <p class="text-xs text-accent mt-0.5">Розн: ${p.retail_price} ₽ | Опт: ${p.wholesale_price} ₽</p>
                                     </div>
                                 </div>
                                 <div class="flex space-x-1.5 items-center">
-                                    <button onclick="openDiscountModal(${p.id})" title="Управление акцией/скидкой" class="w-8 h-8 ${p.old_price && p.old_price > p.retail_price ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-zinc-800 text-zinc-400'} hover:bg-zinc-700 rounded-xl flex items-center justify-center transition">
+                                    <button onclick="openDiscountModal(${p.id})" title="Акция" class="w-8 h-8 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 rounded-xl flex items-center justify-center transition">
                                         <i data-lucide="tag" class="w-4 h-4"></i>
                                     </button>
                                     <button onclick="editProduct(${p.id})" title="Редактировать" class="w-8 h-8 bg-zinc-800 hover:bg-zinc-700 rounded-xl flex items-center justify-center text-zinc-300 transition">
@@ -1460,7 +2097,6 @@
             container.innerHTML = `
                 <div class="space-y-4 max-w-sm mx-auto pt-4">
                     <h2 class="text-lg font-bold">Настройки администратора</h2>
-                    
                     <div class="flex space-x-1 bg-cardBg p-1 rounded-2xl border border-zinc-800">
                         <button onclick="state.adminSettingsSubTab='general'; render();" class="flex-1 py-2 rounded-xl text-xs font-medium transition ${state.adminSettingsSubTab === 'general' ? 'bg-accent text-white' : 'text-zinc-400'}">Основные</button>
                         <button onclick="state.adminSettingsSubTab='managers'; render();" class="flex-1 py-2 rounded-xl text-xs font-medium transition ${state.adminSettingsSubTab === 'managers' ? 'bg-accent text-white' : 'text-zinc-400'}">Менеджеры (${state.managers.length})</button>
@@ -1468,14 +2104,11 @@
 
                     ${state.adminSettingsSubTab === 'general' ? `
                         <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
-                            <button onclick="openChangePasswordModal()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
-                                <i data-lucide="key" class="w-4 h-4 text-accent"></i><span>Сменить пароль</span>
-                            </button>
                             <button onclick="resetSystemToZero()" class="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2 border border-red-500/30">
                                 <i data-lucide="trash-2" class="w-4 h-4"></i><span>Сбросить сайт (Очистить всё)</span>
                             </button>
                             <button onclick="logoutAdmin()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
-                                <i data-lucide="log-out" class="w-4 h-4"></i><span>Выйти</span>
+                                <i data-lucide="log-out" class="w-4 h-4"></i><span>Выйти из админки</span>
                             </button>
                         </div>
                     ` : `
@@ -1486,7 +2119,6 @@
                                 <input type="text" id="new-manager-username" placeholder="Юз телеграм (@username)" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
                                 <button onclick="addNewManager()" class="w-full bg-accent hover:bg-accentHover py-2.5 rounded-xl font-medium transition text-xs text-white">Добавить менеджера</button>
                             </div>
-
                             <h3 class="text-sm font-bold pt-3 border-t border-zinc-800">Список менеджеров</h3>
                             <div class="space-y-2 max-h-48 overflow-y-auto">
                                 ${state.managers.length === 0 ? '<p class="text-xs text-zinc-500 text-center py-2">Менеджеры не добавлены</p>' : state.managers.map(m => `
@@ -1524,17 +2156,15 @@
             try {
                 const { error } = await supabaseClient.from('managers').insert({ name, username });
                 if (error) {
-                    showToast('Ошибка при добавлении менеджера: ' + error.message, 'error');
+                    showToast('Ошибка при добавлении менеджера', 'error');
                     return;
                 }
-
                 nameField.value = '';
                 usernameField.value = '';
                 await fetchManagers();
                 render();
                 showToast('Менеджер успешно добавлен!');
             } catch (e) {
-                console.error(e);
                 showToast('Ошибка подключения к базе данных', 'error');
             }
         }
@@ -1544,527 +2174,6 @@
             await fetchManagers();
             render();
             showToast('Менеджер удален');
-        }
-
-        function openChangePasswordModal() {
-            document.getElementById('new-admin-password').value = '';
-            openModal('modal-change-password');
-        }
-
-        // РЕАЛИЗАЦИЯ: При смене пароля админа все роли админ меняются на пользователь
-        async function submitChangePassword() {
-            const newPassword = document.getElementById('new-admin-password').value.trim();
-            if (!newPassword) {
-                showToast('Введите новый пароль', 'error');
-                return;
-            }
-            try {
-                // Сохраняем новый пароль в таблицу setting (supabase -> setting -> key, value)
-                await supabaseClient.from('setting').upsert({ key: 'admin_password', value: newPassword });
-
-                // Сбрасываем роли ВСЕХ пользователей с роли 'админ' на 'пользователь' в базе данных
-                await supabaseClient.from('user').update({ роль: 'пользователь' }).eq('роль', 'админ');
-
-                // Переводим текущего клиента в статус обычного пользователя
-                state.role = 'user';
-                localStorage.setItem('reflex_role', 'user');
-
-                closeModal('modal-change-password');
-                render();
-                showToast('Пароль успешно изменен! Все роли администраторов сброшены на «пользователь».');
-            } catch (e) {
-                console.error(e);
-                showToast('Ошибка при смене пароля', 'error');
-            }
-        }
-
-        // РЕАЛИЗАЦИЯ: При входе в админ панель в профиле обязательны юз и номер, а в модалке указывается ТОЛЬКО пароль
-        function openAdminLoginModal() {
-            if (!state.user || !state.phone) {
-                showToast('Для входа в админ-панель в вашем профиле обязательно должны быть указаны юз и номер телефона!', 'error');
-                switchTab('profile');
-                return;
-            }
-            document.getElementById('admin-password-input').value = '';
-            openModal('modal-admin-login');
-        }
-
-        async function submitAdminLogin() {
-            const passwordInput = document.getElementById('admin-password-input').value.trim();
-            if (!passwordInput) {
-                showToast('Введите пароль!', 'error');
-                return;
-            }
-
-            if (!state.user || !state.phone) {
-                showToast('В профиле обязательно должны быть указаны юз и номер!', 'error');
-                closeModal('modal-admin-login');
-                switchTab('profile');
-                return;
-            }
-
-            try {
-                // Получаем пароль из supabase -> setting -> key, value (admin_password)
-                const { data: settingData } = await supabaseClient.from('setting').select('value').eq('key', 'admin_password').maybeSingle();
-                let correctPassword = settingData ? settingData.value : 'admin';
-
-                if (passwordInput !== correctPassword) {
-                    showToast('Неверный пароль администратора!', 'error');
-                    return;
-                }
-
-                // Успешный вход: обновляем запись текущего пользователя в таблице user, устанавливая роль 'админ'
-                await supabaseClient.from('user').upsert({
-                    юз: state.user,
-                    номер: state.phone,
-                    роль: 'админ'
-                }, { onConflict: 'юз' });
-
-                state.role = 'admin';
-                localStorage.setItem('reflex_role', 'admin');
-
-                closeModal('modal-admin-login');
-                switchTab('admin_home');
-                showToast('Вы успешно вошли в админ-панель!');
-            } catch (e) {
-                console.error(e);
-                showToast('Ошибка при проверке пароля', 'error');
-            }
-        }
-
-        // Выход из админки (переход на обычный сайт)
-        async function logoutAdmin() {
-            if (state.user) {
-                try {
-                    await supabaseClient.from('user').update({ роль: 'пользователь' }).eq('юз', state.user);
-                } catch (e) { console.error(e); }
-            }
-
-            state.role = 'user';
-            localStorage.setItem('reflex_role', 'user');
-            switchTab('home');
-            showToast('Вы вышли из админ-панели');
-        }
-
-        function toggleAdminMenu() {
-            const dropdown = document.getElementById('admin-dropdown');
-            if (dropdown) dropdown.classList.toggle('hidden');
-        }
-
-        function openProductModal(product = null) {
-            document.getElementById('edit-product-id').value = product ? product.id : '';
-            document.getElementById('product-form-title').textContent = product ? 'Редактировать товар' : 'Добавить товар';
-            document.getElementById('p-name').value = product ? product.name : '';
-            document.getElementById('p-category').value = product ? product.category : 'жидкость';
-            document.getElementById('p-subcategory').value = product ? product.subcategory : '';
-            document.getElementById('p-retail').value = product ? product.retail_price : '';
-            document.getElementById('p-wholesale').value = product ? product.wholesale_price : '';
-            document.getElementById('p-image').value = product ? (product.image_url || '') : '';
-            document.getElementById('p-image-file').value = '';
-            document.getElementById('p-featured').checked = product ? product.is_featured : true;
-
-            const previewContainer = document.getElementById('image-preview-container');
-            const previewImg = document.getElementById('image-preview');
-            if (product && product.image_url) {
-                previewImg.src = product.image_url;
-                previewContainer.classList.remove('hidden');
-            } else {
-                previewContainer.classList.add('hidden');
-            }
-
-            const rowsContainer = document.getElementById('variants-rows');
-            rowsContainer.innerHTML = '';
-
-            if (product && product.product_variants && product.product_variants.length > 0) {
-                product.product_variants.forEach(v => { addVariantRow(v.value, v.quantity, v.id); });
-            } else {
-                addVariantRow();
-            }
-
-            updateVariantLabel();
-            openModal('modal-product-form');
-        }
-
-        function updateVariantLabel() {
-            const cat = document.getElementById('p-category').value;
-            const label = document.getElementById('variants-label');
-            if (label) label.textContent = (cat === 'железо') ? 'Цвета и количество' : 'Вкусы и количество';
-        }
-
-        function addVariantRow(val = '', qty = 1, varId = '') {
-            const container = document.getElementById('variants-rows');
-            const cat = document.getElementById('p-category').value;
-            const placeholder = (cat === 'железо') ? 'Цвет' : 'Вкус';
-            
-            const div = document.createElement('div');
-            div.className = 'flex items-center space-x-2 variant-row';
-            div.innerHTML = `
-                <input type="hidden" class="variant-id" value="${varId}">
-                <input type="text" placeholder="${placeholder}" value="${val}" class="variant-value flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
-                <input type="number" placeholder="Кол-во" value="${qty}" class="variant-qty w-20 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
-                <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-300 p-1.5"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-            `;
-            container.appendChild(div);
-            lucide.createIcons();
-        }
-
-        function handleImageUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const base64 = e.target.result;
-                document.getElementById('p-image').value = base64;
-                const previewContainer = document.getElementById('image-preview-container');
-                const previewImg = document.getElementById('image-preview');
-                previewImg.src = base64;
-                previewContainer.classList.remove('hidden');
-            };
-            reader.readAsDataURL(file);
-        }
-
-        async function saveProduct() {
-            const productId = document.getElementById('edit-product-id').value;
-            const name = document.getElementById('p-name').value.trim();
-            const category = document.getElementById('p-category').value;
-            const subcategory = document.getElementById('p-subcategory').value.trim();
-            const retail_price = Number(document.getElementById('p-retail').value);
-            const wholesale_price = Number(document.getElementById('p-wholesale').value);
-            const image_url = document.getElementById('p-image').value;
-            const is_featured = document.getElementById('p-featured').checked;
-
-            if (!name || isNaN(retail_price) || isNaN(wholesale_price)) {
-                showToast('Заполните название и цены!', 'error');
-                return;
-            }
-
-            const variantRows = document.querySelectorAll('.variant-row');
-            const variants = [];
-            variantRows.forEach(row => {
-                const varId = row.querySelector('.variant-id').value;
-                const val = row.querySelector('.variant-value').value.trim();
-                const qty = Number(row.querySelector('.variant-qty').value);
-                if (val && !isNaN(qty) && qty > 0) variants.push({ id: varId, value: val, quantity: qty });
-            });
-
-            if (variants.length === 0) {
-                showToast('Добавьте хотя бы один вариант с количеством!', 'error');
-                return;
-            }
-
-            try {
-                let currentProductId = productId;
-                const vType = (category === 'железо') ? 'color' : 'flavor';
-
-                if (currentProductId) {
-                    await supabaseClient.from('products').update({
-                        name, category, subcategory, retail_price, wholesale_price, image_url, is_featured
-                    }).eq('id', currentProductId);
-
-                    const { data: existingVars } = await supabaseClient.from('product_variants').select('*').eq('product_id', currentProductId);
-                    const updatedIds = variants.filter(v => v.id).map(v => String(v.id));
-
-                    for (const ev of existingVars) {
-                        if (!updatedIds.includes(String(ev.id))) await supabaseClient.from('product_variants').delete().eq('id', ev.id);
-                    }
-
-                    for (const v of variants) {
-                        if (v.id) {
-                            await supabaseClient.from('product_variants').update({ type: vType, value: v.value, quantity: v.quantity }).eq('id', v.id);
-                        } else {
-                            await supabaseClient.from('product_variants').insert({ product_id: currentProductId, type: vType, value: v.value, quantity: v.quantity });
-                        }
-                    }
-                } else {
-                    const { data: newProd, error: pErr } = await supabaseClient.from('products').insert({
-                        name, category, subcategory, retail_price, wholesale_price, image_url, is_featured
-                    }).select().single();
-
-                    if (pErr || !newProd) throw pErr || new Error('Ошибка создания товара');
-                    currentProductId = newProd.id;
-
-                    for (const v of variants) {
-                        await supabaseClient.from('product_variants').insert({ product_id: currentProductId, type: vType, value: v.value, quantity: v.quantity });
-                    }
-                }
-
-                closeModal('modal-product-form');
-                await fetchProducts();
-                render();
-                showToast('Товар успешно сохранен!');
-            } catch (e) {
-                console.error(e);
-                showToast('Ошибка сохранения товара', 'error');
-            }
-        }
-
-        async function editProduct(id) {
-            const product = (state.products || []).find(p => p.id === id);
-            if (product) openProductModal(product);
-        }
-
-        async function deleteProduct(id) {
-            showConfirm('Удаление товара', 'Вы уверены, что хотите удалить этот товар?', async () => {
-                await supabaseClient.from('products').delete().eq('id', id);
-                await fetchProducts();
-                render();
-                showToast('Товар удален');
-            });
-        }
-
-        function openDiscountModal(id) {
-            const product = (state.products || []).find(p => p.id === id);
-            if (!product) return;
-
-            document.getElementById('discount-product-id').value = product.id;
-            document.getElementById('discount-old-price-text').textContent = (product.old_price || product.retail_price) + ' ₽';
-            document.getElementById('discount-new-price').value = (product.old_price && product.old_price > product.retail_price) ? product.retail_price : '';
-            openModal('modal-discount-form');
-        }
-
-        async function saveDiscount(remove) {
-            const id = document.getElementById('discount-product-id').value;
-            const product = (state.products || []).find(p => p.id === Number(id));
-            if (!product) return;
-
-            if (remove) {
-                const originalPrice = product.old_price || product.retail_price;
-                await supabaseClient.from('products').update({ retail_price: originalPrice, old_price: null }).eq('id', product.id);
-                closeModal('modal-discount-form');
-                await fetchProducts();
-                render();
-                showToast('Акция убрана');
-                return;
-            }
-
-            const newPrice = Number(document.getElementById('discount-new-price').value);
-            if (isNaN(newPrice) || newPrice <= 0) {
-                showToast('Введите корректную новую цену!', 'error');
-                return;
-            }
-
-            const oldPrice = product.old_price || product.retail_price;
-            if (newPrice >= oldPrice) {
-                showToast('Новая акционная цена должна быть ниже старой!', 'error');
-                return;
-            }
-
-            await supabaseClient.from('products').update({ old_price: oldPrice, retail_price: newPrice }).eq('id', product.id);
-            closeModal('modal-discount-form');
-            await fetchProducts();
-            render();
-            showToast('Акция успешно установлена!');
-        }
-
-        function openVariantModal(productId) {
-            const product = (state.products || []).find(p => p.id === productId);
-            if (!product || !product.product_variants || product.product_variants.length === 0) {
-                showToast('Нет доступных вариантов', 'error');
-                return;
-            }
-
-            document.getElementById('variant-modal-title').textContent = product.name;
-            const container = document.getElementById('variant-list-container');
-            container.innerHTML = product.product_variants.map(v => {
-                if (v.quantity <= 0) return '';
-                return `
-                    <div onclick="addToCart(${product.id}, ${v.id}); closeModal('modal-variant-select');" class="bg-zinc-900 border border-zinc-800 hover:border-accent p-3 rounded-xl flex items-center justify-between cursor-pointer transition">
-                        <div>
-                            <span class="text-sm font-semibold text-zinc-200">${v.value}</span>
-                            <span class="text-xs text-zinc-500 block">Остаток: ${v.quantity} шт.</span>
-                        </div>
-                        <span class="text-xs font-bold text-accent">${product.retail_price} ₽</span>
-                    </div>
-                `;
-            }).join('');
-
-            openModal('modal-variant-select');
-        }
-
-        function addToCart(productId, variantId) {
-            const product = (state.products || []).find(p => p.id === productId);
-            if (!product) return;
-
-            const variant = (product.product_variants || []).find(v => v.id === variantId);
-            if (!variant || variant.quantity <= 0) {
-                showToast('Этот вариант закончился', 'error');
-                return;
-            }
-
-            const existingCartItem = state.cart.find(item => item.productId === productId && item.variantId === variantId);
-            const currentCartQty = existingCartItem ? existingCartItem.qty : 0;
-
-            if (currentCartQty + 1 > variant.quantity) {
-                showToast('Нельзя добавить больше, чем есть на складе', 'error');
-                return;
-            }
-
-            if (existingCartItem) {
-                existingCartItem.qty += 1;
-                existingCartItem.maxQty = variant.quantity;
-            } else {
-                state.cart.push({
-                    productId: product.id,
-                    variantId: variant.id,
-                    name: product.name,
-                    variantName: variant.value,
-                    price: product.retail_price,
-                    wholesalePrice: product.wholesale_price,
-                    qty: 1,
-                    maxQty: variant.quantity,
-                    image: product.image_url
-                });
-            }
-
-            localStorage.setItem('reflex_cart', JSON.stringify(state.cart));
-            showToast('Товар добавлен в корзину');
-            renderNav();
-        }
-
-        function updateCartQty(index, delta) {
-            const item = state.cart[index];
-            if (!item) return;
-
-            const newQty = item.qty + delta;
-            if (newQty <= 0) {
-                state.cart.splice(index, 1);
-            } else {
-                if (newQty > item.maxQty) {
-                    showToast('Достигнут предел остатка на складе', 'error');
-                    return;
-                }
-                item.qty = newQty;
-            }
-
-            localStorage.setItem('reflex_cart', JSON.stringify(state.cart));
-            render();
-        }
-
-        function checkoutOrder() {
-            if (!state.cart || state.cart.length === 0) return;
-
-            if (!state.user || !state.phone) {
-                openModal('modal-missing-contacts');
-                return;
-            }
-
-            executeCheckout();
-        }
-
-        function proceedCheckoutWithoutContacts() {
-            closeModal('modal-missing-contacts');
-            executeCheckout(true);
-        }
-
-        function cancelCheckout() {
-            closeModal('modal-missing-contacts');
-            showToast('Заказ отменен', 'error');
-        }
-
-        async function executeCheckout(isAnonymous = false) {
-            try {
-                const totalRetail = state.cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-                const totalWholesale = state.cart.reduce((sum, item) => sum + (item.wholesalePrice * item.qty), 0);
-
-                const usernameToSave = isAnonymous ? 'Аноним' : (state.user || 'Аноним');
-                const phoneToSave = isAnonymous ? 'Не указан' : (state.phone || 'Не указан');
-
-                const { data: orderData, error: orderErr } = await supabaseClient.from('orders').insert({
-                    username: usernameToSave,
-                    phone: phoneToSave,
-                    total_retail: totalRetail,
-                    total_wholesale: totalWholesale,
-                    status: 'in_progress'
-                }).select().single();
-
-                if (orderErr || !orderData) throw orderErr || new Error('Ошибка создания заказа');
-
-                const orderId = orderData.id;
-
-                for (const item of state.cart) {
-                    await supabaseClient.from('order_items').insert({
-                        order_id: orderId,
-                        product_name: item.name,
-                        variant_name: item.variantName,
-                        quantity: item.qty,
-                        price: item.price
-                    });
-
-                    const product = (state.products || []).find(p => p.id === item.productId);
-                    if (product) {
-                        const variant = (product.product_variants || []).find(v => v.id === item.variantId);
-                        if (variant) {
-                            const newStock = variant.quantity - item.qty;
-                            await supabaseClient.from('product_variants').update({ quantity: newStock }).eq('id', variant.id);
-                        }
-                    }
-                }
-
-                state.cart = [];
-                localStorage.removeItem('reflex_cart');
-
-                await fetchProducts();
-                await fetchOrders();
-                switchTab('orders');
-                showToast('Заказ успешно оформлен!');
-            } catch (e) {
-                console.error(e);
-                showToast('Ошибка при оформлении заказа: ' + e.message, 'error');
-            }
-        }
-
-        async function cancelOrder(orderId) {
-            showConfirm('Отмена заказа', 'Вы уверены, что хотите отменить этот заказ?', async () => {
-                try {
-                    const order = (state.orders || []).find(o => String(o.id) === String(orderId));
-                    if (order && order.order_items) {
-                        for (const item of order.order_items) {
-                            const product = (state.products || []).find(p => p.name.trim().toLowerCase() === item.product_name.trim().toLowerCase());
-                            if (product && product.product_variants) {
-                                const variant = product.product_variants.find(v => v.value.trim().toLowerCase() === item.variant_name.trim().toLowerCase());
-                                if (variant) {
-                                    await supabaseClient.from('product_variants').update({ quantity: variant.quantity + item.quantity }).eq('id', variant.id);
-                                }
-                            }
-                        }
-                    }
-
-                    await supabaseClient.from('order_items').delete().eq('order_id', orderId);
-                    await supabaseClient.from('orders').delete().eq('id', orderId);
-
-                    await fetchProducts();
-                    await fetchOrders();
-                    render();
-                    showToast('Заказ отменен и удален');
-                } catch (e) {
-                    console.error(e);
-                    showToast('Ошибка отмены заказа', 'error');
-                }
-            });
-        }
-
-        async function completeOrder(orderId) {
-            try {
-                await supabaseClient.from('orders').update({ status: 'completed' }).eq('id', orderId);
-                await fetchOrders();
-                render();
-                showToast('Заказ помечен как выполненный!');
-            } catch (e) {
-                console.error(e);
-                showToast('Ошибка выполнения заказа', 'error');
-            }
-        }
-
-        async function deleteCompletedOrder(orderId) {
-            try {
-                await supabaseClient.from('orders').update({ status: 'archived' }).eq('id', orderId);
-                await fetchOrders();
-                render();
-                showToast('Заказ скрыт из истории');
-            } catch (e) {
-                console.error(e);
-            }
         }
     </script>
 </body>
