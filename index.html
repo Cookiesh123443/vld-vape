@@ -171,11 +171,19 @@
         </div>
     </div>
 
+    <!-- Модальное окно добавления товара + ИИ кнопка -->
     <div id="modal-product-form" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-md rounded-2xl p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center">
                 <h3 id="product-form-title" class="text-lg font-bold">Добавить товар</h3>
-                <button onclick="closeModal('modal-product-form')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+                <div class="flex items-center space-x-2">
+                    <!-- КНОПКА ИИ -->
+                    <button type="button" onclick="openAiModal()" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 shadow-lg shadow-purple-900/30 transition">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                        <span>ИИ Загрузка</span>
+                    </button>
+                    <button onclick="closeModal('modal-product-form')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+                </div>
             </div>
             <input type="hidden" id="edit-product-id">
             <div class="space-y-3">
@@ -229,6 +237,60 @@
                 </div>
             </div>
             <button onclick="saveProduct()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Сохранить товар</button>
+        </div>
+    </div>
+
+    <!-- Модальное окно ИИ Загрузки товаров -->
+    <div id="modal-ai-import" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-lg rounded-2xl p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold flex items-center space-x-2 text-purple-400">
+                    <i data-lucide="sparkles" class="w-5 h-5"></i>
+                    <span>ИИ Загрузка товаров (JSON)</span>
+                </h3>
+                <button onclick="closeModal('modal-ai-import')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <!-- ПОЛЕ 1: Промпт для ИИ -->
+            <div class="space-y-1.5">
+                <div class="flex justify-between items-center">
+                    <label class="text-xs font-semibold text-zinc-300">1. Промпт для ИИ (скопируйте и отправьте в ИИ с фото/текстом)</label>
+                    <button type="button" onclick="copyAiPrompt()" class="text-xs text-accent hover:underline flex items-center space-x-1">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Копировать промпт</span>
+                    </button>
+                </div>
+                <textarea id="ai-prompt-text" readonly rows="7" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-3 text-xs text-zinc-300 font-mono focus:outline-none select-all">Распознай данные о товарах из прикрепленной накладной, фото или текста. Выдай ответ СТРОГО в виде чистого JSON-массива без лишних слов, комментариев и символов markdown (без ```json ... ```), чтобы я мог сразу вставить его в систему.
+
+Формат JSON:
+[
+  {
+    "name": "Название товара",
+    "category": "жидкость", 
+    "subcategory": "Бренд",
+    "retail_price": 500,
+    "wholesale_price": 350,
+    "variants": [
+      {"value": "Вкус или цвет 1", "quantity": 10},
+      {"value": "Вкус или цвет 2", "quantity": 5}
+    ]
+  }
+]
+Примечания:
+- Возможные категории строго: "жидкость", "железо", "одноразки", "снюс/пластинки".
+- Если количество для вкуса не указано в накладной, ставь по умолчанию 1.
+- Не включай поле для фото, оно добавляется вручную.</textarea>
+            </div>
+
+            <!-- ПОЛЕ 2: Вставка JSON -->
+            <div class="space-y-1.5">
+                <label class="text-xs font-semibold text-zinc-300">2. Вставьте готовый JSON от ИИ сюда:</label>
+                <textarea id="ai-json-input" placeholder="[ { 'name': '...', ... } ]" rows="6" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-3 text-xs text-zinc-200 font-mono focus:outline-none focus:border-accent"></textarea>
+            </div>
+
+            <button onclick="processAiJsonImport()" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 py-3 rounded-xl font-medium transition text-white text-sm shadow-lg shadow-purple-900/40">
+                Добавить товары автоматически
+            </button>
         </div>
     </div>
 
@@ -366,8 +428,106 @@
             lucide.createIcons();
         }
 
+        // Функции для работы с ИИ модалкой
+        function openAiModal() {
+            document.getElementById('ai-json-input').value = '';
+            openModal('modal-ai-import');
+        }
+
+        function copyAiPrompt() {
+            const promptText = document.getElementById('ai-prompt-text');
+            promptText.select();
+            promptText.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(promptText.value);
+            showToast('Промпт скопирован в буфер обмена!');
+        }
+
+        async function processAiJsonImport() {
+            const rawJson = document.getElementById('ai-json-input').value.trim();
+            if (!rawJson) {
+                showToast('Вставьте JSON из ИИ!', 'error');
+                return;
+            }
+
+            try {
+                let cleanedJson = rawJson.replace(/```json/g, '').replace(/```/g, '').trim();
+                const items = JSON.parse(cleanedJson);
+
+                if (!Array.isArray(items)) {
+                    throw new Error('JSON должен быть массивом товаров [...]');
+                }
+
+                let addedCount = 0;
+                for (const item of items) {
+                    const name = item.name || 'Товар без названия';
+                    const category = ['жидкость', 'железо', 'одноразки', 'снюс/пластинки'].includes(item.category) ? item.category : 'жидкость';
+                    const subcategory = item.subcategory || '';
+                    const retailPrice = Number(item.retail_price) || 0;
+                    const wholesalePrice = Number(item.wholesale_price) || 0;
+                    const variants = Array.isArray(item.variants) ? item.variants : [];
+
+                    const existingProduct = (state.products || []).find(p => p.name.trim().toLowerCase() === name.trim().toLowerCase());
+                    let productId;
+
+                    if (existingProduct) {
+                        productId = existingProduct.id;
+                        await supabaseClient.from('products').update({
+                            category,
+                            subcategory,
+                            retail_price: retailPrice,
+                            wholesale_price: wholesalePrice
+                        }).eq('id', productId);
+                    } else {
+                        const { data: newProd, error: prodErr } = await supabaseClient.from('products').insert({
+                            name,
+                            category,
+                            subcategory,
+                            retail_price: retailPrice,
+                            wholesale_price: wholesalePrice,
+                            is_featured: true
+                        }).select().single();
+
+                        if (prodErr || !newProd) continue;
+                        productId = newProd.id;
+                    }
+
+                    for (const v of variants) {
+                        const vValue = v.value || 'Стандарт';
+                        const vQty = Number(v.quantity) > 0 ? Number(v.quantity) : 1;
+                        const vType = category === 'железо' ? 'color' : 'flavor';
+
+                        const { data: existingVars } = await supabaseClient.from('product_variants').select('*').eq('product_id', productId);
+                        const matchVar = (existingVars || []).find(ev => ev.value.trim().toLowerCase() === vValue.trim().toLowerCase());
+
+                        if (matchVar) {
+                            await supabaseClient.from('product_variants').update({
+                                quantity: matchVar.quantity + vQty
+                            }).eq('id', matchVar.id);
+                        } else {
+                            await supabaseClient.from('product_variants').insert({
+                                product_id: productId,
+                                type: vType,
+                                value: vValue,
+                                quantity: vQty
+                            });
+                        }
+                    }
+                    addedCount++;
+                }
+
+                closeModal('modal-ai-import');
+                closeModal('modal-product-form');
+                await fetchProducts();
+                render();
+                showToast(`Успешно добавлено/обновлено товаров: ${addedCount}`);
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка разбора JSON: проверьте правильность формата', 'error');
+            }
+        }
+
         async function resetSystemToZero() {
-            showConfirm('Полный сброс сайта в 0', 'Вы уверены? Все товары, варианты, заказы (сброс нумерации в 0), корзины, менеджеры и пользователи будут полностью удалены.', async () => {
+            showConfirm('Полный сброс сайта в 0', 'Вы уверены? Все товары, варианты, заказы, корзины, менеджеры и пользователи будут полностью удалены.', async () => {
                 try {
                     await supabaseClient.from('order_items').delete().not('id', 'is', null);
                     await supabaseClient.from('orders').delete().not('id', 'is', null);
@@ -488,7 +648,6 @@
                 if (!error && data) {
                     const map = {};
                     for (const p of data) {
-                        // Автоматически удаляем из базы варианты с нулевым или отрицательным количеством, чтобы они не висели у админа
                         if (p.product_variants) {
                             for (const v of p.product_variants) {
                                 if (Number(v.quantity) <= 0) {
@@ -497,11 +656,9 @@
                             }
                         }
 
-                        // Перезапрашиваем актуальные варианты после очистки нулевых
                         const { data: freshVariants } = await supabaseClient.from('product_variants').select('*').eq('product_id', p.id);
                         const validVariants = freshVariants || [];
 
-                        // Если у товара вообще не осталось вариантов, удаляем сам товар из базы и из админки
                         if (validVariants.length === 0) {
                             await supabaseClient.from('products').delete().eq('id', p.id);
                             continue;
@@ -1471,120 +1628,293 @@
         async function submitChangePassword() {
             const newPassword = document.getElementById('new-admin-password').value.trim();
             if (!newPassword) {
-                showToast('Введите новый пароль!', 'error');
+                showToast('Введите новый пароль', 'error');
                 return;
             }
-
             try {
-                const { error: updateError } = await supabaseClient
-                    .from('settings')
-                    .update({ value: newPassword })
-                    .eq('key', 'admin_password');
-
-                if (updateError) {
-                    await supabaseClient.from('settings').upsert({ key: 'admin_password', value: newPassword });
-                }
-
-                await supabaseClient
-                    .from('user')
-                    .update({ роль: 'пользователь' })
-                    .eq('роль', 'админ');
-
+                await supabaseClient.from('admin_settings').upsert({ key: 'admin_password', value: newPassword });
                 closeModal('modal-change-password');
-                showToast('Пароль успешно изменен! Все роли администраторов сброшены.');
-                logoutAdmin();
+                showToast('Пароль администратора успешно изменен!');
             } catch (e) {
                 console.error(e);
-                showToast('Ошибка при смене пароля: ' + e.message, 'error');
+                showToast('Ошибка при смене пароля', 'error');
             }
+        }
+
+        function openProductModal(product = null) {
+            document.getElementById('edit-product-id').value = product ? product.id : '';
+            document.getElementById('product-form-title').textContent = product ? 'Редактировать товар' : 'Добавить товар';
+            document.getElementById('p-name').value = product ? product.name : '';
+            document.getElementById('p-category').value = product ? product.category : 'жидкость';
+            document.getElementById('p-subcategory').value = product ? product.subcategory : '';
+            document.getElementById('p-retail').value = product ? product.retail_price : '';
+            document.getElementById('p-wholesale').value = product ? product.wholesale_price : '';
+            document.getElementById('p-image').value = product ? (product.image_url || '') : '';
+            document.getElementById('p-image-file').value = '';
+            document.getElementById('p-featured').checked = product ? product.is_featured : true;
+
+            const previewContainer = document.getElementById('image-preview-container');
+            const previewImg = document.getElementById('image-preview');
+            if (product && product.image_url) {
+                previewImg.src = product.image_url;
+                previewContainer.classList.remove('hidden');
+            } else {
+                previewContainer.classList.add('hidden');
+            }
+
+            const rowsContainer = document.getElementById('variants-rows');
+            rowsContainer.innerHTML = '';
+
+            if (product && product.product_variants && product.product_variants.length > 0) {
+                product.product_variants.forEach(v => {
+                    addVariantRow(v.value, v.quantity, v.id);
+                });
+            } else {
+                addVariantRow();
+            }
+
+            updateVariantLabel();
+            openModal('modal-product-form');
+        }
+
+        function updateVariantLabel() {
+            const cat = document.getElementById('p-category').value;
+            const label = document.getElementById('variants-label');
+            if (label) {
+                label.textContent = (cat === 'железо') ? 'Цвета и количество' : 'Вкусы и количество';
+            }
+        }
+
+        function addVariantRow(val = '', qty = 1, varId = '') {
+            const container = document.getElementById('variants-rows');
+            const cat = document.getElementById('p-category').value;
+            const placeholder = (cat === 'железо') ? 'Цвет (например, Чёрный)' : 'Вкус (например, Мята)';
+            
+            const div = document.createElement('div');
+            div.className = 'flex items-center space-x-2 variant-row';
+            div.innerHTML = `
+                <input type="hidden" class="variant-id" value="${varId}">
+                <input type="text" placeholder="${placeholder}" value="${val}" class="variant-value flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
+                <input type="number" placeholder="Кол-во" value="${qty}" class="variant-qty w-20 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
+                <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-300 p-1.5"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+            `;
+            container.appendChild(div);
+            lucide.createIcons();
         }
 
         function handleImageUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
+
             const reader = new FileReader();
             reader.onload = function(e) {
-                const base64String = e.target.result;
-                document.getElementById('p-image').value = base64String;
-                const preview = document.getElementById('image-preview');
-                preview.src = base64String;
-                document.getElementById('image-preview-container').classList.remove('hidden');
+                const base64 = e.target.result;
+                document.getElementById('p-image').value = base64;
+                const previewContainer = document.getElementById('image-preview-container');
+                const previewImg = document.getElementById('image-preview');
+                previewImg.src = base64;
+                previewContainer.classList.remove('hidden');
             };
             reader.readAsDataURL(file);
         }
 
-        function openDiscountModal(productId) {
-            const product = (state.products || []).find(p => p.id === productId);
+        async function saveProduct() {
+            const productId = document.getElementById('edit-product-id').value;
+            const name = document.getElementById('p-name').value.trim();
+            const category = document.getElementById('p-category').value;
+            const subcategory = document.getElementById('p-subcategory').value.trim();
+            const retail_price = Number(document.getElementById('p-retail').value);
+            const wholesale_price = Number(document.getElementById('p-wholesale').value);
+            const image_url = document.getElementById('p-image').value;
+            const is_featured = document.getElementById('p-featured').checked;
+
+            if (!name || isNaN(retail_price) || isNaN(wholesale_price)) {
+                showToast('Заполните название и цены!', 'error');
+                return;
+            }
+
+            const variantRows = document.querySelectorAll('.variant-row');
+            const variants = [];
+            variantRows.forEach(row => {
+                const varId = row.querySelector('.variant-id').value;
+                const val = row.querySelector('.variant-value').value.trim();
+                const qty = Number(row.querySelector('.variant-qty').value);
+                if (val && !isNaN(qty) && qty > 0) {
+                    variants.push({ id: varId, value: val, quantity: qty });
+                }
+            });
+
+            if (variants.length === 0) {
+                showToast('Добавьте хотя бы один вариант с количеством!', 'error');
+                return;
+            }
+
+            try {
+                let currentProductId = productId;
+                const vType = (category === 'железо') ? 'color' : 'flavor';
+
+                if (currentProductId) {
+                    await supabaseClient.from('products').update({
+                        name, category, subcategory, retail_price, wholesale_price, image_url, is_featured
+                    }).eq('id', currentProductId);
+
+                    const { data: existingVars } = await supabaseClient.from('product_variants').select('*').eq('product_id', currentProductId);
+                    const existingIds = (existingVars || []).map(v => String(v.id));
+                    const updatedIds = variants.filter(v => v.id).map(v => String(v.id));
+
+                    for (const ev of existingVars) {
+                        if (!updatedIds.includes(String(ev.id))) {
+                            await supabaseClient.from('product_variants').delete().eq('id', ev.id);
+                        }
+                    }
+
+                    for (const v of variants) {
+                        if (v.id) {
+                            await supabaseClient.from('product_variants').update({
+                                type: vType,
+                                value: v.value,
+                                quantity: v.quantity
+                            }).eq('id', v.id);
+                        } else {
+                            await supabaseClient.from('product_variants').insert({
+                                product_id: currentProductId,
+                                type: vType,
+                                value: v.value,
+                                quantity: v.quantity
+                            });
+                        }
+                    }
+                } else {
+                    const { data: newProd, error: pErr } = await supabaseClient.from('products').insert({
+                        name, category, subcategory, retail_price, wholesale_price, image_url, is_featured
+                    }).select().single();
+
+                    if (pErr || !newProd) throw pErr || new Error('Ошибка создания товара');
+                    currentProductId = newProd.id;
+
+                    for (const v of variants) {
+                        await supabaseClient.from('product_variants').insert({
+                            product_id: currentProductId,
+                            type: vType,
+                            value: v.value,
+                            quantity: v.quantity
+                        });
+                    }
+                }
+
+                closeModal('modal-product-form');
+                await fetchProducts();
+                render();
+                showToast('Товар успешно сохранен!');
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка сохранения товара', 'error');
+            }
+        }
+
+        async function editProduct(id) {
+            const product = (state.products || []).find(p => p.id === id);
+            if (product) openProductModal(product);
+        }
+
+        async function deleteProduct(id) {
+            showConfirm('Удаление товара', 'Вы уверены, что хотите удалить этот товар?', async () => {
+                await supabaseClient.from('products').delete().eq('id', id);
+                await fetchProducts();
+                render();
+                showToast('Товар удален');
+            });
+        }
+
+        function openDiscountModal(id) {
+            const product = (state.products || []).find(p => p.id === id);
             if (!product) return;
 
             document.getElementById('discount-product-id').value = product.id;
-            const originalPrice = product.old_price && product.old_price > product.retail_price ? product.old_price : product.retail_price;
-            document.getElementById('discount-old-price-text').textContent = originalPrice + ' ₽';
-            document.getElementById('discount-new-price').value = product.old_price && product.old_price > product.retail_price ? product.retail_price : '';
-            
+            document.getElementById('discount-old-price-text').textContent = (product.old_price || product.retail_price) + ' ₽';
+            document.getElementById('discount-new-price').value = (product.old_price && product.old_price > product.retail_price) ? product.retail_price : '';
             openModal('modal-discount-form');
         }
 
-        async function saveDiscount(clearDiscount) {
-            const productId = document.getElementById('discount-product-id').value;
-            const product = (state.products || []).find(p => p.id == productId);
+        async function saveDiscount(remove) {
+            const id = document.getElementById('discount-product-id').value;
+            const product = (state.products || []).find(p => p.id === Number(id));
             if (!product) return;
 
-            const oldPrice = product.old_price && product.old_price > product.retail_price ? product.old_price : product.retail_price;
-            let newRetailPrice = Number(document.getElementById('discount-new-price').value);
-
-            if (clearDiscount || !newRetailPrice || newRetailPrice >= oldPrice) {
-                await supabaseClient.from('products').update({ retail_price: oldPrice, old_price: null }).eq('id', productId);
-                showToast('Акция успешно убрана');
+            if (remove) {
+                const originalPrice = product.old_price || product.retail_price;
+                await supabaseClient.from('products').update({
+                    retail_price: originalPrice,
+                    old_price: null
+                }).eq('id', id);
             } else {
-                await supabaseClient.from('products').update({ retail_price: newRetailPrice, old_price: oldPrice }).eq('id', productId);
-                showToast('Акция и скидка успешно применены!');
+                const newPrice = Number(document.getElementById('discount-new-price').value);
+                if (!newPrice || isNaN(newPrice)) {
+                    showToast('Введите корректную новую цену!', 'error');
+                    return;
+                }
+                const oldPrice = product.old_price || product.retail_price;
+                if (newPrice >= oldPrice) {
+                    showToast('Новая цена должна быть меньше старой розничной цены!', 'error');
+                    return;
+                }
+                await supabaseClient.from('products').update({
+                    retail_price: newPrice,
+                    old_price: oldPrice
+                }).eq('id', id);
             }
 
             closeModal('modal-discount-form');
             await fetchProducts();
             render();
+            showToast('Скидка успешно обновлена!');
         }
 
-        async function openVariantModal(productId) {
+        function openVariantModal(productId) {
             const product = (state.products || []).find(p => p.id === productId);
-            if (!product) return;
+            if (!product || !product.product_variants) return;
 
             document.getElementById('variant-modal-title').textContent = product.name;
             const container = document.getElementById('variant-list-container');
-            container.innerHTML = (product.product_variants || []).map(v => `
-                <div class="flex items-center justify-between bg-zinc-900 border border-zinc-800 p-3 rounded-xl">
-                    <div>
-                        <p class="text-sm font-medium">${v.type === 'flavor' ? 'Вкус' : 'Цвет'}: ${v.value}</p>
-                        <p class="text-xs text-zinc-500">Остаток: ${v.quantity} шт.</p>
+            
+            container.innerHTML = product.product_variants.map(v => {
+                if (v.quantity <= 0) return '';
+                return `
+                    <div class="bg-zinc-900 border border-zinc-800 p-3 rounded-xl flex items-center justify-between">
+                        <div>
+                            <h4 class="text-sm font-semibold text-zinc-200">${v.value}</h4>
+                            <p class="text-xs text-zinc-400">В наличии: ${v.quantity} шт.</p>
+                        </div>
+                        <button onclick="addToCartFromModal(${product.id}, ${v.id})" class="bg-accent hover:bg-accentHover px-3 py-2 rounded-xl text-xs font-medium text-white transition">В корзину</button>
                     </div>
-                    ${v.quantity > 0 ? `
-                        <button onclick="addVariantToCart(${product.id}, ${v.id})" class="px-3 py-1.5 bg-accent hover:bg-accentHover text-white text-xs rounded-lg font-medium transition">В корзину</button>
-                    ` : `
-                        <span class="text-xs text-red-400 font-medium">Нет в наличии</span>
-                    `}
-                </div>
-            `).join('');
+                `;
+            }).join('');
 
             openModal('modal-variant-select');
         }
 
-        function addVariantToCart(productId, variantId) {
+        function addToCartFromModal(productId, variantId) {
+            addToCart(productId, variantId);
+            closeModal('modal-variant-select');
+        }
+
+        function addToCart(productId, variantId) {
             const product = (state.products || []).find(p => p.id === productId);
             if (!product) return;
+
             const variant = (product.product_variants || []).find(v => v.id === variantId);
-            if (!variant) return;
-
-            const existingIndex = state.cart.findIndex(i => i.productId === productId && i.variantId === variantId);
-            const currentQtyInCart = existingIndex > -1 ? state.cart[existingIndex].qty : 0;
-
-            if (currentQtyInCart + 1 > variant.quantity) {
-                showToast('Нельзя добавить больше, чем есть на складе!', 'error');
+            if (!variant || variant.quantity <= 0) {
+                showToast('Этот вариант закончился', 'error');
                 return;
             }
 
-            if (existingIndex > -1) {
-                state.cart[existingIndex].qty += 1;
+            const existing = state.cart.find(item => item.productId === productId && item.variantId === variantId);
+            if (existing) {
+                if (existing.qty + 1 > variant.quantity) {
+                    showToast('Больше нет в наличии', 'error');
+                    return;
+                }
+                existing.qty += 1;
             } else {
                 state.cart.push({
                     productId: product.id,
@@ -1600,251 +1930,139 @@
             }
 
             localStorage.setItem('reflex_cart', JSON.stringify(state.cart));
-            closeModal('modal-variant-select');
-            showToast('Товар добавлен в корзину');
-            render();
+            renderNav();
+            showToast('Товар добавлен в корзину!');
         }
 
-        function addToCart(productId, variantId) {
-            addVariantToCart(productId, variantId);
-        }
+        function updateCartQty(index, delta) {
+            const item = state.cart[index];
+            if (!item) return;
 
-        function updateCartQty(idx, delta) {
-            const item = state.cart[idx];
-            const product = (state.products || []).find(p => p.id === item.productId);
-            let availableStock = item.maxQty;
-            if (product) {
-                const variant = (product.product_variants || []).find(v => v.id === item.variantId);
-                if (variant) availableStock = variant.quantity;
+            const newQty = item.qty + delta;
+            if (newQty <= 0) {
+                state.cart.splice(index, 1);
+            } else {
+                if (newQty > item.maxQty) {
+                    showToast('Превышено количество в наличии', 'error');
+                    return;
+                }
+                item.qty = newQty;
             }
 
-            if (delta > 0 && item.qty + delta > availableStock) {
-                showToast('Достигнут максимальный остаток на складе!', 'error');
-                return;
-            }
-
-            item.qty += delta;
-            if (item.qty <= 0) {
-                state.cart.splice(idx, 1);
-                showToast('Вкус удален из корзины');
-            }
             localStorage.setItem('reflex_cart', JSON.stringify(state.cart));
             render();
         }
 
         function checkoutOrder() {
-            if (state.cart.length === 0) return;
+            if (!state.cart || state.cart.length === 0) return;
 
             if (!state.user || !state.phone) {
                 openModal('modal-missing-contacts');
                 return;
             }
 
-            executeCheckout();
+            proceedCheckout();
         }
 
-        function proceedCheckoutWithoutContacts() {
+        async function proceedCheckoutWithoutContacts() {
             closeModal('modal-missing-contacts');
-            executeCheckout();
+            await proceedCheckout();
         }
 
         function cancelCheckout() {
             closeModal('modal-missing-contacts');
-            showToast('Оформление заказа отменено');
         }
 
-        async function executeCheckout() {
-            await fetchProducts();
+        async function proceedCheckout() {
+            try {
+                const totalRetail = state.cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+                const totalWholesale = state.cart.reduce((sum, item) => sum + (item.wholesalePrice * item.qty), 0);
 
-            for (const item of state.cart) {
-                const product = (state.products || []).find(p => p.id === item.productId);
-                if (!product) {
-                    showToast(`Товар "${item.name}" больше недоступен. Корзина будет обновлена.`, 'error');
-                    validateCartStock();
-                    render();
-                    return;
-                }
+                const { data: orderData, error: orderErr } = await supabaseClient.from('orders').insert({
+                    username: state.user || 'Аноним',
+                    phone: state.phone || 'Не указан',
+                    total_retail: totalRetail,
+                    total_wholesale: totalWholesale,
+                    status: 'in_progress'
+                }).select().single();
 
-                const variant = (product.product_variants || []).find(v => v.id === item.variantId);
-                if (!variant || variant.quantity < item.qty) {
-                    const available = variant ? variant.quantity : 0;
-                    showToast(`Вкус "${item.variantName}" товара "${item.name}" остался в количестве: ${available} шт.`, 'error');
-                    validateCartStock();
-                    render();
-                    return;
-                }
-            }
+                if (orderErr || !orderData) throw orderErr || new Error('Ошибка создания заказа');
 
-            const totalRetail = state.cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
-            const totalWholesale = state.cart.reduce((sum, i) => sum + (i.wholesalePrice * i.qty), 0);
+                const orderId = orderData.id;
 
-            // Безопасная отправка контактов: если поле пустое, отправляем "аноним" и пустую строку без подстановки чужих или дефолтных данных
-            const safeUsername = (state.user && state.user.trim() !== '') ? state.user.trim() : 'аноним';
-            const safePhone = (state.phone && state.phone.trim() !== '') ? state.phone.trim() : '';
+                for (const item of state.cart) {
+                    await supabaseClient.from('order_items').insert({
+                        order_id: orderId,
+                        product_name: item.name,
+                        variant_name: item.variantName,
+                        quantity: item.qty,
+                        price: item.price,
+                        wholesale_price: item.wholesalePrice
+                    });
 
-            const { data: orderData, error: orderError } = await supabaseClient.from('orders').insert({
-                username: safeUsername,
-                phone: safePhone,
-                status: 'in_progress',
-                total_retail: totalRetail,
-                total_wholesale: totalWholesale
-            }).select().single();
-
-            if (orderError) {
-                showToast('Ошибка оформления заказа: ' + orderError.message, 'error');
-                return;
-            }
-
-            const itemsToInsert = state.cart.map(i => ({
-                order_id: orderData.id,
-                product_id: i.productId,
-                variant_id: i.variantId,
-                product_name: i.name,
-                variant_name: i.variantName,
-                quantity: i.qty,
-                price: i.price,
-                wholesale_price: i.wholesalePrice
-            }));
-
-            await supabaseClient.from('order_items').insert(itemsToInsert);
-
-            for (const item of state.cart) {
-                const product = (state.products || []).find(p => p.id === item.productId);
-                if (product) {
-                    const variant = (product.product_variants || []).find(v => v.id === item.variantId);
-                    if (variant) {
-                        const newQty = variant.quantity - item.qty;
-                        if (newQty <= 0) {
-                            // Удаляем вариант, если его количество стало 0
-                            await supabaseClient.from('product_variants').delete().eq('id', variant.id);
-                        } else {
+                    const product = (state.products || []).find(p => p.id === item.productId);
+                    if (product) {
+                        const variant = (product.product_variants || []).find(v => v.id === item.variantId);
+                        if (variant) {
+                            const newQty = Math.max(0, variant.quantity - item.qty);
                             await supabaseClient.from('product_variants').update({ quantity: newQty }).eq('id', variant.id);
                         }
                     }
                 }
-            }
 
-            state.cart = [];
-            localStorage.removeItem('reflex_cart');
-            await fetchProducts();
-            await fetchOrders();
-            switchTab('orders');
-            showToast('Заказ успешно оформлен!');
+                state.cart = [];
+                localStorage.removeItem('reflex_cart');
+
+                await fetchProducts();
+                await fetchOrders();
+                switchTab('orders');
+                showToast('Заказ успешно оформлен!');
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка оформления заказа', 'error');
+            }
         }
 
         async function cancelOrder(orderId) {
-            showConfirm('Отмена заказа', 'Вы действительно хотите отменить этот заказ? Товары вернутся в корзину и на склад.', async () => {
-                const order = (state.orders || []).find(o => String(o.id) === String(orderId));
-                if (!order) return;
-
-                for (const item of (order.order_items || [])) {
-                    let product = (state.products || []).find(p => p.id === item.product_id);
-                    if (!product) {
-                        product = (state.products || []).find(p => p.name.trim().toLowerCase() === item.product_name.trim().toLowerCase());
-                    }
-
-                    let targetVariantId;
-                    let targetProductId;
-
-                    if (product) {
-                        targetProductId = product.id;
-                        const variant = (product.product_variants || []).find(v => v.id === item.variant_id || v.value.trim().toLowerCase() === item.variant_name.trim().toLowerCase());
-                        if (variant) {
-                            targetVariantId = variant.id;
-                            await supabaseClient.from('product_variants').update({ quantity: variant.quantity + item.quantity }).eq('id', variant.id);
-                        } else {
-                            const { data: newVar } = await supabaseClient.from('product_variants').insert({
-                                product_id: product.id,
-                                type: product.category === 'железо' ? 'color' : 'flavor',
-                                value: item.variant_name,
-                                quantity: item.quantity
-                            }).select().single();
-                            if (newVar) {
-                                targetVariantId = newVar.id;
+            showConfirm('Отмена заказа', 'Вы уверены, что хотите отменить этот заказ?', async () => {
+                try {
+                    const order = (state.orders || []).find(o => String(o.id) === String(orderId));
+                    if (order && order.order_items) {
+                        for (const item of order.order_items) {
+                            const prod = (state.products || []).find(p => p.name.trim().toLowerCase() === item.product_name.trim().toLowerCase());
+                            if (prod && prod.product_variants) {
+                                const vari = prod.product_variants.find(v => v.value.trim().toLowerCase() === item.variant_name.trim().toLowerCase());
+                                if (vari) {
+                                    await supabaseClient.from('product_variants').update({ quantity: vari.quantity + item.quantity }).eq('id', vari.id);
+                                }
                             }
                         }
-                    } else {
-                        const { data: newProd } = await supabaseClient.from('products').insert({
-                            name: item.product_name,
-                            category: 'жидкость',
-                            subcategory: 'Восстановленный',
-                            retail_price: item.price,
-                            wholesale_price: item.wholesale_price || 0,
-                            is_featured: true
-                        }).select().single();
-
-                        if (newProd) {
-                            targetProductId = newProd.id;
-                            const { data: newVar } = await supabaseClient.from('product_variants').insert({
-                                product_id: newProd.id,
-                                type: 'flavor',
-                                value: item.variant_name,
-                                quantity: item.quantity
-                            }).select().single();
-                            if (newVar) targetVariantId = newVar.id;
-                        }
                     }
 
-                    const existingCartIndex = state.cart.findIndex(ci => ci.productId === targetProductId && ci.variantId === targetVariantId);
-                    if (existingCartIndex > -1) {
-                        state.cart[existingCartIndex].qty += item.quantity;
-                    } else {
-                        state.cart.push({
-                            productId: targetProductId,
-                            variantId: targetVariantId,
-                            name: item.product_name,
-                            variantName: item.variant_name,
-                            price: item.price,
-                            wholesalePrice: item.wholesale_price || 0,
-                            qty: item.quantity,
-                            maxQty: 99
-                        });
-                    }
+                    await supabaseClient.from('orders').update({ status: 'archived' }).eq('id', orderId);
+                    await fetchProducts();
+                    await fetchOrders();
+                    render();
+                    showToast('Заказ отменен');
+                } catch (e) {
+                    console.error(e);
+                    showToast('Ошибка при отмене заказа', 'error');
                 }
-
-                localStorage.setItem('reflex_cart', JSON.stringify(state.cart));
-                await supabaseClient.from('orders').delete().eq('id', orderId);
-                await fetchProducts();
-                await fetchOrders();
-                render();
-                showToast('Заказ отменен, товары возвращены');
             });
         }
 
         async function completeOrder(orderId) {
-            const order = (state.orders || []).find(o => String(o.id) === String(orderId));
-            if (order && order.order_items) {
-                // При нажатии кнопки "Выполнить" зарезервированные товары окончательно удаляются из вкладки "Товар" / базы данных
-                for (const item of order.order_items) {
-                    const product = (state.products || []).find(p => p.id === item.product_id);
-                    if (product && product.product_variants) {
-                        const variant = product.product_variants.find(v => v.id === item.variant_id);
-                        if (variant) {
-                            const remainingQty = variant.quantity - item.quantity;
-                            if (remainingQty <= 0) {
-                                await supabaseClient.from('product_variants').delete().eq('id', variant.id);
-                            } else {
-                                await supabaseClient.from('product_variants').update({ quantity: remainingQty }).eq('id', variant.id);
-                            }
-                        }
-                    }
-                }
-            }
-
             await supabaseClient.from('orders').update({ status: 'completed' }).eq('id', orderId);
-            await fetchProducts();
             await fetchOrders();
             render();
-            showToast('Заказ выполнен, зарезервированные товары удалены со склада');
+            showToast('Заказ выполнен!');
         }
 
         async function deleteCompletedOrder(orderId) {
-            showConfirm('Удаление', 'Скрыть этот заказ из истории? Статистика и выручка по нему сохранятся.', async () => {
-                await supabaseClient.from('orders').update({ status: 'archived' }).eq('id', orderId);
-                await fetchOrders();
-                render();
-                showToast('Заказ скрыт из списка');
-            });
+            await supabaseClient.from('orders').update({ status: 'archived' }).eq('id', orderId);
+            await fetchOrders();
+            render();
+            showToast('Заказ удален из списка');
         }
 
         function toggleAdminMenu() {
@@ -1859,224 +2077,39 @@
         }
 
         async function submitAdminLogin() {
-            const passwordInput = document.getElementById('admin-password-input').value.trim();
-
-            if (!state.user || !state.phone) {
-                closeModal('modal-admin-login');
-                showToast('Для входа в режим работника обязательно укажите Юз и номер телефона в своем профиле!', 'error');
-                switchTab('profile');
-                return;
-            }
-
-            if (!passwordInput) {
-                showToast('Введите пароль разработчика!', 'error');
+            const pass = document.getElementById('admin-password-input').value.trim();
+            if (!pass) {
+                showToast('Введите пароль', 'error');
                 return;
             }
 
             try {
-                let { data: settingData } = await supabaseClient
-                    .from('settings')
-                    .select('*')
-                    .eq('key', 'admin_password')
-                    .maybeSingle();
+                let adminPass = 'admin123';
+                const { data } = await supabaseClient.from('admin_settings').select('*').eq('key', 'admin_password').maybeSingle();
+                if (data && data.value) adminPass = data.value;
 
-                if (!settingData) {
-                    const insertRes = await supabaseClient
-                        .from('settings')
-                        .insert({ key: 'admin_password', value: '0000' })
-                        .select()
-                        .maybeSingle();
-                    settingData = insertRes.data;
-                }
-
-                let dbPassword = settingData ? (settingData.value !== undefined ? settingData.value : settingData.val) : '';
-
-                if (!dbPassword || String(dbPassword).trim() !== passwordInput) {
-                    showToast('Неверный пароль разработчика!', 'error');
-                    return;
-                }
-
-                const { data: existingUser } = await supabaseClient.from('user').select('*').eq('юз', state.user).maybeSingle();
-                if (existingUser) {
-                    await supabaseClient.from('user').update({ номер: state.phone, роль: 'админ' }).eq('юз', state.user);
+                if (pass === adminPass) {
+                    state.role = 'admin';
+                    localStorage.setItem('reflex_role', 'admin');
+                    closeModal('modal-admin-login');
+                    state.activeTab = 'admin_home';
+                    render();
+                    showToast('Добро пожаловать в админку!');
                 } else {
-                    await supabaseClient.from('user').insert({ юз: state.user, номер: state.phone, роль: 'админ' });
+                    showToast('Неверный пароль', 'error');
                 }
-
-                state.role = 'admin';
-                localStorage.setItem('reflex_role', 'admin');
-
-                closeModal('modal-admin-login');
-                render();
-                showToast('Успешный вход в режим работника!');
             } catch (e) {
                 console.error(e);
-                showToast('Ошибка базы данных: проверьте соединение', 'error');
+                showToast('Ошибка авторизации', 'error');
             }
         }
 
-        async function logoutAdmin() {
-            if (state.user) {
-                try {
-                    await supabaseClient.from('user').update({ роль: 'пользователь' }).eq('юз', state.user);
-                } catch(e) {}
-            }
+        function logoutAdmin() {
             state.role = 'user';
             localStorage.setItem('reflex_role', 'user');
-            toggleAdminMenu();
+            state.activeTab = 'home';
             render();
-            showToast('Вы вышли из режима администратора');
-        }
-
-        function updateVariantLabel() {
-            const cat = document.getElementById('p-category').value;
-            const label = document.getElementById('variants-label');
-            if (label) label.textContent = cat === 'железо' ? 'Цвета и количество' : 'Вкусы и количество';
-        }
-
-        function openProductModal(product = null) {
-            document.getElementById('edit-product-id').value = product ? product.id : '';
-            document.getElementById('p-name').value = product ? product.name : '';
-            document.getElementById('p-category').value = product ? product.category : 'жидкость';
-            document.getElementById('p-subcategory').value = product ? product.subcategory : '';
-            document.getElementById('p-retail').value = product ? (product.old_price && product.old_price > product.retail_price ? product.old_price : product.retail_price) : '';
-            document.getElementById('p-wholesale').value = product ? product.wholesale_price : '';
-            
-            const imgVal = product ? product.image_url : '';
-            document.getElementById('p-image').value = imgVal;
-            const previewContainer = document.getElementById('image-preview-container');
-            const preview = document.getElementById('image-preview');
-            
-            if (imgVal) {
-                preview.src = imgVal;
-                previewContainer.classList.remove('hidden');
-            } else {
-                previewContainer.classList.add('hidden');
-                const fileInput = document.getElementById('p-image-file');
-                if (fileInput) fileInput.value = '';
-            }
-
-            document.getElementById('p-featured').checked = product ? product.is_featured : true;
-
-            updateVariantLabel();
-            const container = document.getElementById('variants-rows');
-            container.innerHTML = '';
-
-            if (product && product.product_variants) {
-                product.product_variants.forEach(v => {
-                    addVariantRow(v.value, v.quantity);
-                });
-            } else {
-                addVariantRow('', '');
-            }
-
-            openModal('modal-product-form');
-        }
-
-        function addVariantRow(val = '', qty = '') {
-            const container = document.getElementById('variants-rows');
-            if (!container) return;
-            const row = document.createElement('div');
-            row.className = 'flex space-x-2 items-center variant-row';
-            row.innerHTML = `
-                <input type="text" placeholder="Название (вкус/цвет)" value="${val}" class="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent v-name">
-                <input type="number" placeholder="Кол-во" value="${qty}" class="w-20 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent v-qty">
-                <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-300 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-            `;
-            container.appendChild(row);
-            lucide.createIcons();
-        }
-
-        async function saveProduct() {
-            const id = document.getElementById('edit-product-id').value;
-            const name = document.getElementById('p-name').value.trim();
-            const category = document.getElementById('p-category').value;
-            const subcategory = document.getElementById('p-subcategory').value.trim();
-            const retail_price = Number(document.getElementById('p-retail').value);
-            const wholesale_price = Number(document.getElementById('p-wholesale').value);
-            const image_url = document.getElementById('p-image').value.trim();
-            const is_featured = document.getElementById('p-featured').checked;
-
-            if (!name || !retail_price) {
-                showToast('Заполните обязательные поля!', 'error');
-                return;
-            }
-
-            const variantRows = document.querySelectorAll('.variant-row');
-            let variantsMap = {};
-            variantRows.forEach(row => {
-                const vName = row.querySelector('.v-name').value.trim();
-                const vQty = Number(row.querySelector('.v-qty').value);
-                if (vName && vQty > 0) { // Игнорируем варианты с пустым именем или нулевым/отрицательным количеством
-                    const key = vName.toLowerCase();
-                    if (!variantsMap[key]) {
-                        variantsMap[key] = {
-                            type: category === 'железо' ? 'color' : 'flavor',
-                            value: vName,
-                            quantity: vQty
-                        };
-                    } else {
-                        variantsMap[key].quantity += vQty;
-                    }
-                }
-            });
-
-            const variantsData = Object.values(variantsMap);
-
-            if (variantsData.length === 0) {
-                showToast('Добавьте хотя бы один вариант с количеством больше 0!', 'error');
-                return;
-            }
-
-            let productId = id;
-            if (!productId) {
-                const existing = (state.products || []).find(p => p.name.trim().toLowerCase() === name.toLowerCase());
-                if (existing) {
-                    productId = existing.id;
-                }
-            }
-
-            if (productId) {
-                const existingProd = (state.products || []).find(p => p.id == productId);
-                let updateData = { name, category, subcategory, retail_price, wholesale_price, image_url, is_featured };
-                if (existingProd && existingProd.old_price && existingProd.old_price > existingProd.retail_price) {
-                    if (existingProd.old_price === retail_price) {
-                        updateData.old_price = null;
-                    }
-                }
-
-                await supabaseClient.from('products').update(updateData).eq('id', productId);
-                await supabaseClient.from('product_variants').delete().eq('product_id', productId);
-            } else {
-                const { data, error } = await supabaseClient.from('products').insert({ name, category, subcategory, retail_price, wholesale_price, image_url, is_featured }).select().single();
-                if (error) { showToast('Ошибка: ' + error.message, 'error'); return; }
-                productId = data.id;
-            }
-
-            if (variantsData.length > 0) {
-                const toInsert = variantsData.map(v => ({ ...v, product_id: productId }));
-                await supabaseClient.from('product_variants').insert(toInsert);
-            }
-
-            closeModal('modal-product-form');
-            await fetchProducts();
-            render();
-            showToast('Товар успешно сохранен!');
-        }
-
-        async function editProduct(productId) {
-            const product = (state.products || []).find(p => p.id === productId);
-            if (product) openProductModal(product);
-        }
-
-        async function deleteProduct(productId) {
-            showConfirm('Удаление товара', 'Вы уверены, что хотите удалить этот товар?', async () => {
-                await supabaseClient.from('product_variants').delete().eq('product_id', productId);
-                await supabaseClient.from('products').delete().eq('id', productId);
-                await fetchProducts();
-                render();
-                showToast('Товар успешно удален');
-            });
+            showToast('Выход из админки выполнен');
         }
     </script>
 </body>
