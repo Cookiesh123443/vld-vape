@@ -103,7 +103,6 @@
                     <label class="text-xs text-zinc-400 mb-1 block">Пароль разработчика</label>
                     <div class="relative">
                         <input type="password" id="admin-password-input" placeholder="Введите пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 pr-10 text-sm focus:outline-none focus:border-accent">
-                        <!-- Белый глазик для ввода пароля -->
                         <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-3.5 text-white hover:text-zinc-300 transition">
                             <i id="eye-icon" data-lucide="eye" class="w-4 h-4"></i>
                         </button>
@@ -114,7 +113,24 @@
         </div>
     </div>
 
-    <!-- 2. Выбор вкуса/цвета при добавлении в корзину -->
+    <!-- 2. Смена пароля администратора -->
+    <div id="modal-change-password" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold">Смена пароля разработчика</h3>
+                <button onclick="closeModal('modal-change-password')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Новый пароль</label>
+                    <input type="password" id="new-admin-password" placeholder="Введите новый пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-accent">
+                </div>
+            </div>
+            <button onclick="submitChangePassword()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Сменить пароль</button>
+        </div>
+    </div>
+
+    <!-- 3. Выбор вкуса/цвета при добавлении в корзину -->
     <div id="modal-variant-select" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center">
@@ -125,7 +141,7 @@
         </div>
     </div>
 
-    <!-- 3. Добавление / Редактирование товара (Админ) -->
+    <!-- 4. Добавление / Редактирование товара (Админ) -->
     <div id="modal-product-form" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-md rounded-2xl p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center">
@@ -910,8 +926,7 @@
             localStorage.setItem('reflex_phone', valPhone);
 
             try {
-                // Добавление или обновление пользователя в базе данных
-                const { data: existing } = await supabaseClient.from('user').select('*').eq('юз', valUser).single();
+                const { data: existing } = await supabaseClient.from('user').select('*').eq('юз', valUser).maybeSingle();
                 
                 if (existing) {
                     await supabaseClient.from('user').update({
@@ -1255,6 +1270,9 @@
                 <div class="space-y-4 max-w-sm mx-auto pt-6">
                     <h2 class="text-lg font-bold">Настройки администратора</h2>
                     <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                        <button onclick="openChangePasswordModal()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
+                            <i data-lucide="key" class="w-4 h-4 text-accent"></i><span>Сменить пароль разработчика</span>
+                        </button>
                         <button onclick="resetSystemToZero()" class="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2 border border-red-500/30">
                             <i data-lucide="trash-2" class="w-4 h-4"></i><span>Сбросить сайт в 0 (Очистить всё)</span>
                         </button>
@@ -1265,6 +1283,47 @@
                 </div>
             `;
             lucide.createIcons();
+        }
+
+        function openChangePasswordModal() {
+            document.getElementById('new-admin-password').value = '';
+            openModal('modal-change-password');
+        }
+
+        // Функция смены пароля разработчика с автоматическим сбросом всех ролей админ на пользователь
+        async function submitChangePassword() {
+            const newPassword = document.getElementById('new-admin-password').value.trim();
+            if (!newPassword) {
+                showToast('Введите новый пароль!', 'error');
+                return;
+            }
+
+            try {
+                // Обновляем или вставляем новый пароль в таблицу settings
+                const { error: updateError } = await supabaseClient
+                    .from('settings')
+                    .update({ value: newPassword })
+                    .eq('key', 'admin_password');
+
+                if (updateError) {
+                    await supabaseClient.from('settings').upsert({ key: 'admin_password', value: newPassword });
+                }
+
+                // Сбрасываем роли всех пользователей с "админ" на "пользователь" в базе данных
+                await supabaseClient
+                    .from('user')
+                    .update({ роль: 'пользователь' })
+                    .eq('роль', 'админ');
+
+                closeModal('modal-change-password');
+                showToast('Пароль успешно изменен! Все роли администраторов сброшены.');
+                
+                // Выходим из админки для безопасности
+                logoutAdmin();
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка при смене пароля: ' + e.message, 'error');
+            }
         }
 
         function handleImageUpload(event) {
@@ -1587,7 +1646,7 @@
             openModal('modal-admin-login');
         }
 
-        // Авторизация в админку с безопасной проверкой и поддержкой разных структур таблицы settings
+        // Авторизация в админку с обновлением роли текущего юзера в базе
         async function submitAdminLogin() {
             const passwordInput = document.getElementById('admin-password-input').value.trim();
 
@@ -1597,40 +1656,40 @@
             }
 
             try {
-                // Сначала пробуем получить настройки через селект по ключу 'admin_password'
-                let { data: settingData, error: settingError } = await supabaseClient
+                let { data: settingData } = await supabaseClient
                     .from('settings')
                     .select('*')
                     .eq('key', 'admin_password')
                     .maybeSingle();
 
-                // Если записи нет или произошла ошибка структуры, пробуем автоматически создать корректную строку
                 if (!settingData) {
                     const insertRes = await supabaseClient
                         .from('settings')
                         .insert({ key: 'admin_password', value: '0000' })
                         .select()
                         .maybeSingle();
-                    
                     settingData = insertRes.data;
                 }
 
-                // Извлекаем значение пароля независимо от того, как названа колонка со значением
-                let dbPassword = '';
-                if (settingData) {
-                    dbPassword = settingData.value !== undefined ? settingData.value : settingData.val;
-                }
+                let dbPassword = settingData ? (settingData.value !== undefined ? settingData.value : settingData.val) : '';
 
                 if (!dbPassword || String(dbPassword).trim() !== passwordInput) {
                     showToast('Неверный пароль разработчика!', 'error');
                     return;
                 }
 
-                // Сбрасываем чужие роли на "пользователь" и авторизуем текущего
+                // Сбрасываем роли у всех и делаем текущего юзера админом в таблице user
                 await supabaseClient
                     .from('user')
                     .update({ роль: 'пользователь' })
                     .eq('роль', 'админ');
+
+                if (state.user) {
+                    await supabaseClient
+                        .from('user')
+                        .update({ роль: 'админ' })
+                        .eq('юз', state.user);
+                }
 
                 state.role = 'admin';
                 localStorage.setItem('reflex_role', 'admin');
@@ -1645,7 +1704,12 @@
         }
 
         // Выход из админки
-        function logoutAdmin() {
+        async function logoutAdmin() {
+            if (state.user) {
+                try {
+                    await supabaseClient.from('user').update({ роль: 'пользователь' }).eq('юз', state.user);
+                } catch(e) {}
+            }
             state.role = 'user';
             localStorage.setItem('reflex_role', 'user');
             toggleAdminMenu();
