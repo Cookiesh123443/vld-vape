@@ -62,12 +62,6 @@
                         <span>Выйти из админки</span>
                     </button>
                 </div>
-                <div id="header-logout-container" class="hidden border-t border-zinc-800">
-                    <button onclick="logoutUser()" class="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-zinc-700/50 flex items-center space-x-2">
-                        <i data-lucide="log-out" class="w-4 h-4"></i>
-                        <span>Выйти из аккаунта</span>
-                    </button>
-                </div>
             </div>
         </div>
     </header>
@@ -164,6 +158,28 @@
                 </div>
             </div>
             <button onclick="submitChangePassword()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Сменить пароль</button>
+        </div>
+    </div>
+
+    <!-- Модальное окно смены пароля администратора -->
+    <div id="modal-change-admin-password" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold">Смена пароля администратора</h3>
+                <button onclick="closeModal('modal-change-admin-password')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <p class="text-xs text-amber-400">После смены пароля все текущие администраторы (включая вас) будут понижены до пользователей и должны будут войти заново с новым паролем.</p>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Текущий пароль администратора</label>
+                    <input type="password" id="old-admin-password" placeholder="Текущий пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                </div>
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Новый пароль администратора</label>
+                    <input type="password" id="new-admin-password" placeholder="Новый пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                </div>
+            </div>
+            <button onclick="submitChangeAdminPassword()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Сменить пароль администратора</button>
         </div>
     </div>
 
@@ -290,6 +306,21 @@
         </div>
     </div>
 
+    <!-- Модальное окно просмотра фото товара -->
+    <div id="modal-image-preview" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl relative">
+            <button onclick="closeModal('modal-image-preview')" class="absolute top-3 right-3 w-8 h-8 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white z-10 transition">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <img id="preview-image-img" src="" alt="" class="w-full h-72 object-cover">
+            <div class="p-4 space-y-2 max-h-52 overflow-y-auto">
+                <h3 id="preview-image-title" class="text-base font-bold"></h3>
+                <div id="preview-image-price" class="text-sm font-bold text-accent"></div>
+                <div id="preview-image-variants" class="space-y-1.5 pt-1"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Модальное окно управления скидкой/акцией -->
     <div id="modal-discount-form" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
@@ -321,13 +352,25 @@
         const SUPABASE_KEY = 'sb_publishable_5Lj-BMZYANimr2UG2ZCqgQ_MEi6tOHp';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+        function getOrCreateClientId() {
+            let id = localStorage.getItem('reflex_client_id');
+            if (!id) {
+                id = 'guest-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+                localStorage.setItem('reflex_client_id', id);
+            }
+            return id;
+        }
+
         let state = {
             role: localStorage.getItem('reflex_role') || 'user', 
             activeTab: 'home', 
             login: localStorage.getItem('reflex_login') || '',
             contactUser: localStorage.getItem('reflex_contact_user') || '',
             phone: localStorage.getItem('reflex_phone') || '',
+            clientId: getOrCreateClientId(),
             isProfileEditing: false, 
+            authMode: 'login',
+            isPlacingOrder: false,
             cart: [],
             products: [],
             orders: [],
@@ -339,7 +382,9 @@
             catalogSubcategory: 'all',
             searchQuery: '',
             chartInstance: null,
-            selectedOrderForAsk: null
+            selectedOrderForAsk: null,
+            showArchive: false,
+            editingManagerId: null
         };
 
         function togglePasswordVisibility(inputId, iconId) {
@@ -660,14 +705,9 @@
                 if (!error && data) {
                     const map = {};
                     for (const p of data) {
-                        if (p.product_variants) {
-                            for (const v of p.product_variants) {
-                                if (Number(v.quantity) <= 0) await supabaseClient.from('product_variants').delete().eq('id', v.id);
-                            }
-                        }
-
-                        const { data: freshVariants } = await supabaseClient.from('product_variants').select('*').eq('product_id', p.id);
-                        const validVariants = freshVariants || [];
+                        // Важно: варианты с нулевым остатком больше НЕ удаляются автоматически —
+                        // иначе при отмене заказа склад не мог восстановиться (вариант уже был удален из БД).
+                        const validVariants = p.product_variants || [];
 
                         if (validVariants.length === 0) {
                             await supabaseClient.from('products').delete().eq('id', p.id);
@@ -727,7 +767,6 @@
                 const adminLogoutBtn = document.getElementById('admin-logout-btn');
                 const adminLoginMenuItem = document.getElementById('admin-login-menu-item');
                 const headerUserDisplay = document.getElementById('header-user-display');
-                const headerLogoutContainer = document.getElementById('header-logout-container');
 
                 if (state.role !== 'admin') {
                     if (state.activeTab.startsWith('admin_')) state.activeTab = 'home';
@@ -752,10 +791,8 @@
                         headerUserDisplay.textContent = state.login;
                         headerUserDisplay.classList.remove('hidden');
                     }
-                    if (headerLogoutContainer) headerLogoutContainer.classList.remove('hidden');
                 } else {
                     if (headerUserDisplay) headerUserDisplay.classList.add('hidden');
-                    if (headerLogoutContainer) headerLogoutContainer.classList.add('hidden');
                 }
 
                 renderNav();
@@ -821,6 +858,10 @@
             state.activeTab = tab;
             render();
             window.scrollTo(0, 0);
+
+            if (tab === 'orders' || tab === 'admin_orders') {
+                fetchOrders().then(() => { if (state.activeTab === tab) render(); });
+            }
         }
 
         function renderMainContent() {
@@ -843,11 +884,26 @@
             lucide.createIcons();
         }
 
+        function hasActiveDiscount(p) {
+            return !!(p.old_price && p.old_price > p.retail_price);
+        }
+
+        function sortPinnedFirst(list) {
+            // Порядок: сначала закрепленные, затем акционные товары, затем остальные.
+            return [...list].sort((a, b) => {
+                const pinDiff = (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0);
+                if (pinDiff !== 0) return pinDiff;
+                return (hasActiveDiscount(b) ? 1 : 0) - (hasActiveDiscount(a) ? 1 : 0);
+            });
+        }
+
         function renderUserHome(container) {
-            const featured = (state.products || []).filter(p => {
-                if (!p.is_featured) return false;
+            let featured = (state.products || []).filter(p => {
+                if (!p.is_featured || p.is_archived) return false;
                 return p.product_variants && p.product_variants.some(v => v.quantity > 0);
             });
+            featured = sortPinnedFirst(featured);
+            const totalStock = featured.reduce((sum, p) => sum + getProductStock(p), 0);
 
             container.innerHTML = `
                 <div class="space-y-4">
@@ -867,6 +923,7 @@
                     <div id="home-products-grid" class="grid grid-cols-2 gap-3">
                         ${featured.length === 0 ? '<p class="col-span-2 text-center text-zinc-500 py-10">Нет товаров на главной</p>' : featured.map(p => renderProductCard(p)).join('')}
                     </div>
+                    <div id="home-stock-total" class="text-center text-xs text-zinc-500 pt-1">${(state.role === 'admin' && featured.length > 0) ? `Всего в наличии на главной: <span class="text-zinc-300 font-semibold">${totalStock} шт.</span>` : ''}</div>
                 </div>
             `;
             lucide.createIcons();
@@ -875,48 +932,66 @@
         function renderUserHomeSearch(query) {
             const grid = document.getElementById('home-products-grid');
             if (!grid) return;
-            const filtered = (state.products || []).filter(p => {
-                if (!p.is_featured) return false;
+            let filtered = (state.products || []).filter(p => {
+                if (!p.is_featured || p.is_archived) return false;
                 const hasStock = p.product_variants && p.product_variants.some(v => v.quantity > 0);
                 if (!hasStock) return false;
                 return p.name.toLowerCase().includes(query.toLowerCase()) || (p.subcategory && p.subcategory.toLowerCase().includes(query.toLowerCase()));
             });
+            filtered = sortPinnedFirst(filtered);
             grid.innerHTML = filtered.length === 0 ? '<p class="col-span-2 text-center text-zinc-500 py-10">Ничего не найдено</p>' : filtered.map(p => renderProductCard(p)).join('');
+            const totalStock = filtered.reduce((sum, p) => sum + getProductStock(p), 0);
+            const totalEl = document.getElementById('home-stock-total');
+            if (totalEl) totalEl.innerHTML = (state.role === 'admin' && filtered.length > 0) ? `Всего в наличии на главной: <span class="text-zinc-300 font-semibold">${totalStock} шт.</span>` : '';
             lucide.createIcons();
+        }
+
+        function getProductStock(p) {
+            return (p.product_variants || []).reduce((sum, v) => sum + Number(v.quantity || 0), 0);
+        }
+
+        function getCartQtyForProduct(productId) {
+            return state.cart.filter(i => i.productId === productId).reduce((sum, i) => sum + i.qty, 0);
         }
 
         function renderProductCard(p) {
             const hasDiscount = p.old_price && p.old_price > p.retail_price;
+            const stock = getProductStock(p);
+            const inCartQty = getCartQtyForProduct(p.id);
             return `
                 <div class="bg-cardBg border border-zinc-800 rounded-2xl p-3 flex flex-col justify-between hover:border-zinc-700 transition relative">
-                    ${hasDiscount ? '<span class="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">АКЦИЯ</span>' : ''}
-                    <div>
-                        <img src="${p.image_url || 'https://via.placeholder.com/150'}" alt="${p.name}" class="w-full h-36 object-cover rounded-xl mb-3">
-                        <h4 class="font-semibold text-sm line-clamp-1">${p.name}</h4>
-                        <p class="text-xs text-zinc-400">${p.subcategory || ''}</p>
+                    <div class="absolute top-2 right-2 flex flex-col items-end space-y-1">
+                        ${hasDiscount ? '<span class="bg-red-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">АКЦИЯ</span>' : ''}
+                        ${p.is_pinned ? '<span class="bg-amber-500/90 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow flex items-center"><i data-lucide="pin" class="w-3 h-3"></i></span>' : ''}
                     </div>
-                    <div class="flex items-center justify-between mt-3">
-                        <div class="flex flex-col">
-                            ${hasDiscount ? `<span class="text-[11px] text-zinc-500 line-through">${p.old_price} ₽</span>` : ''}
-                            <span class="font-bold text-sm text-accent">${p.retail_price} ₽</span>
+                    <div>
+                        <img src="${p.image_url || 'https://via.placeholder.com/150'}" alt="${p.name}" onclick="openImagePreview(${p.id})" class="w-full h-36 object-cover rounded-xl mb-3 cursor-pointer">
+                        <h4 class="font-semibold text-sm line-clamp-1">${p.name}</h4>
+                        <p class="text-xs text-zinc-400 truncate">${p.subcategory || ''}</p>
+                        ${state.role === 'admin' ? `<p class="text-[11px] text-zinc-500 mt-0.5">Остаток: <span class="${stock > 0 ? 'text-zinc-300' : 'text-red-400'} font-medium">${stock} шт.</span></p>` : ''}
+                    </div>
+                    <div class="flex items-center justify-between mt-3 min-h-[2rem]">
+                        <div class="flex flex-col justify-end">
+                            <span class="text-[11px] text-zinc-500 line-through h-[14px] leading-[14px]">${hasDiscount ? p.old_price + ' ₽' : ''}</span>
+                            <span class="font-bold text-sm text-accent leading-none">${p.retail_price} ₽</span>
                         </div>
-                        <button onclick="openVariantModal(${p.id})" class="w-8 h-8 rounded-full bg-accent hover:bg-accentHover flex items-center justify-center text-white transition">
-                            <i data-lucide="plus" class="w-4 h-4"></i>
+                        <button onclick="openVariantModal(${p.id})" title="${inCartQty > 0 ? 'В корзине: ' + inCartQty : 'Добавить в корзину'}" class="w-8 h-8 rounded-full flex items-center justify-center text-white transition ${inCartQty > 0 ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-accent hover:bg-accentHover'}">
+                            ${inCartQty > 0 ? `<span class="text-[11px] font-bold">${inCartQty}</span>` : '<i data-lucide="plus" class="w-4 h-4"></i>'}
                         </button>
                     </div>
                 </div>
             `;
         }
 
-        function getCatalogCardsHTML() {
+        function getCatalogVariantCards() {
             const filteredProducts = (state.products || []).filter(p => {
-                if (p.category !== state.catalogCategory) return false;
+                if (p.category !== state.catalogCategory || p.is_archived) return false;
                 const hasStock = p.product_variants && p.product_variants.some(v => v.quantity > 0);
                 if (!hasStock) return false;
                 if (state.catalogSubcategory !== 'all' && p.subcategory !== state.catalogSubcategory) return false;
                 return true;
             });
-            
+
             let variantCards = [];
             const query = (state.searchQuery || '').toLowerCase();
 
@@ -935,28 +1010,53 @@
                 }
             });
 
+            variantCards.sort((a, b) => {
+                const pinDiff = (b.product.is_pinned ? 1 : 0) - (a.product.is_pinned ? 1 : 0);
+                if (pinDiff !== 0) return pinDiff;
+                return (hasActiveDiscount(b.product) ? 1 : 0) - (hasActiveDiscount(a.product) ? 1 : 0);
+            });
+            return variantCards;
+        }
+
+        function getCatalogCardsHTML() {
+            const variantCards = getCatalogVariantCards();
             if (variantCards.length === 0) return '<p class="col-span-2 text-center text-zinc-500 py-10">Товары не найдены</p>';
 
             return variantCards.map(item => {
                 const p = item.product;
+                const v = item.variant;
                 const hasDiscount = p.old_price && p.old_price > p.retail_price;
+                const cartIndex = state.cart.findIndex(i => i.productId === p.id && i.variantId === v.id);
+                const inCartQty = cartIndex > -1 ? state.cart[cartIndex].qty : 0;
                 return `
                     <div class="bg-cardBg border border-zinc-800 rounded-2xl p-3 flex flex-col justify-between hover:border-zinc-700 transition relative">
-                        ${hasDiscount ? '<span class="absolute top-2 right-2 bg-red-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">АКЦИЯ</span>' : ''}
-                        <div>
-                            <img src="${p.image_url || 'https://via.placeholder.com/150'}" alt="${p.name}" class="w-full h-36 object-cover rounded-xl mb-3">
-                            <h4 class="font-semibold text-sm line-clamp-1">${p.name}</h4>
-                            <p class="text-xs text-zinc-400">${p.subcategory || ''}</p>
-                            <p class="text-xs font-medium text-purple-300 mt-1">${item.variant.type === 'flavor' ? 'Вкус' : 'Цвет'}: ${item.variant.value}</p>
+                        <div class="absolute top-2 right-2 flex flex-col items-end space-y-1">
+                            ${hasDiscount ? '<span class="bg-red-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">АКЦИЯ</span>' : ''}
+                            ${p.is_pinned ? '<span class="bg-amber-500/90 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow flex items-center"><i data-lucide="pin" class="w-3 h-3"></i></span>' : ''}
                         </div>
-                        <div class="flex items-center justify-between mt-3">
-                            <div class="flex flex-col">
-                                ${hasDiscount ? `<span class="text-[11px] text-zinc-500 line-through">${p.old_price} ₽</span>` : ''}
-                                <span class="font-bold text-sm text-accent">${p.retail_price} ₽</span>
+                        <div>
+                            <img src="${p.image_url || 'https://via.placeholder.com/150'}" alt="${p.name}" onclick="openImagePreview(${p.id})" class="w-full h-36 object-cover rounded-xl mb-3 cursor-pointer">
+                            <h4 class="font-semibold text-sm line-clamp-1">${p.name}</h4>
+                            <p class="text-xs text-zinc-400 truncate">${p.subcategory || ''}</p>
+                            <p class="text-xs font-medium text-purple-300 mt-1">${v.type === 'flavor' ? 'Вкус' : 'Цвет'}: ${v.value}</p>
+                            ${state.role === 'admin' ? `<p class="text-[11px] text-zinc-500 mt-0.5">Остаток: <span class="text-zinc-300 font-medium">${v.quantity} шт.</span></p>` : ''}
+                        </div>
+                        <div class="flex items-center justify-between mt-3 min-h-[2rem]">
+                            <div class="flex flex-col justify-end">
+                                <span class="text-[11px] text-zinc-500 line-through h-[14px] leading-[14px]">${hasDiscount ? p.old_price + ' ₽' : ''}</span>
+                                <span class="font-bold text-sm text-accent leading-none">${p.retail_price} ₽</span>
                             </div>
-                            <button onclick="addToCart(${p.id}, ${item.variant.id})" class="w-8 h-8 rounded-full bg-accent hover:bg-accentHover flex items-center justify-center text-white transition">
+                            ${inCartQty > 0 ? `
+                            <div class="flex items-center bg-zinc-900 border border-accent rounded-full overflow-hidden">
+                                <button onclick="changeCatalogCartQty(${p.id}, ${v.id}, -1)" class="w-7 h-8 flex items-center justify-center text-accent hover:bg-accent/10 transition"><i data-lucide="minus" class="w-3.5 h-3.5"></i></button>
+                                <span class="text-xs font-bold w-5 text-center text-zinc-100">${inCartQty}</span>
+                                <button onclick="changeCatalogCartQty(${p.id}, ${v.id}, 1)" class="w-7 h-8 flex items-center justify-center text-accent hover:bg-accent/10 transition"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>
+                            </div>
+                            ` : `
+                            <button onclick="addToCart(${p.id}, ${v.id})" title="Добавить в корзину" class="w-8 h-8 rounded-full flex items-center justify-center text-white bg-accent hover:bg-accentHover transition">
                                 <i data-lucide="plus" class="w-4 h-4"></i>
                             </button>
+                            `}
                         </div>
                     </div>
                 `;
@@ -968,7 +1068,7 @@
             if (!categories.includes(state.catalogCategory)) state.catalogCategory = categories[0];
 
             const currentCategoryProducts = (state.products || []).filter(p => {
-                if (p.category !== state.catalogCategory) return false;
+                if (p.category !== state.catalogCategory || p.is_archived) return false;
                 return p.product_variants && p.product_variants.some(v => v.quantity > 0);
             });
             
@@ -1000,9 +1100,27 @@
                     <div id="catalog-products-grid" class="grid grid-cols-2 gap-3">
                         ${getCatalogCardsHTML()}
                     </div>
+                    <div id="catalog-stock-total" class="text-center text-xs text-zinc-500 pt-1">${getCatalogStockTotalHTML()}</div>
                 </div>
             `;
             lucide.createIcons();
+        }
+
+        function getCatalogStockTotalHTML() {
+            if (state.role !== 'admin') return '';
+            const variantCards = getCatalogVariantCards();
+            if (variantCards.length === 0) return '';
+            const total = variantCards.reduce((sum, item) => sum + Number(item.variant.quantity || 0), 0);
+            return `Всего в наличии: <span class="text-zinc-300 font-semibold">${total} шт.</span>`;
+        }
+
+        async function changeCatalogCartQty(productId, variantId, delta) {
+            const index = state.cart.findIndex(i => i.productId === productId && i.variantId === variantId);
+            if (index === -1) {
+                if (delta > 0) await addToCart(productId, variantId);
+                return;
+            }
+            await updateCartQty(index, delta);
         }
 
         function updateCatalogGrid() {
@@ -1011,6 +1129,8 @@
                 grid.innerHTML = getCatalogCardsHTML();
                 lucide.createIcons();
             }
+            const totalEl = document.getElementById('catalog-stock-total');
+            if (totalEl) totalEl.innerHTML = getCatalogStockTotalHTML();
         }
 
         function openVariantModal(productId) {
@@ -1024,17 +1144,45 @@
             if (availableVariants.length === 0) {
                 container.innerHTML = '<p class="text-xs text-zinc-500 text-center py-4">Нет в наличии</p>';
             } else {
-                container.innerHTML = availableVariants.map(v => `
-                    <div onclick="addToCart(${p.id}, ${v.id}); closeModal('modal-variant-select');" class="bg-zinc-900 border border-zinc-800 hover:border-accent p-3 rounded-xl flex items-center justify-between cursor-pointer transition">
+                container.innerHTML = availableVariants.map(v => {
+                    const inCart = state.cart.find(i => i.productId === p.id && i.variantId === v.id);
+                    return `
+                    <div onclick="addToCart(${p.id}, ${v.id})" class="bg-zinc-900 border ${inCart ? 'border-emerald-600' : 'border-zinc-800'} hover:border-accent p-3 rounded-xl flex items-center justify-between cursor-pointer transition">
                         <div>
-                            <span class="text-xs text-zinc-400 block">${v.type === 'flavor' ? 'Вкус' : 'Цвет'}</span>
-                            <h4 class="text-sm font-semibold text-zinc-200">${v.value}</h4>
+                            <span class="text-xs text-zinc-400 block">${v.type === 'flavor' ? 'Вкус' : 'Цвет'}${state.role === 'admin' ? ' • Остаток: ' + v.quantity + ' шт.' : ''}</span>
+                            <h4 class="text-sm font-semibold text-zinc-200">${v.value} ${inCart ? `<span class="text-emerald-400 text-xs">(в корзине: ${inCart.qty})</span>` : ''}</h4>
                         </div>
                         <span class="text-xs font-bold text-accent">${p.retail_price} ₽</span>
                     </div>
-                `).join('');
+                `}).join('');
             }
             openModal('modal-variant-select');
+        }
+
+        function openImagePreview(productId) {
+            const p = (state.products || []).find(item => item.id === productId);
+            if (!p) return;
+
+            const hasDiscount = p.old_price && p.old_price > p.retail_price;
+            document.getElementById('preview-image-img').src = p.image_url || 'https://via.placeholder.com/300';
+            document.getElementById('preview-image-img').alt = p.name;
+            document.getElementById('preview-image-title').textContent = p.name;
+            document.getElementById('preview-image-price').innerHTML = hasDiscount
+                ? `<span class="text-zinc-500 line-through font-normal text-xs mr-2">${p.old_price} ₽</span>${p.retail_price} ₽`
+                : `${p.retail_price} ₽`;
+
+            const variantsContainer = document.getElementById('preview-image-variants');
+            const variants = (p.product_variants || []).filter(v => v.quantity > 0);
+            variantsContainer.innerHTML = variants.length === 0
+                ? '<p class="text-xs text-zinc-500">Нет в наличии</p>'
+                : variants.map(v => `
+                    <div class="flex items-center justify-between text-xs bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2">
+                        <span class="text-zinc-300">${v.type === 'flavor' ? 'Вкус' : 'Цвет'}: ${v.value}</span>
+                        <span class="text-accent font-semibold">${p.retail_price} ₽</span>
+                    </div>
+                `).join('');
+
+            openModal('modal-image-preview');
         }
 
         async function addToCart(productId, variantId) {
@@ -1072,6 +1220,13 @@
             showToast('Товар добавлен в корзину');
             renderNav();
             if (state.activeTab === 'cart') render();
+            else if (state.activeTab === 'home') renderUserHomeSearch(state.searchQuery || '');
+            else if (state.activeTab === 'catalog' || state.activeTab === 'admin_catalog') updateCatalogGrid();
+
+            const variantModal = document.getElementById('modal-variant-select');
+            if (variantModal && !variantModal.classList.contains('hidden')) {
+                openVariantModal(productId);
+            }
         }
 
         async function updateCartQty(index, delta) {
@@ -1146,7 +1301,7 @@
                                 <span>Итого:</span>
                                 <span class="text-accent">${total} ₽</span>
                             </div>
-                            <button onclick="checkoutOrder()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Оформить заказ</button>
+                            <button id="checkout-order-btn" onclick="checkoutOrder()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Оформить заказ</button>
                         </div>
                     ` : ''}
                 </div>
@@ -1155,6 +1310,7 @@
         }
 
         function checkoutOrder() {
+            if (state.isPlacingOrder) return;
             if (!state.contactUser && !state.phone) {
                 openModal('modal-missing-contacts');
                 return;
@@ -1173,6 +1329,14 @@
 
         async function executeCheckout() {
             if (state.cart.length === 0) return;
+            if (state.isPlacingOrder) return; // защита от повторного нажатия при плохом интернете
+            state.isPlacingOrder = true;
+            const checkoutBtn = document.getElementById('checkout-order-btn');
+            if (checkoutBtn) {
+                checkoutBtn.disabled = true;
+                checkoutBtn.textContent = 'Оформляем заказ...';
+                checkoutBtn.classList.add('opacity-60', 'cursor-not-allowed');
+            }
 
             let totalRetail = 0;
             let totalWholesale = 0;
@@ -1205,7 +1369,9 @@
                     phone: state.phone || 'не указан',
                     total_retail: totalRetail,
                     total_wholesale: totalWholesale,
-                    status: 'in_progress'
+                    status: 'in_progress',
+                    user_login: state.login || null,
+                    client_id: state.clientId
                 }).select().single();
 
                 if (orderErr || !orderData) throw orderErr;
@@ -1224,6 +1390,10 @@
             } catch (e) {
                 console.error(e);
                 showToast('Ошибка при оформлении заказа', 'error');
+                state.isPlacingOrder = false;
+                if (state.activeTab === 'cart') render();
+            } finally {
+                state.isPlacingOrder = false;
             }
         }
 
@@ -1254,7 +1424,11 @@
         }
 
         function renderUserOrders(container) {
-            const myOrders = (state.orders || []).filter(o => o.status !== 'archived');
+            const myOrders = (state.orders || []).filter(o => {
+                if (o.status === 'archived') return false;
+                if (state.login) return o.user_login === state.login;
+                return o.client_id === state.clientId;
+            });
             const inProgress = myOrders.filter(o => o.status === 'in_progress');
             const completed = myOrders.filter(o => o.status === 'completed');
 
@@ -1343,6 +1517,11 @@
         }
 
         // --- Профиль / Авторизация ---
+        function setAuthMode(mode) {
+            state.authMode = mode;
+            render();
+        }
+
         function renderUserProfile(container) {
             const isLoggedIn = Boolean(state.login);
 
@@ -1351,52 +1530,94 @@
                     <h2 class="text-lg font-bold">Профиль аккаунта</h2>
                     
                     ${!isLoggedIn ? `
-                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
-                            <h3 class="text-sm font-bold text-accent">Вход / Регистрация</h3>
-                            <p class="text-xs text-zinc-400">Для регистрации требуется уникальный логин и пароль. Юз и номер необязательны и нужны только для связи.</p>
-                            
-                            <div>
-                                <label class="text-xs text-zinc-400 mb-1 block">Логин <span class="text-red-400">*</span></label>
-                                <input type="text" id="auth-login" placeholder="Уникальный логин" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
-                            </div>
-                            <div>
-                                <label class="text-xs text-zinc-400 mb-1 block">Пароль <span class="text-red-400">*</span></label>
-                                <div class="relative">
-                                    <input type="password" id="auth-password" placeholder="Пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 pr-10 text-sm focus:outline-none focus:border-accent">
-                                    <button type="button" onclick="togglePasswordVisibility('auth-password', 'eye-auth')" class="absolute right-3 top-3 text-zinc-400 hover:text-white transition">
-                                        <i id="eye-auth" data-lucide="eye" class="w-4 h-4"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <div>
-                                <label class="text-xs text-zinc-400 mb-1 block">Юз <span class="text-zinc-500">(необязательно)</span></label>
-                                <input type="text" id="auth-contact" placeholder="@username" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
-                            </div>
-                            <div>
-                                <label class="text-xs text-zinc-400 mb-1 block">Номер <span class="text-zinc-500">(необязательно)</span></label>
-                                <input type="tel" id="auth-phone" placeholder="+7 (999) 000-00-00" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
-                            </div>
-
-                            <button onclick="submitAuth()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white text-sm">Войти / Зарегистрироваться</button>
+                        <div class="flex space-x-1 bg-cardBg p-1 rounded-2xl border border-zinc-800">
+                            <button onclick="setAuthMode('login')" class="flex-1 py-2 rounded-xl text-xs font-medium transition ${state.authMode === 'login' ? 'bg-accent text-white' : 'text-zinc-400'}">Вход</button>
+                            <button onclick="setAuthMode('register')" class="flex-1 py-2 rounded-xl text-xs font-medium transition ${state.authMode === 'register' ? 'bg-accent text-white' : 'text-zinc-400'}">Регистрация</button>
                         </div>
+
+                        ${state.authMode === 'login' ? `
+                            <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                                <h3 class="text-sm font-bold text-accent">Вход в аккаунт</h3>
+                                <div>
+                                    <label class="text-xs text-zinc-400 mb-1 block">Логин</label>
+                                    <input type="text" id="login-login" placeholder="Ваш логин" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-zinc-400 mb-1 block">Пароль</label>
+                                    <div class="relative">
+                                        <input type="password" id="login-password" placeholder="Пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 pr-10 text-sm focus:outline-none focus:border-accent">
+                                        <button type="button" onclick="togglePasswordVisibility('login-password', 'eye-login')" class="absolute right-3 top-3 text-zinc-400 hover:text-white transition">
+                                            <i id="eye-login" data-lucide="eye" class="w-4 h-4"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <button onclick="submitLogin()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white text-sm">Войти</button>
+                            </div>
+                        ` : `
+                            <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                                <h3 class="text-sm font-bold text-accent">Регистрация</h3>
+                                <p class="text-xs text-zinc-500">Обязательные поля</p>
+                                <div>
+                                    <label class="text-xs text-zinc-400 mb-1 block">Логин <span class="text-red-400">*</span></label>
+                                    <input type="text" id="reg-login" placeholder="Уникальный логин" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-zinc-400 mb-1 block">Пароль <span class="text-red-400">*</span></label>
+                                    <div class="relative">
+                                        <input type="password" id="reg-password" placeholder="Пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 pr-10 text-sm focus:outline-none focus:border-accent">
+                                        <button type="button" onclick="togglePasswordVisibility('reg-password', 'eye-reg')" class="absolute right-3 top-3 text-zinc-400 hover:text-white transition">
+                                            <i id="eye-reg" data-lucide="eye" class="w-4 h-4"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="border-t border-dashed border-zinc-800 pt-3">
+                                    <p class="text-xs text-zinc-500 mb-2">Необязательные поля (для связи с вами)</p>
+                                    <div class="space-y-3">
+                                        <div>
+                                            <label class="text-xs text-zinc-400 mb-1 block">Юз <span class="text-zinc-500">(необязательно)</span></label>
+                                            <input type="text" id="reg-contact" placeholder="@username" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                                        </div>
+                                        <div>
+                                            <label class="text-xs text-zinc-400 mb-1 block">Номер <span class="text-zinc-500">(необязательно)</span></label>
+                                            <input type="tel" id="reg-phone" placeholder="+7 (999) 000-00-00" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                                        </div>
+                                    </div>
+                                </div>
+                                <button onclick="submitRegister()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white text-sm">Зарегистрироваться</button>
+                            </div>
+                        `}
                     ` : `
                         <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
                             <div class="flex justify-between items-center">
                                 <span class="text-xs text-zinc-400">Логин аккаунта:</span>
                                 <span class="font-bold text-sm text-zinc-200">${state.login}</span>
                             </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-xs text-zinc-400">Юз для связи:</span>
-                                <span class="font-medium text-sm text-zinc-200">${state.contactUser || 'Не указано'}</span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-xs text-zinc-400">Номер телефона:</span>
-                                <span class="font-medium text-sm text-zinc-200">${state.phone || 'Не указано'}</span>
-                            </div>
-                            <div class="flex justify-between items-center pt-2 border-t border-zinc-800">
-                                <span class="text-xs text-zinc-400">Роль:</span>
-                                <span class="text-xs px-2 py-0.5 rounded-full ${state.role === 'admin' ? 'bg-accent text-white' : 'bg-zinc-800 text-zinc-400'}">${state.role === 'admin' ? 'Администратор' : 'Пользователь'}</span>
-                            </div>
+                            ${!state.isProfileEditing ? `
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs text-zinc-400">Юз для связи:</span>
+                                    <span class="font-medium text-sm text-zinc-200">${state.contactUser || 'Не указано'}</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs text-zinc-400">Номер телефона:</span>
+                                    <span class="font-medium text-sm text-zinc-200">${state.phone || 'Не указано'}</span>
+                                </div>
+                                <button onclick="startEditContacts()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-2.5 rounded-xl font-medium transition text-xs flex items-center justify-center space-x-2 mt-1">
+                                    <i data-lucide="edit-3" class="w-4 h-4 text-accent"></i><span>Изменить юз и номер</span>
+                                </button>
+                            ` : `
+                                <div>
+                                    <label class="text-xs text-zinc-400 mb-1 block">Юз</label>
+                                    <input type="text" id="edit-contact-user" value="${state.contactUser}" placeholder="@username" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-zinc-400 mb-1 block">Номер телефона</label>
+                                    <input type="tel" id="edit-contact-phone" value="${state.phone}" placeholder="+7 (999) 000-00-00" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button onclick="cancelEditContacts()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl text-xs font-medium transition">Отмена</button>
+                                    <button onclick="saveEditContacts()" class="flex-1 bg-accent hover:bg-accentHover py-2.5 rounded-xl text-xs font-medium transition text-white">Сохранить</button>
+                                </div>
+                            `}
                         </div>
 
                         <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
@@ -1411,9 +1632,7 @@
 
                         <div class="bg-cardBg border border-red-900/40 rounded-2xl p-4 space-y-3 mt-4">
                             <h3 class="text-sm font-bold text-red-400">Удаление аккаунта</h3>
-                            <p class="text-xs text-zinc-400">Для удаления аккаунта введите ваш логин и пароль:</p>
-                            <input type="text" id="del-login" placeholder="Логин" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-red-500">
-                            <input type="password" id="del-password" placeholder="Пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-red-500">
+                            <p class="text-xs text-zinc-400">Это действие необратимо. Аккаунт и все связанные с ним данные будут удалены.</p>
                             <button onclick="deleteAccount()" class="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-2.5 rounded-xl font-medium transition text-xs border border-red-500/30">Удалить аккаунт</button>
                         </div>
                     `}
@@ -1422,11 +1641,85 @@
             lucide.createIcons();
         }
 
-        async function submitAuth() {
-            const login = document.getElementById('auth-login').value.trim();
-            const password = document.getElementById('auth-password').value.trim();
-            let contact = document.getElementById('auth-contact').value.trim();
-            const phone = document.getElementById('auth-phone').value.trim();
+        function startEditContacts() {
+            state.isProfileEditing = true;
+            render();
+        }
+
+        function cancelEditContacts() {
+            state.isProfileEditing = false;
+            render();
+        }
+
+        async function saveEditContacts() {
+            let contact = document.getElementById('edit-contact-user').value.trim();
+            const phone = document.getElementById('edit-contact-phone').value.trim();
+            if (contact && !contact.startsWith('@')) contact = '@' + contact;
+
+            try {
+                await supabaseClient.from('user').update({
+                    contact_username: contact,
+                    номер: phone
+                }).eq('логин', state.login);
+
+                state.contactUser = contact;
+                state.phone = phone;
+                localStorage.setItem('reflex_contact_user', state.contactUser);
+                localStorage.setItem('reflex_phone', state.phone);
+                state.isProfileEditing = false;
+                render();
+                showToast('Контакты обновлены!');
+            } catch (e) {
+                showToast('Ошибка обновления контактов', 'error');
+            }
+        }
+
+        async function submitLogin() {
+            const login = document.getElementById('login-login').value.trim();
+            const password = document.getElementById('login-password').value.trim();
+
+            if (!login || !password) {
+                showToast('Введите логин и пароль!', 'error');
+                return;
+            }
+
+            try {
+                const { data: existingUser } = await supabaseClient.from('user').select('*').eq('логин', login).maybeSingle();
+
+                if (!existingUser) {
+                    showToast('Аккаунт с таким логином не найден. Зарегистрируйтесь!', 'error');
+                    return;
+                }
+                if (existingUser.пароль !== password) {
+                    showToast('Неверный пароль!', 'error');
+                    return;
+                }
+
+                state.login = login;
+                state.contactUser = existingUser.contact_username || '';
+                state.phone = existingUser.номер || '';
+                state.role = existingUser.роль === 'админ' ? 'admin' : 'user';
+
+                localStorage.setItem('reflex_login', state.login);
+                localStorage.setItem('reflex_contact_user', state.contactUser);
+                localStorage.setItem('reflex_phone', state.phone);
+                localStorage.setItem('reflex_role', state.role);
+
+                showToast('Успешный вход в аккаунт!');
+                await loadCartFromDb();
+                await fetchOrders();
+                render();
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка входа', 'error');
+            }
+        }
+
+        async function submitRegister() {
+            const login = document.getElementById('reg-login').value.trim();
+            const password = document.getElementById('reg-password').value.trim();
+            let contact = document.getElementById('reg-contact').value.trim();
+            const phone = document.getElementById('reg-phone').value.trim();
 
             if (!login || !password) {
                 showToast('Введите логин и пароль!', 'error');
@@ -1436,56 +1729,42 @@
             if (contact && !contact.startsWith('@')) contact = '@' + contact;
 
             try {
-                const { data: existingUser } = await supabaseClient.from('user').select('*').eq('логин', login).maybeSingle();
-
+                const { data: existingUser } = await supabaseClient.from('user').select('логин').eq('логин', login).maybeSingle();
                 if (existingUser) {
-                    if (existingUser.пароль !== password) {
-                        showToast('Неверный пароль!', 'error');
-                        return;
-                    }
-                    await supabaseClient.from('user').update({
-                        contact_username: contact || existingUser.contact_username,
-                        номер: phone || existingUser.номер
-                    }).eq('логин', login);
-
-                    state.login = login;
-                    state.contactUser = contact || existingUser.contact_username || '';
-                    state.phone = phone || existingUser.номер || '';
-                    state.role = existingUser.роль === 'админ' ? 'admin' : 'user';
-
-                    showToast('Успешный вход в аккаунт!');
-                } else {
-                    const { error } = await supabaseClient.from('user').insert({
-                        логин: login,
-                        пароль: password,
-                        contact_username: contact,
-                        номер: phone,
-                        роль: 'пользователь'
-                    });
-
-                    if (error) {
-                        showToast('Ошибка регистрации (возможно, логин уже занят)', 'error');
-                        return;
-                    }
-
-                    state.login = login;
-                    state.contactUser = contact;
-                    state.phone = phone;
-                    state.role = 'user';
-
-                    showToast('Успешная регистрация и вход!');
+                    showToast('Такой логин уже занят, выберите другой', 'error');
+                    return;
                 }
+
+                const { error } = await supabaseClient.from('user').insert({
+                    логин: login,
+                    пароль: password,
+                    contact_username: contact,
+                    номер: phone,
+                    роль: 'пользователь'
+                });
+
+                if (error) {
+                    showToast('Ошибка регистрации (возможно, логин уже занят)', 'error');
+                    return;
+                }
+
+                state.login = login;
+                state.contactUser = contact;
+                state.phone = phone;
+                state.role = 'user';
 
                 localStorage.setItem('reflex_login', state.login);
                 localStorage.setItem('reflex_contact_user', state.contactUser);
                 localStorage.setItem('reflex_phone', state.phone);
                 localStorage.setItem('reflex_role', state.role);
 
+                showToast('Успешная регистрация и вход!');
                 await loadCartFromDb();
+                await fetchOrders();
                 render();
             } catch (e) {
                 console.error(e);
-                showToast('Ошибка авторизации', 'error');
+                showToast('Ошибка регистрации', 'error');
             }
         }
 
@@ -1494,6 +1773,8 @@
             state.contactUser = '';
             state.phone = '';
             state.role = 'user';
+            state.isProfileEditing = false;
+            state.authMode = 'login';
             localStorage.removeItem('reflex_login');
             localStorage.removeItem('reflex_contact_user');
             localStorage.removeItem('reflex_phone');
@@ -1504,32 +1785,8 @@
             showToast('Вы вышли из аккаунта');
         }
 
-        async function deleteAccount() {
-            const loginInput = document.getElementById('del-login').value.trim();
-            const passInput = document.getElementById('del-password').value.trim();
-
-            if (!loginInput || !passInput) {
-                showToast('Введите логин и пароль для подтверждения удаления', 'error');
-                return;
-            }
-
-            if (loginInput !== state.login) {
-                showToast('Логин не совпадает с текущим аккаунтом', 'error');
-                return;
-            }
-
-            try {
-                const { data: dbUser } = await supabaseClient.from('user').select('пароль').eq('логин', state.login).maybeSingle();
-                if (!dbUser || dbUser.пароль !== passInput) {
-                    showToast('Неверный пароль аккаунта!', 'error');
-                    return;
-                }
-            } catch (e) {
-                showToast('Ошибка проверки пароля', 'error');
-                return;
-            }
-
-            showConfirm('Удаление аккаунта', 'Вы уверены, что хотите удалить свой аккаунт?', async () => {
+        function deleteAccount() {
+            showConfirm('Удаление аккаунта', 'Вы уверены, что хотите удалить свой аккаунт? Это действие необратимо.', async () => {
                 try {
                     await supabaseClient.from('user').delete().eq('логин', state.login);
                 } catch (e) {}
@@ -1611,6 +1868,51 @@
             } catch (e) {
                 console.error(e);
                 showToast('Ошибка входа в админку', 'error');
+            }
+        }
+
+        function openChangeAdminPasswordModal() {
+            document.getElementById('old-admin-password').value = '';
+            document.getElementById('new-admin-password').value = '';
+            openModal('modal-change-admin-password');
+        }
+
+        async function submitChangeAdminPassword() {
+            const oldPass = document.getElementById('old-admin-password').value.trim();
+            const newPass = document.getElementById('new-admin-password').value.trim();
+
+            if (!oldPass || !newPass) {
+                showToast('Заполните оба поля', 'error');
+                return;
+            }
+
+            try {
+                const { data: settingData } = await supabaseClient.from('setting').select('value').eq('key', 'admin_password').maybeSingle();
+                const correctPassword = settingData ? settingData.value : 'admin';
+
+                if (oldPass !== correctPassword) {
+                    showToast('Неверный текущий пароль администратора!', 'error');
+                    return;
+                }
+
+                if (settingData) {
+                    await supabaseClient.from('setting').update({ value: newPass }).eq('key', 'admin_password');
+                } else {
+                    await supabaseClient.from('setting').insert({ key: 'admin_password', value: newPass });
+                }
+
+                // После смены пароля все администраторы понижаются до пользователей
+                await supabaseClient.from('user').update({ роль: 'пользователь' }).eq('роль', 'админ');
+
+                state.role = 'user';
+                localStorage.setItem('reflex_role', 'user');
+
+                closeModal('modal-change-admin-password');
+                switchTab('home');
+                showToast('Пароль администратора изменен. Все админы понижены до пользователей.');
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка смены пароля администратора', 'error');
             }
         }
 
@@ -2055,6 +2357,9 @@
         }
 
         function renderAdminProducts(container) {
+            const products = (state.products || []).filter(p => !p.is_archived);
+            const archivedProducts = (state.products || []).filter(p => p.is_archived);
+            const totalStock = products.reduce((sum, p) => sum + getProductStock(p), 0);
             container.innerHTML = `
                 <div class="space-y-4">
                     <div class="flex justify-between items-center">
@@ -2064,33 +2369,104 @@
                         </button>
                     </div>
                     <div class="space-y-3">
-                        ${(state.products || []).map(p => `
-                            <div class="bg-cardBg border border-zinc-800 rounded-2xl p-3 flex items-center justify-between">
+                        ${products.map(p => `
+                            <div class="bg-cardBg border ${p.is_pinned ? 'border-amber-500/50' : 'border-zinc-800'} rounded-2xl p-3 flex items-center justify-between">
                                 <div class="flex items-center space-x-3">
                                     <img src="${p.image_url || 'https://via.placeholder.com/150'}" class="w-14 h-14 object-cover rounded-xl">
                                     <div>
-                                        <h4 class="font-semibold text-sm">${p.name}</h4>
+                                        <h4 class="font-semibold text-sm flex items-center space-x-1">
+                                            <span>${p.name}</span>
+                                            ${p.is_pinned ? '<i data-lucide="pin" class="w-3.5 h-3.5 text-amber-400"></i>' : ''}
+                                        </h4>
                                         <p class="text-xs text-zinc-400">${p.category} | ${p.subcategory || ''}</p>
                                         <p class="text-xs text-accent mt-0.5">Розн: ${p.retail_price} ₽ | Опт: ${p.wholesale_price} ₽</p>
+                                        <p class="text-[11px] text-zinc-500 mt-0.5">Остаток: <span class="text-zinc-300 font-medium">${getProductStock(p)} шт.</span></p>
                                     </div>
                                 </div>
-                                <div class="flex space-x-1.5 items-center">
-                                    <button onclick="openDiscountModal(${p.id})" title="Акция" class="w-8 h-8 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 rounded-xl flex items-center justify-center transition">
-                                        <i data-lucide="tag" class="w-4 h-4"></i>
-                                    </button>
-                                    <button onclick="editProduct(${p.id})" title="Редактировать" class="w-8 h-8 bg-zinc-800 hover:bg-zinc-700 rounded-xl flex items-center justify-center text-zinc-300 transition">
-                                        <i data-lucide="edit-2" class="w-4 h-4"></i>
-                                    </button>
-                                    <button onclick="deleteProduct(${p.id})" title="Удалить" class="w-8 h-8 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl flex items-center justify-center transition">
-                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                    </button>
+                                <div class="flex flex-col space-y-1.5 items-center">
+                                    <div class="flex space-x-1.5">
+                                        <button onclick="toggleProductPin(${p.id})" title="${p.is_pinned ? 'Открепить' : 'Закрепить на главной'}" class="w-8 h-8 ${p.is_pinned ? 'bg-amber-500/30 text-amber-400' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} rounded-xl flex items-center justify-center transition">
+                                            <i data-lucide="pin" class="w-4 h-4"></i>
+                                        </button>
+                                        <button onclick="toggleProductArchive(${p.id})" title="В архив" class="w-8 h-8 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 rounded-xl flex items-center justify-center transition">
+                                            <i data-lucide="archive" class="w-4 h-4"></i>
+                                        </button>
+                                    </div>
+                                    <div class="flex space-x-1.5">
+                                        <button onclick="openDiscountModal(${p.id})" title="Акция" class="w-8 h-8 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 rounded-xl flex items-center justify-center transition">
+                                            <i data-lucide="tag" class="w-4 h-4"></i>
+                                        </button>
+                                        <button onclick="editProduct(${p.id})" title="Редактировать" class="w-8 h-8 bg-zinc-800 hover:bg-zinc-700 rounded-xl flex items-center justify-center text-zinc-300 transition">
+                                            <i data-lucide="edit-2" class="w-4 h-4"></i>
+                                        </button>
+                                        <button onclick="deleteProduct(${p.id})" title="Удалить" class="w-8 h-8 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl flex items-center justify-center transition">
+                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         `).join('')}
                     </div>
+                    <div class="text-center text-xs text-zinc-500 pt-1">${products.length > 0 ? `Общий остаток по всем товарам: <span class="text-zinc-300 font-semibold">${totalStock} шт.</span>` : ''}</div>
+
+                    <div class="pt-2">
+                        <button onclick="state.showArchive = !state.showArchive; render();" class="w-full flex items-center justify-between bg-cardBg border border-zinc-800 rounded-2xl px-4 py-3 text-sm font-medium text-zinc-300 hover:bg-zinc-800/50 transition">
+                            <span class="flex items-center space-x-2">
+                                <i data-lucide="archive" class="w-4 h-4 text-zinc-400"></i>
+                                <span>Архив (${archivedProducts.length})</span>
+                            </span>
+                            <i data-lucide="${state.showArchive ? 'chevron-up' : 'chevron-down'}" class="w-4 h-4 text-zinc-400"></i>
+                        </button>
+                        ${state.showArchive ? `
+                            <div class="space-y-2 mt-2">
+                                ${archivedProducts.length === 0 ? '<p class="text-xs text-zinc-500 text-center py-3">Архив пуст</p>' : archivedProducts.map(p => `
+                                    <div class="bg-cardBg border border-zinc-800 rounded-2xl p-3 flex items-center justify-between opacity-75">
+                                        <div class="flex items-center space-x-3">
+                                            <img src="${p.image_url || 'https://via.placeholder.com/150'}" class="w-12 h-12 object-cover rounded-xl grayscale">
+                                            <div>
+                                                <h4 class="font-semibold text-sm">${p.name}</h4>
+                                                <p class="text-xs text-zinc-500">${p.category} | ${p.subcategory || ''}</p>
+                                            </div>
+                                        </div>
+                                        <button onclick="toggleProductArchive(${p.id})" title="Восстановить" class="px-3 py-2 bg-accent/20 hover:bg-accent/30 text-accent rounded-xl text-xs font-medium flex items-center space-x-1 transition">
+                                            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i><span>Вернуть</span>
+                                        </button>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
                 </div>
             `;
             lucide.createIcons();
+        }
+
+        async function toggleProductArchive(id) {
+            const product = (state.products || []).find(p => p.id === id);
+            if (!product) return;
+            try {
+                await supabaseClient.from('products').update({ is_archived: !product.is_archived }).eq('id', id);
+                await fetchProducts();
+                render();
+                showToast(!product.is_archived ? 'Товар перемещен в архив' : 'Товар восстановлен из архива');
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка архивации товара', 'error');
+            }
+        }
+
+        async function toggleProductPin(id) {
+            const product = (state.products || []).find(p => p.id === id);
+            if (!product) return;
+            try {
+                await supabaseClient.from('products').update({ is_pinned: !product.is_pinned }).eq('id', id);
+                await fetchProducts();
+                render();
+                showToast(!product.is_pinned ? 'Товар закреплен на главной' : 'Товар откреплен');
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка закрепления товара', 'error');
+            }
         }
 
         function renderAdminSettings(container) {
@@ -2104,6 +2480,9 @@
 
                     ${state.adminSettingsSubTab === 'general' ? `
                         <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <button onclick="openChangeAdminPasswordModal()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
+                                <i data-lucide="key" class="w-4 h-4 text-accent"></i><span>Сменить пароль администратора</span>
+                            </button>
                             <button onclick="resetSystemToZero()" class="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2 border border-red-500/30">
                                 <i data-lucide="trash-2" class="w-4 h-4"></i><span>Сбросить сайт (Очистить всё)</span>
                             </button>
@@ -2113,21 +2492,27 @@
                         </div>
                     ` : `
                         <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
-                            <h3 class="text-sm font-bold">Добавить менеджера</h3>
+                            <h3 class="text-sm font-bold">${state.editingManagerId ? 'Редактировать менеджера' : 'Добавить менеджера'}</h3>
                             <div class="space-y-2">
-                                <input type="text" id="new-manager-name" placeholder="Имя менеджера" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
-                                <input type="text" id="new-manager-username" placeholder="Юз телеграм (@username)" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
-                                <button onclick="addNewManager()" class="w-full bg-accent hover:bg-accentHover py-2.5 rounded-xl font-medium transition text-xs text-white">Добавить менеджера</button>
+                                <input type="text" id="new-manager-name" placeholder="Имя менеджера" value="${(() => { const m = state.managers.find(x => x.id == state.editingManagerId); return m ? m.name : ''; })()}" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
+                                <input type="text" id="new-manager-username" placeholder="Юз телеграм (@username)" value="${(() => { const m = state.managers.find(x => x.id == state.editingManagerId); return m ? m.username : ''; })()}" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
+                                <div class="flex space-x-2">
+                                    <button onclick="saveManager()" class="flex-1 bg-accent hover:bg-accentHover py-2.5 rounded-xl font-medium transition text-xs text-white">${state.editingManagerId ? 'Сохранить изменения' : 'Добавить менеджера'}</button>
+                                    ${state.editingManagerId ? `<button onclick="cancelEditManager()" class="px-4 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl font-medium transition text-xs text-zinc-300">Отмена</button>` : ''}
+                                </div>
                             </div>
                             <h3 class="text-sm font-bold pt-3 border-t border-zinc-800">Список менеджеров</h3>
                             <div class="space-y-2 max-h-48 overflow-y-auto">
                                 ${state.managers.length === 0 ? '<p class="text-xs text-zinc-500 text-center py-2">Менеджеры не добавлены</p>' : state.managers.map(m => `
-                                    <div class="bg-zinc-900 border border-zinc-800 p-2.5 rounded-xl flex items-center justify-between">
+                                    <div class="bg-zinc-900 border ${state.editingManagerId == m.id ? 'border-accent' : 'border-zinc-800'} p-2.5 rounded-xl flex items-center justify-between">
                                         <div>
                                             <h4 class="text-xs font-semibold text-zinc-200">${m.name}</h4>
                                             <p class="text-[10px] text-accent">@${m.username.replace('@', '')}</p>
                                         </div>
-                                        <button onclick="deleteManager('${m.id}')" class="text-red-400 hover:text-red-300 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                        <div class="flex items-center space-x-1">
+                                            <button onclick="startEditManager('${m.id}')" class="text-zinc-400 hover:text-accent p-1"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
+                                            <button onclick="deleteManager('${m.id}')" class="text-red-400 hover:text-red-300 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                        </div>
                                     </div>
                                 `).join('')}
                             </div>
@@ -2138,7 +2523,7 @@
             lucide.createIcons();
         }
 
-        async function addNewManager() {
+        async function saveManager() {
             const nameField = document.getElementById('new-manager-name');
             const usernameField = document.getElementById('new-manager-username');
             if (!nameField || !usernameField) return;
@@ -2154,22 +2539,43 @@
             if (username.startsWith('@')) username = username.substring(1);
 
             try {
-                const { error } = await supabaseClient.from('managers').insert({ name, username });
-                if (error) {
-                    showToast('Ошибка при добавлении менеджера', 'error');
-                    return;
+                if (state.editingManagerId) {
+                    const { error } = await supabaseClient.from('managers').update({ name, username }).eq('id', state.editingManagerId);
+                    if (error) {
+                        showToast('Ошибка при сохранении менеджера', 'error');
+                        return;
+                    }
+                    state.editingManagerId = null;
+                    await fetchManagers();
+                    render();
+                    showToast('Данные менеджера обновлены!');
+                } else {
+                    const { error } = await supabaseClient.from('managers').insert({ name, username });
+                    if (error) {
+                        showToast('Ошибка при добавлении менеджера', 'error');
+                        return;
+                    }
+                    await fetchManagers();
+                    render();
+                    showToast('Менеджер успешно добавлен!');
                 }
-                nameField.value = '';
-                usernameField.value = '';
-                await fetchManagers();
-                render();
-                showToast('Менеджер успешно добавлен!');
             } catch (e) {
                 showToast('Ошибка подключения к базе данных', 'error');
             }
         }
 
+        function startEditManager(id) {
+            state.editingManagerId = id;
+            render();
+        }
+
+        function cancelEditManager() {
+            state.editingManagerId = null;
+            render();
+        }
+
         async function deleteManager(id) {
+            if (state.editingManagerId == id) state.editingManagerId = null;
             await supabaseClient.from('managers').delete().eq('id', id);
             await fetchManagers();
             render();
