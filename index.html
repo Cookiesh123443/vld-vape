@@ -384,7 +384,8 @@
             chartInstance: null,
             selectedOrderForAsk: null,
             showArchive: false,
-            editingManagerId: null
+            editingManagerId: null,
+            adminProductSearch: ''
         };
 
         function togglePasswordVisibility(inputId, iconId) {
@@ -703,45 +704,18 @@
             try {
                 const { data, error } = await supabaseClient.from('products').select('*, product_variants(*)');
                 if (!error && data) {
-                    const map = {};
-                    for (const p of data) {
-                        // Важно: варианты с нулевым остатком больше НЕ удаляются автоматически —
-                        // иначе при отмене заказа склад не мог восстановиться (вариант уже был удален из БД).
-                        const validVariants = p.product_variants || [];
-
-                        if (validVariants.length === 0) {
-                            await supabaseClient.from('products').delete().eq('id', p.id);
-                            continue;
+                    // Просто загружаем все товары как есть, без автоудаления.
+                    // Дубли вариантов (одинаковый value в одном товаре) объединяем только в памяти.
+                    state.products = data.map(p => {
+                        const variants = p.product_variants || [];
+                        const varMap = {};
+                        for (const v of variants) {
+                            const vKey = v.value.trim().toLowerCase();
+                            if (!varMap[vKey]) varMap[vKey] = { ...v };
+                            else varMap[vKey].quantity += Number(v.quantity || 0);
                         }
-
-                        const key = p.name.trim().toLowerCase();
-                        if (!map[key]) {
-                            const varMap = {};
-                            for (const v of validVariants) {
-                                const vKey = v.value.trim().toLowerCase();
-                                if (!varMap[vKey]) varMap[vKey] = { ...v };
-                                else {
-                                    varMap[vKey].quantity += Number(v.quantity || 0);
-                                    await supabaseClient.from('product_variants').delete().eq('id', v.id);
-                                }
-                            }
-                            map[key] = { ...p, product_variants: Object.values(varMap) };
-                        } else {
-                            for (const v of validVariants) {
-                                const vKey = v.value.trim().toLowerCase();
-                                const existingVar = map[key].product_variants.find(item => item.value.trim().toLowerCase() === vKey);
-                                if (existingVar) {
-                                    existingVar.quantity += Number(v.quantity || 0);
-                                    await supabaseClient.from('product_variants').delete().eq('id', v.id);
-                                } else {
-                                    await supabaseClient.from('product_variants').update({ product_id: map[key].id }).eq('id', v.id);
-                                    map[key].product_variants.push(v);
-                                }
-                            }
-                            await supabaseClient.from('products').delete().eq('id', p.id);
-                        }
-                    }
-                    state.products = Object.values(map);
+                        return { ...p, product_variants: Object.values(varMap) };
+                    });
                     await validateCartStock();
                 }
             } catch (e) { console.error(e); }
@@ -1365,7 +1339,7 @@
 
             try {
                 const { data: orderData, error: orderErr } = await supabaseClient.from('orders').insert({
-                    username: state.contactUser || state.login || '@аноним',
+                    username: state.contactUser || 'не указано',
                     phone: state.phone || 'не указан',
                     total_retail: totalRetail,
                     total_wholesale: totalWholesale,
@@ -1403,11 +1377,26 @@
                     const order = (state.orders || []).find(o => o.id == orderId);
                     if (order && order.order_items) {
                         for (const item of order.order_items) {
-                            const prod = (state.products || []).find(p => p.name === item.product_name);
-                            if (prod && prod.product_variants) {
-                                const v = prod.product_variants.find(ev => ev.value === item.variant_name);
-                                if (v) {
-                                    await supabaseClient.from('product_variants').update({ quantity: v.quantity + item.quantity }).eq('id', v.id);
+                            // Ищем товар в БД по имени
+                            const { data: prodData } = await supabaseClient
+                                .from('products')
+                                .select('id')
+                                .ilike('name', item.product_name)
+                                .limit(1);
+
+                            if (prodData && prodData.length > 0) {
+                                const productId = prodData[0].id;
+                                // Ищем вариант в БД по product_id и value
+                                const { data: varData } = await supabaseClient
+                                    .from('product_variants')
+                                    .select('id, quantity')
+                                    .eq('product_id', productId)
+                                    .ilike('value', item.variant_name)
+                                    .limit(1);
+
+                                if (varData && varData.length > 0) {
+                                    const newQty = Number(varData[0].quantity || 0) + Number(item.quantity);
+                                    await supabaseClient.from('product_variants').update({ quantity: newQty }).eq('id', varData[0].id);
                                 }
                             }
                         }
@@ -1416,8 +1405,9 @@
                     await fetchProducts();
                     await fetchOrders();
                     render();
-                    showToast('Заказ отменен');
+                    showToast('Заказ отменен, товар возвращен на склад');
                 } catch (e) {
+                    console.error(e);
                     showToast('Ошибка отмены заказа', 'error');
                 }
             });
@@ -1438,7 +1428,10 @@
                     
                     <div class="space-y-3">
                         <h3 class="text-sm font-semibold text-zinc-400">В работе (${inProgress.length})</h3>
-                        ${inProgress.length === 0 ? '<p class="text-xs text-zinc-600">Нет заказов в работе</p>' : inProgress.map(o => `
+                        ${inProgress.length === 0 ? '<p class="text-xs text-zinc-600">Нет заказов в работе</p>' : inProgress.map(o => {
+                            const cleanUsername = (o.username || '').replace('@', '');
+                            const hasContact = !!o.phone || (cleanUsername && cleanUsername.toLowerCase() !== 'аноним');
+                            return `
                             <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-2">
                                 <div class="flex justify-between text-xs text-zinc-400">
                                     <span>Заказ #${String(o.id).slice(0,6)}</span>
@@ -1447,17 +1440,23 @@
                                 <div class="space-y-1">
                                     ${(o.order_items || []).map(i => `<div class="text-sm flex justify-between"><span>${i.product_name} (${i.variant_name})</span><span>${i.quantity} шт. x ${i.price} ₽</span></div>`).join('')}
                                 </div>
+                                ${!hasContact ? `
+                                    <div class="bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2 flex items-start space-x-2">
+                                        <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+                                        <p class="text-[11px] text-amber-300 leading-snug">Вы не указали телефон или Telegram, менеджер не сможет с вами связаться. Напишите ему сами, нажав кнопку ниже.</p>
+                                    </div>
+                                ` : ''}
                                 <div class="flex flex-col space-y-2 pt-2 border-t border-zinc-800">
                                     <div class="flex justify-between items-center">
                                         <span class="font-bold text-sm text-accent">Итого: ${o.total_retail} ₽</span>
                                         <button onclick="cancelOrder('${o.id}')" class="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs rounded-lg transition">Отменить</button>
                                     </div>
-                                    <button onclick="openAskManagerModal('${o.id}')" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-2 rounded-xl text-xs font-medium transition flex items-center justify-center space-x-1.5">
-                                        <i data-lucide="message-circle" class="w-4 h-4 text-accent"></i><span>Спросить о заказе</span>
+                                    <button onclick="openAskManagerModal('${o.id}')" class="w-full ${hasContact ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200' : 'bg-accent hover:bg-accentHover text-white'} py-2 rounded-xl text-xs font-medium transition flex items-center justify-center space-x-1.5">
+                                        <i data-lucide="message-circle" class="w-4 h-4 ${hasContact ? 'text-accent' : 'text-white'}"></i><span>Спросить о заказе</span>
                                     </button>
                                 </div>
                             </div>
-                        `).join('')}
+                        `}).join('')}
                     </div>
 
                     <div class="space-y-3 pt-4">
@@ -1968,7 +1967,7 @@
                     }
                 }
             } else {
-                addVariantRow('', 10);
+                addVariantRow('', '');
             }
 
             updateVariantLabel();
@@ -2292,17 +2291,21 @@
                     <div class="space-y-3">
                         <h3 class="text-sm font-semibold text-amber-400">В работе (${inProgress.length})</h3>
                         ${inProgress.length === 0 ? '<p class="text-xs text-zinc-600">Нет заказов в работе</p>' : inProgress.map(o => {
-                            const cleanUsername = (o.username || '').replace('@', '');
-                            const phoneNum = o.phone;
+                            const rawUsername = (o.username || '').trim();
+                            const cleanUsername = rawUsername.replace('@', '');
+                            const isBadUsername = !cleanUsername || cleanUsername === 'не указано' || cleanUsername === 'аноним';
+                            const phoneNum = (o.phone || '').trim();
+                            const isBadPhone = !phoneNum || phoneNum === 'не указан';
+                            const displayLogin = o.user_login || null;
                             return `
                                 <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-2">
                                     <div class="flex justify-between text-xs text-zinc-400">
-                                        <span>Заказ #${String(o.id).slice(0,6)} • <strong class="text-white">${o.username || 'Аноним'}</strong></span>
+                                        <span>Заказ #${String(o.id).slice(0,6)} • ${displayLogin ? `<strong class="text-white">${displayLogin}</strong>` : `<span class="text-zinc-500 italic">без аккаунта</span>`}</span>
                                         <span>${new Date(o.created_at).toLocaleString()}</span>
                                     </div>
                                     <div class="bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-800 space-y-1 text-xs">
-                                        <div>Телефон: ${phoneNum ? `<a href="tel:${phoneNum}" class="text-accent underline font-medium">${phoneNum}</a>` : '<span class="text-zinc-500">Не указано</span>'}</div>
-                                        <div>Telegram: ${cleanUsername && cleanUsername !== 'аноним' ? `<a href="https://t.me/${cleanUsername}" target="_blank" class="text-accent underline font-medium">@${cleanUsername}</a>` : '<span class="text-zinc-500">Не указано</span>'}</div>
+                                        <div>Телефон: ${!isBadPhone ? `<a href="tel:${phoneNum}" class="text-accent underline font-medium">${phoneNum}</a>` : '<span class="text-zinc-500">Не указан</span>'}</div>
+                                        <div>Telegram: ${!isBadUsername ? `<a href="https://t.me/${cleanUsername}" target="_blank" class="text-accent underline font-medium">@${cleanUsername}</a>` : '<span class="text-zinc-500">Не указан</span>'}</div>
                                     </div>
                                     <div class="space-y-1">
                                         ${(o.order_items || []).map(i => `<div class="text-sm flex justify-between"><span>${i.product_name} (${i.variant_name})</span><span>${i.quantity} шт. x ${i.price} ₽</span></div>`).join('')}
@@ -2356,44 +2359,62 @@
             showToast('Заказ удален');
         }
 
-        function renderAdminProducts(container) {
-            const products = (state.products || []).filter(p => !p.is_archived);
-            const archivedProducts = (state.products || []).filter(p => p.is_archived);
-            const totalStock = products.reduce((sum, p) => sum + getProductStock(p), 0);
-            container.innerHTML = `
-                <div class="space-y-4">
-                    <div class="flex justify-between items-center">
-                        <h2 class="text-lg font-bold">Управление товарами</h2>
-                        <button onclick="openProductModal()" class="bg-accent hover:bg-accentHover px-4 py-2 rounded-xl text-xs font-medium transition text-white flex items-center space-x-1">
-                            <i data-lucide="plus" class="w-4 h-4"></i><span>Добавить товар</span>
+        function getAdminProductsResultsHTML() {
+            const q = (state.adminProductSearch || '').toLowerCase().trim();
+            const allProducts = (state.products || []);
+            const activeProducts = allProducts.filter(p => !p.is_archived && (!q || p.name.toLowerCase().includes(q)));
+            const archivedProducts = allProducts.filter(p => p.is_archived && (!q || p.name.toLowerCase().includes(q)));
+            const totalStock = allProducts.filter(p => !p.is_archived).reduce((sum, p) => sum + getProductStock(p), 0);
+            return `
+                    <!-- Итог + быстрый переход к архиву -->
+                    <div class="bg-cardBg border border-zinc-800 rounded-2xl px-4 py-3 flex items-center justify-between">
+                        <div class="text-xs text-zinc-400">
+                            Общий остаток: <span class="text-zinc-100 font-bold text-sm">${totalStock} шт.</span>
+                            <span class="text-zinc-600 mx-1">|</span>
+                            <span class="text-zinc-500">${allProducts.filter(p=>!p.is_archived).length} товаров</span>
+                        </div>
+                        <button onclick="state.showArchive = true; updateAdminProductsList(); document.getElementById('archive-section').scrollIntoView({behavior:'smooth'})" class="text-xs text-zinc-400 hover:text-accent flex items-center space-x-1 transition">
+                            <i data-lucide="archive" class="w-3.5 h-3.5"></i>
+                            <span>Архив (${allProducts.filter(p=>p.is_archived).length})</span>
                         </button>
                     </div>
-                    <div class="space-y-3">
-                        ${products.map(p => `
-                            <div class="bg-cardBg border ${p.is_pinned ? 'border-amber-500/50' : 'border-zinc-800'} rounded-2xl p-3 flex items-center justify-between">
-                                <div class="flex items-center space-x-3">
-                                    <img src="${p.image_url || 'https://via.placeholder.com/150'}" class="w-14 h-14 object-cover rounded-xl">
-                                    <div>
-                                        <h4 class="font-semibold text-sm flex items-center space-x-1">
-                                            <span>${p.name}</span>
-                                            ${p.is_pinned ? '<i data-lucide="pin" class="w-3.5 h-3.5 text-amber-400"></i>' : ''}
-                                        </h4>
-                                        <p class="text-xs text-zinc-400">${p.category} | ${p.subcategory || ''}</p>
-                                        <p class="text-xs text-accent mt-0.5">Розн: ${p.retail_price} ₽ | Опт: ${p.wholesale_price} ₽</p>
-                                        <p class="text-[11px] text-zinc-500 mt-0.5">Остаток: <span class="text-zinc-300 font-medium">${getProductStock(p)} шт.</span></p>
+
+                    <!-- Список активных товаров -->
+                    <div class="space-y-2 mt-1">
+                        ${activeProducts.length === 0 ? `<p class="text-xs text-zinc-500 text-center py-6">${q ? 'По запросу ничего не найдено' : 'Нет активных товаров'}</p>` : activeProducts.map(p => {
+                            const stock = getProductStock(p);
+                            const isDiscount = hasActiveDiscount(p);
+                            return `
+                            <div class="bg-cardBg border ${p.is_pinned ? 'border-amber-500/50' : isDiscount ? 'border-red-500/40' : 'border-zinc-800'} rounded-2xl p-3 flex items-center justify-between gap-2">
+                                <div class="flex items-center space-x-3 min-w-0">
+                                    <img src="${p.image_url || 'https://via.placeholder.com/150'}" class="w-12 h-12 object-cover rounded-xl shrink-0">
+                                    <div class="min-w-0">
+                                        <div class="flex items-center flex-wrap gap-1 mb-0.5">
+                                            ${p.is_pinned ? '<span class="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5"><i data-lucide="pin" class="w-2.5 h-2.5"></i>Закреп</span>' : ''}
+                                            ${isDiscount ? '<span class="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full font-semibold">АКЦИЯ</span>' : ''}
+                                        </div>
+                                        <h4 class="font-semibold text-sm truncate">${p.name}</h4>
+                                        <p class="text-[11px] text-zinc-500">${p.category}${p.subcategory ? ' · ' + p.subcategory : ''}</p>
+                                        <div class="text-xs mt-0.5">
+                                            ${isDiscount
+                                                ? `<span class="text-zinc-500 line-through">${p.old_price} ₽</span> <span class="text-red-400 font-bold">${p.retail_price} ₽</span> <span class="text-zinc-500">| Опт: ${p.wholesale_price} ₽</span>`
+                                                : `<span class="text-accent font-semibold">${p.retail_price} ₽</span> <span class="text-zinc-500">| Опт: ${p.wholesale_price} ₽</span>`
+                                            }
+                                        </div>
+                                        <p class="text-[11px] text-zinc-500 mt-0.5">Остаток: <span class="${stock > 0 ? 'text-zinc-300' : 'text-red-400'} font-medium">${stock} шт.</span></p>
                                     </div>
                                 </div>
-                                <div class="flex flex-col space-y-1.5 items-center">
-                                    <div class="flex space-x-1.5">
-                                        <button onclick="toggleProductPin(${p.id})" title="${p.is_pinned ? 'Открепить' : 'Закрепить на главной'}" class="w-8 h-8 ${p.is_pinned ? 'bg-amber-500/30 text-amber-400' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} rounded-xl flex items-center justify-center transition">
+                                <div class="flex flex-col space-y-1.5 items-center shrink-0">
+                                    <div class="flex space-x-1">
+                                        <button onclick="toggleProductPin(${p.id})" title="${p.is_pinned ? 'Открепить' : 'Закрепить'}" class="w-8 h-8 ${p.is_pinned ? 'bg-amber-500/30 text-amber-400' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} rounded-xl flex items-center justify-center transition">
                                             <i data-lucide="pin" class="w-4 h-4"></i>
                                         </button>
                                         <button onclick="toggleProductArchive(${p.id})" title="В архив" class="w-8 h-8 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 rounded-xl flex items-center justify-center transition">
                                             <i data-lucide="archive" class="w-4 h-4"></i>
                                         </button>
                                     </div>
-                                    <div class="flex space-x-1.5">
-                                        <button onclick="openDiscountModal(${p.id})" title="Акция" class="w-8 h-8 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 rounded-xl flex items-center justify-center transition">
+                                    <div class="flex space-x-1">
+                                        <button onclick="openDiscountModal(${p.id})" title="Акция" class="w-8 h-8 ${isDiscount ? 'bg-red-500/20 text-red-400' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} rounded-xl flex items-center justify-center transition">
                                             <i data-lucide="tag" class="w-4 h-4"></i>
                                         </button>
                                         <button onclick="editProduct(${p.id})" title="Редактировать" class="w-8 h-8 bg-zinc-800 hover:bg-zinc-700 rounded-xl flex items-center justify-center text-zinc-300 transition">
@@ -2405,36 +2426,76 @@
                                     </div>
                                 </div>
                             </div>
-                        `).join('')}
+                        `}).join('')}
                     </div>
-                    <div class="text-center text-xs text-zinc-500 pt-1">${products.length > 0 ? `Общий остаток по всем товарам: <span class="text-zinc-300 font-semibold">${totalStock} шт.</span>` : ''}</div>
 
-                    <div class="pt-2">
-                        <button onclick="state.showArchive = !state.showArchive; render();" class="w-full flex items-center justify-between bg-cardBg border border-zinc-800 rounded-2xl px-4 py-3 text-sm font-medium text-zinc-300 hover:bg-zinc-800/50 transition">
+                    <!-- Архив -->
+                    <div id="archive-section" class="pt-3">
+                        <button onclick="state.showArchive = !state.showArchive; updateAdminProductsList();" class="w-full flex items-center justify-between bg-cardBg border border-zinc-800 rounded-2xl px-4 py-3 text-sm font-medium text-zinc-300 hover:bg-zinc-800/50 transition">
                             <span class="flex items-center space-x-2">
                                 <i data-lucide="archive" class="w-4 h-4 text-zinc-400"></i>
-                                <span>Архив (${archivedProducts.length})</span>
+                                <span>Архив</span>
+                                <span class="bg-zinc-700 text-zinc-300 text-[10px] px-2 py-0.5 rounded-full font-bold">${allProducts.filter(p=>p.is_archived).length}</span>
                             </span>
                             <i data-lucide="${state.showArchive ? 'chevron-up' : 'chevron-down'}" class="w-4 h-4 text-zinc-400"></i>
                         </button>
                         ${state.showArchive ? `
                             <div class="space-y-2 mt-2">
-                                ${archivedProducts.length === 0 ? '<p class="text-xs text-zinc-500 text-center py-3">Архив пуст</p>' : archivedProducts.map(p => `
-                                    <div class="bg-cardBg border border-zinc-800 rounded-2xl p-3 flex items-center justify-between opacity-75">
-                                        <div class="flex items-center space-x-3">
-                                            <img src="${p.image_url || 'https://via.placeholder.com/150'}" class="w-12 h-12 object-cover rounded-xl grayscale">
-                                            <div>
-                                                <h4 class="font-semibold text-sm">${p.name}</h4>
-                                                <p class="text-xs text-zinc-500">${p.category} | ${p.subcategory || ''}</p>
+                                ${archivedProducts.length === 0 ? `<p class="text-xs text-zinc-500 text-center py-3">${q ? 'По запросу в архиве ничего' : 'Архив пуст'}</p>` : archivedProducts.map(p => `
+                                    <div class="bg-cardBg border border-zinc-800 rounded-2xl p-3 flex items-center justify-between gap-2">
+                                        <div class="flex items-center space-x-3 min-w-0">
+                                            <img src="${p.image_url || 'https://via.placeholder.com/150'}" class="w-12 h-12 object-cover rounded-xl grayscale opacity-60 shrink-0">
+                                            <div class="min-w-0">
+                                                <h4 class="font-semibold text-sm text-zinc-400 truncate">${p.name}</h4>
+                                                <p class="text-[11px] text-zinc-600">${p.category}${p.subcategory ? ' · ' + p.subcategory : ''}</p>
+                                                <p class="text-[11px] text-zinc-600 mt-0.5">${p.retail_price} ₽ | Опт: ${p.wholesale_price} ₽</p>
                                             </div>
                                         </div>
-                                        <button onclick="toggleProductArchive(${p.id})" title="Восстановить" class="px-3 py-2 bg-accent/20 hover:bg-accent/30 text-accent rounded-xl text-xs font-medium flex items-center space-x-1 transition">
-                                            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i><span>Вернуть</span>
-                                        </button>
+                                        <div class="flex flex-col space-y-1 items-center shrink-0">
+                                            <button onclick="toggleProductArchive(${p.id})" title="Восстановить" class="px-3 py-2 bg-accent/20 hover:bg-accent/30 text-accent rounded-xl text-xs font-medium flex items-center space-x-1 transition">
+                                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i><span>Вернуть</span>
+                                            </button>
+                                            <button onclick="deleteProduct(${p.id})" title="Удалить навсегда" class="w-full px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs flex items-center justify-center space-x-1 transition">
+                                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i><span>Удалить</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 `).join('')}
                             </div>
                         ` : ''}
+                    </div>
+            `;
+        }
+
+        function updateAdminProductsList() {
+            const resultsEl = document.getElementById('admin-products-results');
+            if (resultsEl) {
+                resultsEl.className = 'space-y-4';
+                resultsEl.innerHTML = getAdminProductsResultsHTML();
+                lucide.createIcons();
+            }
+        }
+
+        function renderAdminProducts(container) {
+            container.innerHTML = `
+                <div class="space-y-4">
+                    <!-- Шапка + кнопка добавить -->
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-bold">Товары</h2>
+                        <button onclick="openProductModal()" class="bg-accent hover:bg-accentHover px-4 py-2 rounded-xl text-xs font-medium transition text-white flex items-center space-x-1">
+                            <i data-lucide="plus" class="w-4 h-4"></i><span>Добавить</span>
+                        </button>
+                    </div>
+
+                    <!-- Поиск -->
+                    <div class="relative">
+                        <input type="text" id="admin-product-search-input" oninput="state.adminProductSearch=this.value; updateAdminProductsList(); const cb=document.getElementById('admin-search-clear-btn'); if(cb) cb.classList.toggle('hidden', !this.value.trim());" placeholder="Поиск по названию..." value="${state.adminProductSearch || ''}" class="w-full bg-cardBg border border-zinc-700 rounded-2xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                        <i data-lucide="search" class="w-4 h-4 text-zinc-400 absolute left-3 top-3"></i>
+                        <button id="admin-search-clear-btn" onclick="state.adminProductSearch=''; const inp=document.getElementById('admin-product-search-input'); if(inp) inp.value=''; updateAdminProductsList(); this.classList.add('hidden');" class="absolute right-3 top-3 text-zinc-400 hover:text-white ${(state.adminProductSearch || '').trim() ? '' : 'hidden'}"><i data-lucide="x" class="w-4 h-4"></i></button>
+                    </div>
+
+                    <div id="admin-products-results" class="space-y-4">
+                        ${getAdminProductsResultsHTML()}
                     </div>
                 </div>
             `;
@@ -2444,11 +2505,18 @@
         async function toggleProductArchive(id) {
             const product = (state.products || []).find(p => p.id === id);
             if (!product) return;
+            const wasArchived = product.is_archived;
             try {
-                await supabaseClient.from('products').update({ is_archived: !product.is_archived }).eq('id', id);
+                await supabaseClient.from('products').update({ is_archived: !wasArchived }).eq('id', id);
                 await fetchProducts();
-                render();
-                showToast(!product.is_archived ? 'Товар перемещен в архив' : 'Товар восстановлен из архива');
+                // если открыт таб товаров — только обновляем список, не трогая showArchive
+                const resultsEl = document.getElementById('admin-products-results');
+                if (resultsEl) {
+                    updateAdminProductsList();
+                } else {
+                    render();
+                }
+                showToast(!wasArchived ? 'Товар перемещен в архив' : 'Товар восстановлен из архива');
             } catch (e) {
                 console.error(e);
                 showToast('Ошибка архивации товара', 'error');
