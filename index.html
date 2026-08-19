@@ -237,7 +237,8 @@
             catalogCategory: 'жидкость',
             catalogSubcategory: 'all',
             searchQuery: '',
-            chartInstance: null
+            chartInstance: null,
+            lastKnownAdminPass: localStorage.getItem('reflex_admin_pass_cache') || ''
         };
 
         // Кастомные уведомления
@@ -295,6 +296,34 @@
 
             okBtn.addEventListener('click', handleOk);
             cancelBtn.addEventListener('click', handleCancel);
+        }
+
+        // Проверка изменения пароля админа в базе данных
+        async function checkAdminPasswordValidity() {
+            if (state.role !== 'admin') return;
+            try {
+                const { data, error } = await supabaseClient.from('settings').select('value').eq('key', 'admin_password').single();
+                if (!error && data) {
+                    if (state.lastKnownAdminPass && state.lastKnownAdminPass !== data.value) {
+                        // Пароль был изменен где-то (или в другой сессии/вкладке)
+                        forceDemoteToUser('Пароль администратора был изменен. Требуется повторный вход.');
+                    } else {
+                        state.lastKnownAdminPass = data.value;
+                        localStorage.setItem('reflex_admin_pass_cache', data.value);
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function forceDemoteToUser(message) {
+            state.role = 'user';
+            localStorage.setItem('reflex_role', 'user');
+            state.lastKnownAdminPass = '';
+            localStorage.removeItem('reflex_admin_pass_cache');
+            render();
+            showToast(message, 'error');
         }
 
         // Полный сброс системы в 0
@@ -363,12 +392,39 @@
                 if (window.Notification && Notification.permission !== 'granted') {
                     Notification.requestPermission();
                 }
+
+                // Инициализация кэша пароля при загрузке, если админ
+                if (state.role === 'admin' && !state.lastKnownAdminPass) {
+                    const { data } = await supabaseClient.from('settings').select('value').eq('key', 'admin_password').single();
+                    if (data) {
+                        state.lastKnownAdminPass = data.value;
+                        localStorage.setItem('reflex_admin_pass_cache', data.value);
+                    }
+                }
+
                 await fetchProducts();
                 await fetchOrders();
                 validateCartStock();
                 render();
 
+                // Подписка Realtime на изменение таблицы settings (смена пароля админа)
+                supabaseClient
+                    .channel('settings-changes')
+                    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings' }, payload => {
+                        if (payload.new && payload.new.key === 'admin_password') {
+                            if (state.role === 'admin') {
+                                if (state.lastKnownAdminPass && state.lastKnownAdminPass !== payload.new.value) {
+                                    forceDemoteToUser('Пароль администратора был изменен. Требуется повторный вход.');
+                                }
+                            }
+                        }
+                    })
+                    .subscribe();
+
+                // Периодический опрос заказов и актуальности пароля
                 setInterval(async () => {
+                    await checkAdminPasswordValidity();
+
                     const prevInProgress = (state.orders || []).filter(o => o.status === 'in_progress').length;
                     await fetchOrders();
                     const newInProgress = (state.orders || []).filter(o => o.status === 'in_progress').length;
@@ -382,7 +438,7 @@
                             render();
                         }
                     }
-                }, 15000);
+                }, 10000);
 
             } catch (e) {
                 console.error(e);
@@ -1537,6 +1593,9 @@
             if (data && data.value === pass) {
                 state.role = 'admin';
                 localStorage.setItem('reflex_role', 'admin');
+                state.lastKnownAdminPass = data.value;
+                localStorage.setItem('reflex_admin_pass_cache', data.value);
+
                 closeModal('modal-admin-login');
                 document.getElementById('admin-pass-input').value = '';
                 render();
@@ -1549,6 +1608,8 @@
         async function logoutAdmin() {
             state.role = 'user';
             localStorage.setItem('reflex_role', 'user');
+            state.lastKnownAdminPass = '';
+            localStorage.removeItem('reflex_admin_pass_cache');
             toggleAdminMenu();
             render();
             showToast('Вы вышли из режима администратора');
@@ -1560,11 +1621,15 @@
 
             const { error } = await supabaseClient.from('settings').update({ value: newPass }).eq('key', 'admin_password');
             if (!error) {
-                showToast('Пароль успешно изменен!');
+                showToast('Пароль успешно изменен! Все открытые сессии админки сброшены.');
                 closeModal('modal-change-password');
                 document.getElementById('new-admin-pass').value = '';
+                
+                // Переводим текущего пользователя в обычный режим
                 state.role = 'user';
                 localStorage.setItem('reflex_role', 'user');
+                state.lastKnownAdminPass = '';
+                localStorage.removeItem('reflex_admin_pass_cache');
                 render();
             } else {
                 showToast('Ошибка: ' + error.message, 'error');
