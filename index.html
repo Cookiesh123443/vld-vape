@@ -228,6 +228,7 @@
             activeTab: localStorage.getItem('reflex_role') === 'admin' ? 'admin_home' : 'home', 
             user: localStorage.getItem('reflex_username') || '',
             phone: localStorage.getItem('reflex_phone') || '',
+            userId: localStorage.getItem('reflex_user_id') || null,
             isProfileEditing: false, 
             cart: JSON.parse(localStorage.getItem('reflex_cart') || '[]'),
             products: [],
@@ -305,7 +306,6 @@
                 const { data, error } = await supabaseClient.from('settings').select('value').eq('key', 'admin_password').single();
                 if (!error && data) {
                     if (state.lastKnownAdminPass && state.lastKnownAdminPass !== data.value) {
-                        // Пароль был изменен где-то (или в другой сессии/вкладке)
                         forceDemoteToUser('Пароль администратора был изменен. Требуется повторный вход.');
                     } else {
                         state.lastKnownAdminPass = data.value;
@@ -350,7 +350,7 @@
             });
         }
 
-        // Точечная проверка остатков: удаляется или корректируется только закончившийся вариант (вкус/цвет)
+        // Точечная проверка остатков
         function validateCartStock() {
             if (!state.cart || state.cart.length === 0) return;
 
@@ -361,17 +361,17 @@
                 const product = (state.products || []).find(p => p.id === item.productId);
                 if (!product) {
                     removedFlavors = true;
-                    continue; // Товар полностью удален из базы
+                    continue;
                 }
 
                 const variant = (product.product_variants || []).find(v => v.id === item.variantId);
                 if (!variant || variant.quantity <= 0) {
                     removedFlavors = true;
-                    continue; // Конкретный вкус/вариант закончился, удаляем только его из корзины
+                    continue;
                 }
 
                 if (item.qty > variant.quantity) {
-                    item.qty = variant.quantity; // Корректируем количество, если на складе стало меньше
+                    item.qty = variant.quantity;
                 }
 
                 item.maxQty = variant.quantity;
@@ -393,7 +393,6 @@
                     Notification.requestPermission();
                 }
 
-                // Инициализация кэша пароля при загрузке, если админ
                 if (state.role === 'admin' && !state.lastKnownAdminPass) {
                     const { data } = await supabaseClient.from('settings').select('value').eq('key', 'admin_password').single();
                     if (data) {
@@ -407,7 +406,6 @@
                 validateCartStock();
                 render();
 
-                // Подписка Realtime на изменение таблицы settings (смена пароля админа)
                 supabaseClient
                     .channel('settings-changes')
                     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings' }, payload => {
@@ -421,7 +419,6 @@
                     })
                     .subscribe();
 
-                // Периодический опрос заказов и актуальности пароля
                 setInterval(async () => {
                     await checkAdminPasswordValidity();
 
@@ -446,7 +443,6 @@
             }
         });
 
-        // Загрузка товаров с группировкой
         async function fetchProducts() {
             try {
                 const { data, error } = await supabaseClient.from('products').select('*, product_variants(*)');
@@ -606,8 +602,6 @@
             }
             lucide.createIcons();
         }
-
-        // --- ПОЛЬЗОВАТЕЛЬСКИЕ ВКЛАДКИ ---
 
         function renderUserHome(container) {
             const featured = (state.products || []).filter(p => {
@@ -935,15 +929,56 @@
             render();
         }
 
-        function saveProfile() {
+        // НОВАЯ ФИЧА: Синхронизация и сохранение профиля в таблицу users в Supabase
+        async function saveProfile() {
             const valUser = document.getElementById('profile-username').value.trim();
             const valPhone = document.getElementById('profile-phone').value.trim();
+            
+            if (!valUser) {
+                showToast('Укажите ваш юзернейм!', 'error');
+                return;
+            }
+
             state.user = valUser;
             state.phone = valPhone;
             state.isProfileEditing = false;
+            
             localStorage.setItem('reflex_username', valUser);
             localStorage.setItem('reflex_phone', valPhone);
-            showToast('Профиль успешно сохранен!');
+
+            try {
+                // Проверяем, есть ли уже запись пользователя в таблице users
+                if (state.userId) {
+                    await supabaseClient.from('users').update({
+                        email: valUser + '@vldvape.local',
+                        role: 'user'
+                    }).eq('id', state.userId);
+                } else {
+                    // Ищем по email или создаем новую строку
+                    const { data: existingUser } = await supabaseClient.from('users').select('id').eq('email', valUser + '@vldvape.local').single();
+                    
+                    if (existingUser) {
+                        state.userId = existingUser.id;
+                        localStorage.setItem('reflex_user_id', existingUser.id);
+                    } else {
+                        const { data: newUser, error } = await supabaseClient.from('users').insert({
+                            email: valUser + '@vldvape.local',
+                            password_hash: 'no_pass',
+                            role: 'user'
+                        }).select().single();
+
+                        if (!error && newUser) {
+                            state.userId = newUser.id;
+                            localStorage.setItem('reflex_user_id', newUser.id);
+                        }
+                    }
+                }
+                showToast('Профиль успешно сохранен и синхронизирован с базой!');
+            } catch (e) {
+                console.error(e);
+                showToast('Профиль сохранен локально', 'success');
+            }
+
             render();
         }
 
@@ -1249,8 +1284,6 @@
             lucide.createIcons();
         }
 
-        // --- ЛОГИКА ЗАГРУЗКИ ФОТО ---
-
         function handleImageUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -1264,8 +1297,6 @@
             };
             reader.readAsDataURL(file);
         }
-
-        // --- ЛОГИКА СКИДОК / АКЦИЙ ---
 
         function openDiscountModal(productId) {
             const product = (state.products || []).find(p => p.id === productId);
@@ -1299,8 +1330,6 @@
             await fetchProducts();
             render();
         }
-
-        // --- ЛОГИКА ТОВАРОВ И КОРЗИНЫ ---
 
         async function openVariantModal(productId) {
             const product = (state.products || []).find(p => p.id === productId);
@@ -1365,7 +1394,6 @@
             addVariantToCart(productId, variantId);
         }
 
-        // Изменение количества конкретного варианта в корзине
         function updateCartQty(idx, delta) {
             const item = state.cart[idx];
             const product = (state.products || []).find(p => p.id === item.productId);
@@ -1389,7 +1417,6 @@
             render();
         }
 
-        // Оформление заказа со строгой проверкой наличия
         async function checkoutOrder() {
             if (!state.user) {
                 showToast('Пожалуйста, укажите ваш юз в профиле!', 'error');
@@ -1447,7 +1474,6 @@
 
             await supabaseClient.from('order_items').insert(itemsToInsert);
 
-            // Списываем со склада
             for (const item of state.cart) {
                 const product = (state.products || []).find(p => p.id === item.productId);
                 if (product) {
@@ -1478,7 +1504,6 @@
             showToast('Заказ успешно оформлен!');
         }
 
-        // Отмена заказа с возвратом на склад
         async function cancelOrder(orderId) {
             showConfirm('Отмена заказа', 'Вы действительно хотите отменить этот заказ? Товары вернутся в корзину и на склад.', async () => {
                 const order = (state.orders || []).find(o => String(o.id) === String(orderId));
@@ -1574,8 +1599,6 @@
             });
         }
 
-        // --- УПРАВЛЕНИЕ АДМИНКОЙ И ТОВАРАМИ ---
-
         function toggleAdminMenu() {
             const dropdown = document.getElementById('admin-dropdown');
             if (dropdown) dropdown.classList.toggle('hidden');
@@ -1625,7 +1648,6 @@
                 closeModal('modal-change-password');
                 document.getElementById('new-admin-pass').value = '';
                 
-                // Переводим текущего пользователя в обычный режим
                 state.role = 'user';
                 localStorage.setItem('reflex_role', 'user');
                 state.lastKnownAdminPass = '';
