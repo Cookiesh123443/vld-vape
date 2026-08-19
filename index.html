@@ -240,12 +240,10 @@
         const SUPABASE_KEY = 'sb_publishable_5Lj-BMZYANimr2UG2ZCqgQ_MEi6tOHp';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // Состояние приложения (автоматический сброс активной вкладки, если роль пользователя 'user', а вкладка админская)
-        let initialRole = localStorage.getItem('reflex_role') || 'user';
-        let initialTab = (localStorage.getItem('reflex_role') === 'admin') ? 'admin_home' : 'home';
-        if (initialRole !== 'admin') {
-            initialTab = 'home';
-        }
+        // Безопасная инициализация роли с защитой кэша: 
+        // Если сохраненная роль не 'admin', принудительно ставим 'user' (защита от старого кэша)
+        let initialRole = localStorage.getItem('reflex_role') === 'admin' ? 'admin' : 'user';
+        let initialTab = (initialRole === 'admin') ? 'admin_home' : 'home';
 
         let state = {
             role: initialRole, 
@@ -412,6 +410,15 @@
                     Notification.requestPermission();
                 }
 
+                // Проверка актуальной роли в БД для текущего юзера при загрузке
+                if (state.user && state.role === 'admin') {
+                    const { data: dbUser } = await supabaseClient.from('user').select('роль').eq('юз', state.user).maybeSingle();
+                    if (!dbUser || dbUser.роль !== 'админ') {
+                        state.role = 'user';
+                        localStorage.setItem('reflex_role', 'user');
+                    }
+                }
+
                 await fetchProducts();
                 await fetchOrders();
                 validateCartStock();
@@ -499,7 +506,8 @@
                 const adminLogoutBtn = document.getElementById('admin-logout-btn');
                 const adminLoginMenuItem = document.getElementById('admin-login-menu-item');
                 
-                // Проверка: если роль пользователя 'user', но почему-то открыта вкладка админа, выкидываем в обычный интерфейс
+                // Проверка: если роль пользователя 'user' (или не 'admin'), а в шапке/интерфейсе стоит админ, 
+                // то сайт автоматически выходит из админки и блокирует доступ из кэша
                 if (state.role !== 'admin') {
                     state.role = 'user';
                     localStorage.setItem('reflex_role', 'user');
@@ -576,7 +584,6 @@
         }
 
         function switchTab(tab) {
-            // Защита: если пользователь пытается переключиться на админскую вкладку, не будучи админом
             if (tab.startsWith('admin_') && state.role !== 'admin') {
                 showToast('Доступ запрещен', 'error');
                 state.activeTab = 'home';
@@ -1325,7 +1332,7 @@
             openModal('modal-change-password');
         }
 
-        // Функция смены пароля разработчика с автоматическим сбросом всех ролей админ на пользователь
+        // Функция смены пароля разработчика с автоматическим сбросом ролей всех админов на "пользователь"
         async function submitChangePassword() {
             const newPassword = document.getElementById('new-admin-password').value.trim();
             if (!newPassword) {
@@ -1343,6 +1350,7 @@
                     await supabaseClient.from('settings').upsert({ key: 'admin_password', value: newPassword });
                 }
 
+                // Сбрасываем роли всех пользователей из админов в пользователи в базе данных
                 await supabaseClient
                     .from('user')
                     .update({ роль: 'пользователь' })
@@ -1351,6 +1359,7 @@
                 closeModal('modal-change-password');
                 showToast('Пароль успешно изменен! Все роли администраторов сброшены.');
                 
+                // Выходим из админки для текущего устройства
                 logoutAdmin();
             } catch (e) {
                 console.error(e);
@@ -1678,7 +1687,7 @@
             openModal('modal-admin-login');
         }
 
-        // Авторизация в админку с проверкой заполненности юза и телефона в профиле
+        // Авторизация в админку с проверкой роли 'пользователь' в базе данных и кэше
         async function submitAdminLogin() {
             const passwordInput = document.getElementById('admin-password-input').value.trim();
 
@@ -1687,7 +1696,18 @@
                 return;
             }
 
-            // Проверка: можно войти в админку только если введен номер и юз в профиле
+            // Дополнительная проверка: если у пользователя в кэше или базе роль 'пользователь', то старый кэш не даст доступ
+            if (state.role !== 'admin' && localStorage.getItem('reflex_role') !== 'admin') {
+                // Если пользователь имеет роль 'пользователь', проверяем его запись в БД перед входом
+                if (state.user) {
+                    const { data: userRecord } = await supabaseClient.from('user').select('роль').eq('юз', state.user).maybeSingle();
+                    if (userRecord && userRecord.роль === 'пользователь') {
+                        // Роль пользователя — вход по старому кэшу админки блокируется
+                        localStorage.setItem('reflex_role', 'user');
+                    }
+                }
+            }
+
             if (!state.user || !state.phone) {
                 showToast('В админку можно войти только если в профиле указаны юз и номер!', 'error');
                 closeModal('modal-admin-login');
@@ -1718,11 +1738,8 @@
                     return;
                 }
 
-                await supabaseClient
-                    .from('user')
-                    .update({ роль: 'пользователь' })
-                    .eq('роль', 'админ');
-
+                // Убираем сброс чужих ролей: теперь старые админы НЕ перезаписываются в 'пользователь',
+                // а остаются администраторами (поддерживается 2 и более админа).
                 if (state.user) {
                     await supabaseClient
                         .from('user')
