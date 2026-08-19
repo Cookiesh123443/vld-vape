@@ -90,20 +90,48 @@
         </div>
     </div>
 
+    <!-- Модальное окно: предупреждение о незаполненных данных при заказе -->
+    <div id="modal-missing-contacts" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+            <h3 class="text-lg font-bold">Контакты не указаны</h3>
+            <p class="text-sm text-zinc-400">У вас не указан юз (username) или номер телефона в профиле. Без них работникам будет сложнее связаться с вами.</p>
+            <div class="flex flex-col space-y-2 pt-2">
+                <button onclick="closeModal('modal-missing-contacts'); switchTab('profile');" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl text-sm font-medium transition text-white">Указать в профиле</button>
+                <button onclick="proceedCheckoutWithoutContacts()" class="w-full bg-zinc-800 hover:bg-zinc-700 py-3 rounded-xl text-sm font-medium transition text-zinc-300">Продолжить без указания</button>
+                <button onclick="cancelCheckout()" class="w-full bg-red-500/20 hover:bg-red-500/30 py-3 rounded-xl text-sm font-medium transition text-red-400 border border-red-500/30">Отменить заказ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно: выбор менеджера для вопроса о заказе -->
+    <div id="modal-select-manager" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold">Выберите менеджера</h3>
+                <button onclick="closeModal('modal-select-manager')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <p class="text-xs text-zinc-400">Выберите менеджера, с которым хотите обсудить заказ <span id="ask-order-id-label" class="text-white font-bold"></span>:</p>
+            <div id="managers-list-container" class="space-y-2 max-h-60 overflow-y-auto">
+                <!-- Рендерится через JS -->
+            </div>
+        </div>
+    </div>
+
     <!-- Модальные окна -->
-    <!-- 1. Вход админа / Ввод пароля разработчика -->
+    <!-- 1. Вход админа / Ввод только пароля разработчика (проверка юза и телефона идет из профиля) -->
     <div id="modal-admin-login" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center">
                 <h3 id="admin-login-title" class="text-lg font-bold">Вход для работников</h3>
                 <button onclick="closeModal('modal-admin-login')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
+            <p class="text-xs text-zinc-400">Введите пароль разработчика (убедитесь, что в вашем профиле предварительно указаны юз и номер телефона):</p>
             <div class="space-y-3">
                 <div>
-                    <label class="text-xs text-zinc-400 mb-1 block">Пароль</label>
+                    <label class="text-xs text-zinc-400 mb-1 block">Пароль разработчика</label>
                     <div class="relative">
-                        <input type="password" id="admin-password-input" placeholder="Введите пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 pr-10 text-sm focus:outline-none focus:border-accent">
-                        <button type="button" onclick="togglePasswordVisibility('admin-password-input', 'eye-icon')" class="absolute right-3 top-3.5 text-white hover:text-zinc-300 transition">
+                        <input type="password" id="admin-password-input" placeholder="Введите пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 pr-10 text-sm focus:outline-none focus:border-accent">
+                        <button type="button" onclick="togglePasswordVisibility('admin-password-input', 'eye-icon')" class="absolute right-3 top-3 text-zinc-400 hover:text-white transition">
                             <i id="eye-icon" data-lucide="eye" class="w-4 h-4"></i>
                         </button>
                     </div>
@@ -125,7 +153,7 @@
                     <label class="text-xs text-zinc-400 mb-1 block">Новый пароль</label>
                     <div class="relative">
                         <input type="password" id="new-admin-password" placeholder="Введите новый пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 pr-10 text-sm focus:outline-none focus:border-accent">
-                        <button type="button" onclick="togglePasswordVisibility('new-admin-password', 'eye-icon-new')" class="absolute right-3 top-3.5 text-white hover:text-zinc-300 transition">
+                        <button type="button" onclick="togglePasswordVisibility('new-admin-password', 'eye-icon-new')" class="absolute right-3 top-3.5 text-zinc-400 hover:text-white transition">
                             <i id="eye-icon-new" data-lucide="eye" class="w-4 h-4"></i>
                         </button>
                     </div>
@@ -240,8 +268,6 @@
         const SUPABASE_KEY = 'sb_publishable_5Lj-BMZYANimr2UG2ZCqgQ_MEi6tOHp';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // Безопасная инициализация роли с защитой кэша: 
-        // Если сохраненная роль не 'admin', принудительно ставим 'user' (защита от старого кэша)
         let initialRole = localStorage.getItem('reflex_role') === 'admin' ? 'admin' : 'user';
         let initialTab = (initialRole === 'admin') ? 'admin_home' : 'home';
 
@@ -254,15 +280,17 @@
             cart: JSON.parse(localStorage.getItem('reflex_cart') || '[]'),
             products: [],
             orders: [],
+            managers: [],
+            adminSettingsSubTab: 'general', 
             adminStatsFilter: 'all', 
             adminHomeSubTab: 'stats',
             catalogCategory: 'жидкость',
             catalogSubcategory: 'all',
             searchQuery: '',
-            chartInstance: null
+            chartInstance: null,
+            selectedOrderForAsk: null
         };
 
-        // Универсальное переключение видимости пароля (глазик)
         function togglePasswordVisibility(inputId, iconId) {
             const passwordInput = document.getElementById(inputId);
             const eyeIcon = document.getElementById(iconId);
@@ -278,7 +306,6 @@
             lucide.createIcons();
         }
 
-        // Кастомные уведомления
         function showToast(message, type = 'success') {
             try {
                 const container = document.getElementById('toast-container');
@@ -303,7 +330,6 @@
             }
         }
 
-        // Кастомное подтверждение
         function showConfirm(title, text, onConfirm) {
             const modal = document.getElementById('modal-confirm');
             document.getElementById('confirm-title').textContent = title;
@@ -335,14 +361,25 @@
             cancelBtn.addEventListener('click', handleCancel);
         }
 
-        // Полный сброс системы в 0 (включая очистку пользователей)
+        function closeModal(modalId) {
+            const m = document.getElementById(modalId);
+            if (m) m.classList.add('hidden');
+        }
+
+        function openModal(modalId) {
+            const m = document.getElementById(modalId);
+            if (m) m.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
         async function resetSystemToZero() {
-            showConfirm('Полный сброс сайта в 0', 'Вы уверены? Все товары, варианты, заказы, корзины и пользователи будут полностью удалены.', async () => {
+            showConfirm('Полный сброс сайта в 0', 'Вы уверены? Все товары, варианты, заказы, корзины, менеджеры и пользователи будут полностью удалены.', async () => {
                 try {
                     await supabaseClient.from('order_items').delete().not('id', 'is', null);
                     await supabaseClient.from('orders').delete().not('id', 'is', null);
                     await supabaseClient.from('product_variants').delete().not('id', 'is', null);
                     await supabaseClient.from('products').delete().not('id', 'is', null);
+                    await supabaseClient.from('managers').delete().not('id', 'is', null);
                     await supabaseClient.from('user').delete().not('юз', 'is', null);
 
                     state.cart = [];
@@ -353,11 +390,11 @@
                     localStorage.removeItem('reflex_username');
                     localStorage.removeItem('reflex_phone');
 
-                    // Выходим из админки при полном сбросе
                     logoutAdmin();
 
                     await fetchProducts();
                     await fetchOrders();
+                    await fetchManagers();
                     render();
                     showToast('Сайт полностью сброшен в начальное состояние!');
                 } catch (e) {
@@ -367,7 +404,6 @@
             });
         }
 
-        // Точечная проверка остатков
         function validateCartStock() {
             if (!state.cart || state.cart.length === 0) return;
 
@@ -403,14 +439,12 @@
             localStorage.setItem('reflex_cart', JSON.stringify(state.cart));
         }
 
-        // Запуск при загрузке
         window.addEventListener('DOMContentLoaded', async () => {
             try {
                 if (window.Notification && Notification.permission !== 'granted') {
                     Notification.requestPermission();
                 }
 
-                // Проверка актуальной роли в БД для текущего юзера при загрузке
                 if (state.user && state.role === 'admin') {
                     const { data: dbUser } = await supabaseClient.from('user').select('роль').eq('юз', state.user).maybeSingle();
                     if (!dbUser || dbUser.роль !== 'админ') {
@@ -421,6 +455,7 @@
 
                 await fetchProducts();
                 await fetchOrders();
+                await fetchManagers();
                 validateCartStock();
                 render();
 
@@ -500,14 +535,21 @@
             }
         }
 
+        async function fetchManagers() {
+            try {
+                const { data, error } = await supabaseClient.from('managers').select('*');
+                if (!error && data) state.managers = data;
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
         function render() {
             try {
                 const roleBadge = document.getElementById('role-badge');
                 const adminLogoutBtn = document.getElementById('admin-logout-btn');
                 const adminLoginMenuItem = document.getElementById('admin-login-menu-item');
                 
-                // Проверка: если роль пользователя 'user' (или не 'admin'), а в шапке/интерфейсе стоит админ, 
-                // то сайт автоматически выходит из админки и блокирует доступ из кэша
                 if (state.role !== 'admin') {
                     state.role = 'user';
                     localStorage.setItem('reflex_role', 'user');
@@ -820,7 +862,7 @@
                         <div class="border-t border-zinc-800 pt-3 space-y-3">
                             <div class="bg-cardBg border border-zinc-700/60 rounded-2xl p-3.5 space-y-2">
                                 <div class="flex justify-between items-center">
-                                    <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Проверка данных для заказа</span>
+                                    <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Данные для заказа</span>
                                     <button onclick="switchTab('profile')" class="text-xs text-accent hover:underline flex items-center space-x-1">
                                         <i data-lucide="edit-3" class="w-3.5 h-3.5"></i><span>Изменить</span>
                                     </button>
@@ -850,14 +892,13 @@
         }
 
         function renderUserOrders(container) {
-            const myOrders = state.user ? (state.orders || []).filter(o => o.status !== 'archived' && o.username && o.username.toLowerCase() === state.user.toLowerCase()) : [];
+            const myOrders = (state.orders || []).filter(o => o.status !== 'archived');
             const inProgress = myOrders.filter(o => o.status === 'in_progress');
             const completed = myOrders.filter(o => o.status === 'completed');
 
             container.innerHTML = `
                 <div class="space-y-4">
                     <h2 class="text-lg font-bold">Мои заказы</h2>
-                    ${!state.user ? '<p class="text-center text-zinc-500 py-6">Укажите свой юз в профиле, чтобы видеть заказы</p>' : ''}
                     
                     <div class="space-y-3">
                         <h3 class="text-sm font-semibold text-zinc-400">В работе (${inProgress.length})</h3>
@@ -870,9 +911,14 @@
                                 <div class="space-y-1">
                                     ${(o.order_items || []).map(i => `<div class="text-sm flex justify-between"><span>${i.product_name} (${i.variant_name})</span><span>${i.quantity} шт. x ${i.price} ₽</span></div>`).join('')}
                                 </div>
-                                <div class="flex justify-between items-center pt-2 border-t border-zinc-800">
-                                    <span class="font-bold text-sm text-accent">Итого: ${o.total_retail} ₽</span>
-                                    <button onclick="cancelOrder('${o.id}')" class="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs rounded-lg transition">Отменить заказ</button>
+                                <div class="flex flex-col space-y-2 pt-2 border-t border-zinc-800">
+                                    <div class="flex justify-between items-center">
+                                        <span class="font-bold text-sm text-accent">Итого: ${o.total_retail} ₽</span>
+                                        <button onclick="cancelOrder('${o.id}')" class="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs rounded-lg transition">Отменить</button>
+                                    </div>
+                                    <button onclick="openAskManagerModal('${o.id}')" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-2 rounded-xl text-xs font-medium transition flex items-center justify-center space-x-1.5">
+                                        <i data-lucide="message-circle" class="w-4 h-4 text-accent"></i><span>Спросить о заказе</span>
+                                    </button>
                                 </div>
                             </div>
                         `).join('')}
@@ -898,6 +944,40 @@
                 </div>
             `;
             lucide.createIcons();
+        }
+
+        function openAskManagerModal(orderId) {
+            state.selectedOrderForAsk = orderId;
+            const labelEl = document.getElementById('ask-order-id-label');
+            if (labelEl) labelEl.textContent = '#' + String(orderId).slice(0, 6);
+
+            const container = document.getElementById('managers-list-container');
+            if (state.managers.length === 0) {
+                container.innerHTML = `<p class="text-xs text-zinc-500 text-center py-4">Менеджеры пока не добавлены администратором в разделе Ещё -> Менеджеры</p>`;
+            } else {
+                container.innerHTML = state.managers.map(m => `
+                    <div onclick="contactManager('${m.username}', '${orderId}')" class="bg-zinc-900 border border-zinc-800 hover:border-accent p-3 rounded-xl flex items-center justify-between cursor-pointer transition">
+                        <div>
+                            <h4 class="text-sm font-semibold text-zinc-200">${m.name}</h4>
+                            <p class="text-xs text-accent">@${m.username.replace('@', '')}</p>
+                        </div>
+                        <i data-lucide="send" class="w-4 h-4 text-accent"></i>
+                    </div>
+                `).join('');
+            }
+
+            openModal('modal-select-manager');
+            lucide.createIcons();
+        }
+
+        function contactManager(username, orderId) {
+            const cleanUsername = username.replace('@', '');
+            const shortId = String(orderId).slice(0, 6);
+            const message = encodeURIComponent(`Здравствуйте! Хотел(а) спросить о заказе номер ${shortId}`);
+            const tgUrl = `https://t.me/${cleanUsername}?text=${message}`;
+            
+            closeModal('modal-select-manager');
+            window.open(tgUrl, '_blank');
         }
 
         function renderUserProfile(container) {
@@ -932,7 +1012,6 @@
                         ` : ''}
                     </div>
 
-                    <!-- Блок удаления аккаунта -->
                     <div class="bg-cardBg border border-red-900/40 rounded-2xl p-4 space-y-2 mt-4">
                         <h3 class="text-sm font-bold text-red-400">Удаление аккаунта</h3>
                         <p class="text-xs text-zinc-400">Для удаления введите ваш юз и номер телефона ниже:</p>
@@ -950,16 +1029,10 @@
             render();
         }
 
-        // Сохранение и синхронизация профиля с добавлением пользователей в Supabase
         async function saveProfile() {
             const valUser = document.getElementById('profile-username').value.trim();
             const valPhone = document.getElementById('profile-phone').value.trim();
             
-            if (!valUser || !valPhone) {
-                showToast('Укажите юз и номер телефона!', 'error');
-                return;
-            }
-
             state.user = valUser;
             state.phone = valPhone;
             state.isProfileEditing = false;
@@ -967,31 +1040,23 @@
             localStorage.setItem('reflex_username', valUser);
             localStorage.setItem('reflex_phone', valPhone);
 
-            try {
-                const { data: existing } = await supabaseClient.from('user').select('*').eq('юз', valUser).maybeSingle();
-                
-                if (existing) {
-                    await supabaseClient.from('user').update({
-                        номер: valPhone,
-                        роль: existing.роль || 'пользователь'
-                    }).eq('юз', valUser);
-                } else {
-                    await supabaseClient.from('user').insert({
-                        юз: valUser,
-                        номер: valPhone,
-                        роль: 'пользователь'
-                    });
+            if (valUser) {
+                try {
+                    const { data: existing } = await supabaseClient.from('user').select('*').eq('юз', valUser).maybeSingle();
+                    if (existing) {
+                        await supabaseClient.from('user').update({ номер: valPhone, роль: existing.роль || 'пользователь' }).eq('юз', valUser);
+                    } else {
+                        await supabaseClient.from('user').insert({ юз: valUser, номер: valPhone, роль: 'пользователь' });
+                    }
+                } catch (e) {
+                    console.error(e);
                 }
-                showToast('Данные успешно сохранены и синхронизированы с базой!');
-            } catch (e) {
-                console.error(e);
-                showToast('Данные сохранены локально', 'success');
             }
 
+            showToast('Данные успешно сохранены!');
             render();
         }
 
-        // Удаление аккаунта при совпадении номера и юза
         async function deleteAccount() {
             const uInput = document.getElementById('delete-confirm-username').value.trim();
             const pInput = document.getElementById('delete-confirm-phone').value.trim();
@@ -1025,8 +1090,6 @@
             });
         }
 
-        // --- АДМИНСКИЕ ВКЛАДКИ ---
-
         function setAdminHomeSubTab(subTab) {
             state.adminHomeSubTab = subTab;
             render();
@@ -1037,7 +1100,7 @@
                 <div class="space-y-4">
                     <div class="flex space-x-1 bg-cardBg p-1 rounded-2xl border border-zinc-800">
                         <button onclick="setAdminHomeSubTab('stats')" class="flex-1 py-2 rounded-xl text-xs font-medium transition ${state.adminHomeSubTab === 'stats' ? 'bg-accent text-white' : 'text-zinc-400'}">Статистика</button>
-                        <button onclick="setAdminHomeSubTab('product')" class="flex-1 py-2 rounded-xl text-xs font-medium transition ${state.adminHomeSubTab === 'product' ? 'bg-accent text-white' : 'text-zinc-400'}">Товар (Главная у пользователя)</button>
+                        <button onclick="setAdminHomeSubTab('product')" class="flex-1 py-2 rounded-xl text-xs font-medium transition ${state.adminHomeSubTab === 'product' ? 'bg-accent text-white' : 'text-zinc-400'}">Товар (Главная)</button>
                     </div>
                     
                     <div id="admin-home-subcontent"></div>
@@ -1068,7 +1131,6 @@
 
             const completedOrders = filteredOrders.filter(o => o.status === 'completed' || o.status === 'archived');
             const inProgressOrders = (state.orders || []).filter(o => o.status === 'in_progress');
-            const featured = (state.products || []).filter(p => p.is_featured);
 
             const revenue = completedOrders.reduce((sum, o) => sum + Number(o.total_retail), 0);
             const wholesaleCost = completedOrders.reduce((sum, o) => sum + Number(o.total_wholesale), 0);
@@ -1110,21 +1172,6 @@
                         <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4">
                             <span class="text-xs text-zinc-400 block mb-1">В РАБОТЕ</span>
                             <span class="text-xl font-bold text-amber-400">${inProgressOrders.length}</span>
-                        </div>
-                    </div>
-
-                    <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
-                        <h3 class="text-sm font-bold">Товары на главной странице (${featured.length})</h3>
-                        <div class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
-                            ${featured.length === 0 ? '<p class="col-span-2 text-xs text-zinc-500">Нет товаров на главной</p>' : featured.map(p => `
-                                <div class="bg-zinc-900/60 border border-zinc-800 rounded-xl p-2 flex items-center space-x-2">
-                                    <img src="${p.image_url || 'https://via.placeholder.com/150'}" class="w-10 h-10 object-cover rounded-lg">
-                                    <div class="overflow-hidden">
-                                        <h4 class="text-xs font-semibold truncate">${p.name}</h4>
-                                        <p class="text-[10px] text-accent">${p.retail_price} ₽</p>
-                                    </div>
-                                </div>
-                            `).join('')}
                         </div>
                     </div>
 
@@ -1220,7 +1267,7 @@
                                     </div>
                                     <div class="bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-800 space-y-1 text-xs">
                                         <div>Телефон: <a href="tel:${phoneNum}" class="text-accent underline font-medium">${phoneNum}</a></div>
-                                        <div>Telegram: <a href="https://t.me/${cleanUsername}" target="_blank" class="text-accent underline font-medium">@${cleanUsername}</a></div>
+                                        <div>Telegram: ${cleanUsername ? `<a href="https://t.me/${cleanUsername}" target="_blank" class="text-accent underline font-medium">@${cleanUsername}</a>` : '<span class="text-zinc-500">Не указан</span>'}</div>
                                     </div>
                                     <div class="space-y-1">
                                         ${(o.order_items || []).map(i => `<div class="text-sm flex justify-between"><span>${i.product_name} (${i.variant_name})</span><span>${i.quantity} шт. x ${i.price} ₽</span></div>`).join('')}
@@ -1250,7 +1297,7 @@
                                     </div>
                                     <div class="bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-800 space-y-1 text-xs">
                                         <div>Телефон: <a href="tel:${phoneNum}" class="text-accent underline font-medium">${phoneNum}</a></div>
-                                        <div>Telegram: <a href="https://t.me/${cleanUsername}" target="_blank" class="text-accent underline font-medium">@${cleanUsername}</a></div>
+                                        <div>Telegram: ${cleanUsername ? `<a href="https://t.me/${cleanUsername}" target="_blank" class="text-accent underline font-medium">@${cleanUsername}</a>` : '<span class="text-zinc-500">Не указан</span>'}</div>
                                     </div>
                                     <div class="space-y-1">
                                         ${(o.order_items || []).map(i => `<div class="text-sm flex justify-between"><span>${i.product_name} (${i.variant_name})</span><span>${i.quantity} шт.</span></div>`).join('')}
@@ -1309,22 +1356,93 @@
 
         function renderAdminSettings(container) {
             container.innerHTML = `
-                <div class="space-y-4 max-w-sm mx-auto pt-6">
+                <div class="space-y-4 max-w-sm mx-auto pt-4">
                     <h2 class="text-lg font-bold">Настройки администратора</h2>
-                    <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
-                        <button onclick="openChangePasswordModal()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
-                            <i data-lucide="key" class="w-4 h-4 text-accent"></i><span>Сменить пароль</span>
-                        </button>
-                        <button onclick="resetSystemToZero()" class="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2 border border-red-500/30">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i><span>Сбросить сайт (Очистить всё)</span>
-                        </button>
-                        <button onclick="logoutAdmin()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
-                            <i data-lucide="log-out" class="w-4 h-4"></i><span>Выйти из админки</span>
-                        </button>
+                    
+                    <div class="flex space-x-1 bg-cardBg p-1 rounded-2xl border border-zinc-800">
+                        <button onclick="state.adminSettingsSubTab='general'; render();" class="flex-1 py-2 rounded-xl text-xs font-medium transition ${state.adminSettingsSubTab === 'general' ? 'bg-accent text-white' : 'text-zinc-400'}">Основные</button>
+                        <button onclick="state.adminSettingsSubTab='managers'; render();" class="flex-1 py-2 rounded-xl text-xs font-medium transition ${state.adminSettingsSubTab === 'managers' ? 'bg-accent text-white' : 'text-zinc-400'}">Менеджеры (${state.managers.length})</button>
                     </div>
+
+                    ${state.adminSettingsSubTab === 'general' ? `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <button onclick="openChangePasswordModal()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
+                                <i data-lucide="key" class="w-4 h-4 text-accent"></i><span>Сменить пароль</span>
+                            </button>
+                            <button onclick="resetSystemToZero()" class="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2 border border-red-500/30">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i><span>Сбросить сайт (Очистить всё)</span>
+                            </button>
+                            <button onclick="logoutAdmin()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
+                                <i data-lucide="log-out" class="w-4 h-4"></i><span>Выйти из админки</span>
+                            </button>
+                        </div>
+                    ` : `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <h3 class="text-sm font-bold">Добавить менеджера</h3>
+                            <div class="space-y-2">
+                                <input type="text" id="new-manager-name" placeholder="Имя менеджера (например, Иван)" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
+                                <input type="text" id="new-manager-username" placeholder="Юз телеграм (например, @manager_tg)" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
+                                <button onclick="addNewManager()" class="w-full bg-accent hover:bg-accentHover py-2.5 rounded-xl font-medium transition text-xs text-white">Добавить менеджера</button>
+                            </div>
+
+                            <h3 class="text-sm font-bold pt-3 border-t border-zinc-800">Список менеджеров</h3>
+                            <div class="space-y-2 max-h-48 overflow-y-auto">
+                                ${state.managers.length === 0 ? '<p class="text-xs text-zinc-500 text-center py-2">Менеджеры не добавлены</p>' : state.managers.map(m => `
+                                    <div class="bg-zinc-900 border border-zinc-800 p-2.5 rounded-xl flex items-center justify-between">
+                                        <div>
+                                            <h4 class="text-xs font-semibold text-zinc-200">${m.name}</h4>
+                                            <p class="text-[10px] text-accent">@${m.username.replace('@', '')}</p>
+                                        </div>
+                                        <button onclick="deleteManager('${m.id}')" class="text-red-400 hover:text-red-300 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `}
                 </div>
             `;
             lucide.createIcons();
+        }
+
+        async function addNewManager() {
+            const nameField = document.getElementById('new-manager-name');
+            const usernameField = document.getElementById('new-manager-username');
+            if (!nameField || !usernameField) return;
+
+            const name = nameField.value.trim();
+            let username = usernameField.value.trim();
+
+            if (!name || !username) {
+                showToast('Заполните имя и юз менеджера!', 'error');
+                return;
+            }
+
+            if (username.startsWith('@')) username = username.substring(1);
+
+            try {
+                const { error } = await supabaseClient.from('managers').insert({ name, username });
+                if (error) {
+                    showToast('Ошибка при добавлении менеджера: ' + error.message, 'error');
+                    return;
+                }
+
+                nameField.value = '';
+                usernameField.value = '';
+
+                await fetchManagers();
+                render();
+                showToast('Менеджер успешно добавлен!');
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка подключения к базе данных', 'error');
+            }
+        }
+
+        async function deleteManager(id) {
+            await supabaseClient.from('managers').delete().eq('id', id);
+            await fetchManagers();
+            render();
+            showToast('Менеджер удален');
         }
 
         function openChangePasswordModal() {
@@ -1332,7 +1450,6 @@
             openModal('modal-change-password');
         }
 
-        // Функция смены пароля разработчика с автоматическим сбросом ролей всех админов на "пользователь"
         async function submitChangePassword() {
             const newPassword = document.getElementById('new-admin-password').value.trim();
             if (!newPassword) {
@@ -1350,7 +1467,6 @@
                     await supabaseClient.from('settings').upsert({ key: 'admin_password', value: newPassword });
                 }
 
-                // Сбрасываем роли всех пользователей из админов в пользователи в базе данных
                 await supabaseClient
                     .from('user')
                     .update({ роль: 'пользователь' })
@@ -1358,8 +1474,6 @@
 
                 closeModal('modal-change-password');
                 showToast('Пароль успешно изменен! Все роли администраторов сброшены.');
-                
-                // Выходим из админки для текущего устройства
                 logoutAdmin();
             } catch (e) {
                 console.error(e);
@@ -1500,14 +1614,28 @@
             render();
         }
 
-        async function checkoutOrder() {
-            if (!state.user || !state.phone) {
-                showToast('Пожалуйста, укажите ваш юз и номер телефона в профиле!', 'error');
-                switchTab('profile');
-                return;
-            }
+        function checkoutOrder() {
             if (state.cart.length === 0) return;
 
+            if (!state.user || !state.phone) {
+                openModal('modal-missing-contacts');
+                return;
+            }
+
+            executeCheckout();
+        }
+
+        function proceedCheckoutWithoutContacts() {
+            closeModal('modal-missing-contacts');
+            executeCheckout();
+        }
+
+        function cancelCheckout() {
+            closeModal('modal-missing-contacts');
+            showToast('Оформление заказа отменено');
+        }
+
+        async function executeCheckout() {
             await fetchProducts();
 
             for (const item of state.cart) {
@@ -1532,9 +1660,9 @@
             const totalRetail = state.cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
             const totalWholesale = state.cart.reduce((sum, i) => sum + (i.wholesalePrice * i.qty), 0);
 
-            // Исправление: убрано поле phone, так как в таблице orders в базе данных Supabase оно отсутствует
             const { data: orderData, error: orderError } = await supabaseClient.from('orders').insert({
-                username: state.user,
+                username: state.user || 'Аноним',
+                phone: state.phone || '',
                 status: 'in_progress',
                 total_retail: totalRetail,
                 total_wholesale: totalWholesale
@@ -1687,31 +1815,18 @@
             openModal('modal-admin-login');
         }
 
-        // Авторизация в админку с проверкой роли 'пользователь' в базе данных и кэше
         async function submitAdminLogin() {
             const passwordInput = document.getElementById('admin-password-input').value.trim();
 
-            if (!passwordInput) {
-                showToast('Введите пароль!', 'error');
+            if (!state.user || !state.phone) {
+                closeModal('modal-admin-login');
+                showToast('Для входа в режим работника обязательно укажите Юз и номер телефона в своем профиле!', 'error');
+                switchTab('profile');
                 return;
             }
 
-            // Дополнительная проверка: если у пользователя в кэше или базе роль 'пользователь', то старый кэш не даст доступ
-            if (state.role !== 'admin' && localStorage.getItem('reflex_role') !== 'admin') {
-                // Если пользователь имеет роль 'пользователь', проверяем его запись в БД перед входом
-                if (state.user) {
-                    const { data: userRecord } = await supabaseClient.from('user').select('роль').eq('юз', state.user).maybeSingle();
-                    if (userRecord && userRecord.роль === 'пользователь') {
-                        // Роль пользователя — вход по старому кэшу админки блокируется
-                        localStorage.setItem('reflex_role', 'user');
-                    }
-                }
-            }
-
-            if (!state.user || !state.phone) {
-                showToast('В админку можно войти только если в профиле указаны юз и номер!', 'error');
-                closeModal('modal-admin-login');
-                switchTab('profile');
+            if (!passwordInput) {
+                showToast('Введите пароль разработчика!', 'error');
                 return;
             }
 
@@ -1734,15 +1849,15 @@
                 let dbPassword = settingData ? (settingData.value !== undefined ? settingData.value : settingData.val) : '';
 
                 if (!dbPassword || String(dbPassword).trim() !== passwordInput) {
-                    showToast('Неверный пароль!', 'error');
+                    showToast('Неверный пароль разработчика!', 'error');
                     return;
                 }
 
-                if (state.user) {
-                    await supabaseClient
-                        .from('user')
-                        .update({ роль: 'админ' })
-                        .eq('юз', state.user);
+                const { data: existingUser } = await supabaseClient.from('user').select('*').eq('юз', state.user).maybeSingle();
+                if (existingUser) {
+                    await supabaseClient.from('user').update({ номер: state.phone, роль: 'админ' }).eq('юз', state.user);
+                } else {
+                    await supabaseClient.from('user').insert({ юз: state.user, номер: state.phone, роль: 'админ' });
                 }
 
                 state.role = 'admin';
@@ -1750,14 +1865,13 @@
 
                 closeModal('modal-admin-login');
                 render();
-                showToast('Успешный вход в админку!');
+                showToast('Успешный вход в режим работника!');
             } catch (e) {
                 console.error(e);
-                showToast('Ошибка базы данных: проверьте таблицу settings', 'error');
+                showToast('Ошибка базы данных: проверьте соединение', 'error');
             }
         }
 
-        // Выход из админки (переводит сайт на интерфейс пользователя)
         async function logoutAdmin() {
             if (state.user) {
                 try {
@@ -1914,23 +2028,12 @@
 
         async function deleteProduct(productId) {
             showConfirm('Удаление товара', 'Вы уверены, что хотите удалить этот товар?', async () => {
+                await supabaseClient.from('product_variants').delete().eq('product_id', productId);
                 await supabaseClient.from('products').delete().eq('id', productId);
                 await fetchProducts();
                 render();
-                showToast('Товар удален');
+                showToast('Товар успешно удален');
             });
-        }
-
-        function openModal(id) { 
-            const el = document.getElementById(id);
-            if (el) {
-                el.classList.remove('hidden'); 
-                lucide.createIcons(); 
-            }
-        }
-        function closeModal(id) { 
-            const el = document.getElementById(id);
-            if (el) el.classList.add('hidden'); 
         }
     </script>
 </body>
