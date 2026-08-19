@@ -91,17 +91,26 @@
     </div>
 
     <!-- Модальные окна -->
-    <!-- 1. Вход админа -->
+    <!-- 1. Вход админа / Ввод пароля разработчика -->
     <div id="modal-admin-login" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center">
-                <h3 class="text-lg font-bold">Вход для работников</h3>
+                <h3 id="admin-login-title" class="text-lg font-bold">Вход для работников</h3>
                 <button onclick="closeModal('modal-admin-login')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
-            <div>
-                <input type="password" id="admin-pass-input" placeholder="Введите пароль админа" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-accent" style="color-scheme: dark;">
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Пароль разработчика</label>
+                    <div class="relative">
+                        <input type="password" id="admin-password-input" placeholder="Введите пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 pr-10 text-sm focus:outline-none focus:border-accent">
+                        <!-- Белый глазик для ввода пароля -->
+                        <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-3.5 text-white hover:text-zinc-300 transition">
+                            <i id="eye-icon" data-lucide="eye" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
             </div>
-            <button onclick="submitAdminLogin()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition">Войти</button>
+            <button onclick="submitAdminLogin()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Войти в админку</button>
         </div>
     </div>
 
@@ -174,7 +183,7 @@
                     <div id="variants-rows" class="space-y-2"></div>
                 </div>
             </div>
-            <button onclick="saveProduct()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition">Сохранить товар</button>
+            <button onclick="saveProduct()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Сохранить товар</button>
         </div>
     </div>
 
@@ -203,18 +212,6 @@
         </div>
     </div>
 
-    <!-- 4. Изменение пароля админа -->
-    <div id="modal-change-password" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
-            <div class="flex justify-between items-center">
-                <h3 class="text-lg font-bold">Сменить пароль админа</h3>
-                <button onclick="closeModal('modal-change-password')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            <input type="password" id="new-admin-pass" placeholder="Новый пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-accent">
-            <button onclick="submitChangeAdminPassword()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition">Обновить пароль</button>
-        </div>
-    </div>
-
     <!-- Скрипт приложения -->
     <script>
         // Инициализация Supabase
@@ -228,7 +225,6 @@
             activeTab: localStorage.getItem('reflex_role') === 'admin' ? 'admin_home' : 'home', 
             user: localStorage.getItem('reflex_username') || '',
             phone: localStorage.getItem('reflex_phone') || '',
-            userId: localStorage.getItem('reflex_user_id') || null,
             isProfileEditing: false, 
             cart: JSON.parse(localStorage.getItem('reflex_cart') || '[]'),
             products: [],
@@ -238,9 +234,24 @@
             catalogCategory: 'жидкость',
             catalogSubcategory: 'all',
             searchQuery: '',
-            chartInstance: null,
-            lastKnownAdminPass: localStorage.getItem('reflex_admin_pass_cache') || ''
+            chartInstance: null
         };
+
+        // Переключение видимости пароля (глазик)
+        function togglePasswordVisibility() {
+            const passwordInput = document.getElementById('admin-password-input');
+            const eyeIcon = document.getElementById('eye-icon');
+            if (!passwordInput || !eyeIcon) return;
+
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIcon.setAttribute('data-lucide', 'eye-off');
+            } else {
+                passwordInput.type = 'password';
+                eyeIcon.setAttribute('data-lucide', 'eye');
+            }
+            lucide.createIcons();
+        }
 
         // Кастомные уведомления
         function showToast(message, type = 'success') {
@@ -299,36 +310,9 @@
             cancelBtn.addEventListener('click', handleCancel);
         }
 
-        // Проверка изменения пароля админа в базе данных
-        async function checkAdminPasswordValidity() {
-            if (state.role !== 'admin') return;
-            try {
-                const { data, error } = await supabaseClient.from('settings').select('value').eq('key', 'admin_password').single();
-                if (!error && data) {
-                    if (state.lastKnownAdminPass && state.lastKnownAdminPass !== data.value) {
-                        forceDemoteToUser('Пароль администратора был изменен. Требуется повторный вход.');
-                    } else {
-                        state.lastKnownAdminPass = data.value;
-                        localStorage.setItem('reflex_admin_pass_cache', data.value);
-                    }
-                }
-            } catch (e) {
-                console.error(e);
-            }
-        }
-
-        function forceDemoteToUser(message) {
-            state.role = 'user';
-            localStorage.setItem('reflex_role', 'user');
-            state.lastKnownAdminPass = '';
-            localStorage.removeItem('reflex_admin_pass_cache');
-            render();
-            showToast(message, 'error');
-        }
-
         // Полный сброс системы в 0
         async function resetSystemToZero() {
-            showConfirm('Полный сброс сайта в 0', 'Вы уверены? Все товары, варианты, заказы и корзины будут полностью удалены. Пароль администратора сохранится.', async () => {
+            showConfirm('Полный сброс сайта в 0', 'Вы уверены? Все товары, варианты, заказы и корзины будут полностью удалены.', async () => {
                 try {
                     await supabaseClient.from('order_items').delete().not('id', 'is', null);
                     await supabaseClient.from('orders').delete().not('id', 'is', null);
@@ -393,35 +377,12 @@
                     Notification.requestPermission();
                 }
 
-                if (state.role === 'admin' && !state.lastKnownAdminPass) {
-                    const { data } = await supabaseClient.from('settings').select('value').eq('key', 'admin_password').single();
-                    if (data) {
-                        state.lastKnownAdminPass = data.value;
-                        localStorage.setItem('reflex_admin_pass_cache', data.value);
-                    }
-                }
-
                 await fetchProducts();
                 await fetchOrders();
                 validateCartStock();
                 render();
 
-                supabaseClient
-                    .channel('settings-changes')
-                    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'settings' }, payload => {
-                        if (payload.new && payload.new.key === 'admin_password') {
-                            if (state.role === 'admin') {
-                                if (state.lastKnownAdminPass && state.lastKnownAdminPass !== payload.new.value) {
-                                    forceDemoteToUser('Пароль администратора был изменен. Требуется повторный вход.');
-                                }
-                            }
-                        }
-                    })
-                    .subscribe();
-
                 setInterval(async () => {
-                    await checkAdminPasswordValidity();
-
                     const prevInProgress = (state.orders || []).filter(o => o.status === 'in_progress').length;
                     await fetchOrders();
                     const newInProgress = (state.orders || []).filter(o => o.status === 'in_progress').length;
@@ -480,13 +441,6 @@
                         }
                     }
                     
-                    for (const mainKey of Object.keys(map)) {
-                        const prod = map[mainKey];
-                        if (!prod.product_variants || prod.product_variants.length === 0) {
-                            await supabaseClient.from('products').delete().eq('id', prod.id);
-                            delete map[mainKey];
-                        }
-                    }
                     state.products = Object.values(map);
                     validateCartStock();
                 }
@@ -919,6 +873,15 @@
                             <button onclick="saveProfile()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Сохранить изменения</button>
                         ` : ''}
                     </div>
+
+                    <!-- Блок удаления аккаунта -->
+                    <div class="bg-cardBg border border-red-900/40 rounded-2xl p-4 space-y-2 mt-4">
+                        <h3 class="text-sm font-bold text-red-400">Удаление аккаунта</h3>
+                        <p class="text-xs text-zinc-400">Для удаления введите ваш юз и номер телефона ниже:</p>
+                        <input type="text" id="delete-confirm-username" placeholder="@username" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-red-500">
+                        <input type="tel" id="delete-confirm-phone" placeholder="+7 (999) 000-00-00" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-red-500">
+                        <button onclick="deleteAccount()" class="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-2.5 rounded-xl font-medium transition text-xs border border-red-500/30">Удалить аккаунт</button>
+                    </div>
                 </div>
             `;
             lucide.createIcons();
@@ -929,13 +892,13 @@
             render();
         }
 
-        // НОВАЯ ФИЧА: Синхронизация и сохранение профиля в таблицу users в Supabase
+        // Сохранение и синхронизация профиля с добавлением пользователей в Supabase
         async function saveProfile() {
             const valUser = document.getElementById('profile-username').value.trim();
             const valPhone = document.getElementById('profile-phone').value.trim();
             
-            if (!valUser) {
-                showToast('Укажите ваш юзернейм!', 'error');
+            if (!valUser || !valPhone) {
+                showToast('Укажите юз и номер телефона!', 'error');
                 return;
             }
 
@@ -947,39 +910,62 @@
             localStorage.setItem('reflex_phone', valPhone);
 
             try {
-                // Проверяем, есть ли уже запись пользователя в таблице users
-                if (state.userId) {
-                    await supabaseClient.from('users').update({
-                        email: valUser + '@vldvape.local',
-                        role: 'user'
-                    }).eq('id', state.userId);
+                // Добавление или обновление пользователя в базе данных
+                const { data: existing } = await supabaseClient.from('user').select('*').eq('юз', valUser).single();
+                
+                if (existing) {
+                    await supabaseClient.from('user').update({
+                        номер: valPhone,
+                        роль: existing.роль || 'пользователь'
+                    }).eq('юз', valUser);
                 } else {
-                    // Ищем по email или создаем новую строку
-                    const { data: existingUser } = await supabaseClient.from('users').select('id').eq('email', valUser + '@vldvape.local').single();
-                    
-                    if (existingUser) {
-                        state.userId = existingUser.id;
-                        localStorage.setItem('reflex_user_id', existingUser.id);
-                    } else {
-                        const { data: newUser, error } = await supabaseClient.from('users').insert({
-                            email: valUser + '@vldvape.local',
-                            password_hash: 'no_pass',
-                            role: 'user'
-                        }).select().single();
-
-                        if (!error && newUser) {
-                            state.userId = newUser.id;
-                            localStorage.setItem('reflex_user_id', newUser.id);
-                        }
-                    }
+                    await supabaseClient.from('user').insert({
+                        юз: valUser,
+                        номер: valPhone,
+                        роль: 'пользователь'
+                    });
                 }
-                showToast('Профиль успешно сохранен и синхронизирован с базой!');
+                showToast('Данные успешно сохранены и синхронизированы с базой!');
             } catch (e) {
                 console.error(e);
-                showToast('Профиль сохранен локально', 'success');
+                showToast('Данные сохранены локально', 'success');
             }
 
             render();
+        }
+
+        // Удаление аккаунта при совпадении номера и юза
+        async function deleteAccount() {
+            const uInput = document.getElementById('delete-confirm-username').value.trim();
+            const pInput = document.getElementById('delete-confirm-phone').value.trim();
+
+            if (!uInput || !pInput) {
+                showToast('Введите юз и номер для подтверждения удаления!', 'error');
+                return;
+            }
+
+            if (uInput !== state.user || pInput !== state.phone) {
+                showToast('Введенные данные не совпадают с вашим текущим профилем!', 'error');
+                return;
+            }
+
+            showConfirm('Удаление аккаунта', 'Вы уверены, что хотите удалить свой аккаунт и очистить данные?', async () => {
+                try {
+                    await supabaseClient.from('user').delete().eq('юз', state.user);
+                } catch (e) {
+                    console.error(e);
+                }
+
+                state.user = '';
+                state.phone = '';
+                state.role = 'user';
+                localStorage.removeItem('reflex_username');
+                localStorage.removeItem('reflex_phone');
+                localStorage.setItem('reflex_role', 'user');
+
+                render();
+                showToast('Аккаунт успешно удален');
+            });
         }
 
         // --- АДМИНСКИЕ ВКЛАДКИ ---
@@ -1269,9 +1255,6 @@
                 <div class="space-y-4 max-w-sm mx-auto pt-6">
                     <h2 class="text-lg font-bold">Настройки администратора</h2>
                     <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
-                        <button onclick="openModal('modal-change-password')" class="w-full bg-zinc-800 hover:bg-zinc-700 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
-                            <i data-lucide="key" class="w-4 h-4 text-accent"></i><span>Сменить пароль админа</span>
-                        </button>
                         <button onclick="resetSystemToZero()" class="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2 border border-red-500/30">
                             <i data-lucide="trash-2" class="w-4 h-4"></i><span>Сбросить сайт в 0 (Очистить всё)</span>
                         </button>
@@ -1418,8 +1401,8 @@
         }
 
         async function checkoutOrder() {
-            if (!state.user) {
-                showToast('Пожалуйста, укажите ваш юз в профиле!', 'error');
+            if (!state.user || !state.phone) {
+                showToast('Пожалуйста, укажите ваш юз и номер телефона в профиле!', 'error');
                 switchTab('profile');
                 return;
             }
@@ -1451,6 +1434,7 @@
 
             const { data: orderData, error: orderError } = await supabaseClient.from('orders').insert({
                 username: state.user,
+                phone: state.phone,
                 status: 'in_progress',
                 total_retail: totalRetail,
                 total_wholesale: totalWholesale
@@ -1486,13 +1470,6 @@
                             await supabaseClient.from('product_variants').update({ quantity: newQty }).eq('id', variant.id);
                         }
                     }
-                }
-            }
-
-            for (const item of state.cart) {
-                const { data: remainingVars } = await supabaseClient.from('product_variants').select('id').eq('product_id', item.productId);
-                if (!remainingVars || remainingVars.length === 0) {
-                    await supabaseClient.from('products').delete().eq('id', item.productId);
                 }
             }
 
@@ -1606,56 +1583,74 @@
 
         function openAdminLoginModal() {
             toggleAdminMenu();
+            document.getElementById('admin-password-input').value = '';
             openModal('modal-admin-login');
         }
 
+        // Авторизация в админку с безопасной проверкой и поддержкой разных структур таблицы settings
         async function submitAdminLogin() {
-            const pass = document.getElementById('admin-pass-input').value;
-            const { data } = await supabaseClient.from('settings').select('value').eq('key', 'admin_password').single();
-            
-            if (data && data.value === pass) {
+            const passwordInput = document.getElementById('admin-password-input').value.trim();
+
+            if (!passwordInput) {
+                showToast('Введите пароль разработчика!', 'error');
+                return;
+            }
+
+            try {
+                // Сначала пробуем получить настройки через селект по ключу 'admin_password'
+                let { data: settingData, error: settingError } = await supabaseClient
+                    .from('settings')
+                    .select('*')
+                    .eq('key', 'admin_password')
+                    .maybeSingle();
+
+                // Если записи нет или произошла ошибка структуры, пробуем автоматически создать корректную строку
+                if (!settingData) {
+                    const insertRes = await supabaseClient
+                        .from('settings')
+                        .insert({ key: 'admin_password', value: '0000' })
+                        .select()
+                        .maybeSingle();
+                    
+                    settingData = insertRes.data;
+                }
+
+                // Извлекаем значение пароля независимо от того, как названа колонка со значением
+                let dbPassword = '';
+                if (settingData) {
+                    dbPassword = settingData.value !== undefined ? settingData.value : settingData.val;
+                }
+
+                if (!dbPassword || String(dbPassword).trim() !== passwordInput) {
+                    showToast('Неверный пароль разработчика!', 'error');
+                    return;
+                }
+
+                // Сбрасываем чужие роли на "пользователь" и авторизуем текущего
+                await supabaseClient
+                    .from('user')
+                    .update({ роль: 'пользователь' })
+                    .eq('роль', 'админ');
+
                 state.role = 'admin';
                 localStorage.setItem('reflex_role', 'admin');
-                state.lastKnownAdminPass = data.value;
-                localStorage.setItem('reflex_admin_pass_cache', data.value);
 
                 closeModal('modal-admin-login');
-                document.getElementById('admin-pass-input').value = '';
                 render();
                 showToast('Успешный вход в админку!');
-            } else {
-                showToast('Неверный пароль!', 'error');
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка базы данных: проверьте таблицу settings', 'error');
             }
         }
 
-        async function logoutAdmin() {
+        // Выход из админки
+        function logoutAdmin() {
             state.role = 'user';
             localStorage.setItem('reflex_role', 'user');
-            state.lastKnownAdminPass = '';
-            localStorage.removeItem('reflex_admin_pass_cache');
             toggleAdminMenu();
             render();
             showToast('Вы вышли из режима администратора');
-        }
-
-        async function submitChangeAdminPassword() {
-            const newPass = document.getElementById('new-admin-pass').value.trim();
-            if (!newPass) return;
-
-            const { error } = await supabaseClient.from('settings').update({ value: newPass }).eq('key', 'admin_password');
-            if (!error) {
-                showToast('Пароль успешно изменен! Все открытые сессии админки сброшены.');
-                closeModal('modal-change-password');
-                document.getElementById('new-admin-pass').value = '';
-                
-                state.role = 'user';
-                localStorage.setItem('reflex_role', 'user');
-                state.lastKnownAdminPass = '';
-                localStorage.removeItem('reflex_admin_pass_cache');
-                render();
-            } else {
-                showToast('Ошибка: ' + error.message, 'error');
-            }
         }
 
         function updateVariantLabel() {
