@@ -94,7 +94,7 @@
     <div id="modal-missing-contacts" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
             <h3 class="text-lg font-bold">Контакты не указаны</h3>
-            <p class="text-sm text-zinc-400">У вас не указан юз (username) или номер телефона в профиле. Без них работникам будет сложнее связаться с вами.</p>
+            <p class="text-sm text-zinc-400">У вас не указан username или номер телефона в профиле. Без них вы САМИ должны написать менеджеру.</p>
             <div class="flex flex-col space-y-2 pt-2">
                 <button onclick="closeModal('modal-missing-contacts'); switchTab('profile');" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl text-sm font-medium transition text-white">Указать в профиле</button>
                 <button onclick="proceedCheckoutWithoutContacts()" class="w-full bg-zinc-800 hover:bg-zinc-700 py-3 rounded-xl text-sm font-medium transition text-zinc-300">Продолжить без указания</button>
@@ -118,7 +118,6 @@
     </div>
 
     <!-- Модальные окна -->
-    <!-- 1. Вход админа / Ввод только пароля разработчика (проверка юза и телефона идет из профиля) -->
     <div id="modal-admin-login" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center">
@@ -141,7 +140,6 @@
         </div>
     </div>
 
-    <!-- 2. Смена пароля администратора -->
     <div id="modal-change-password" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center">
@@ -163,7 +161,6 @@
         </div>
     </div>
 
-    <!-- 3. Выбор вкуса/цвета при добавлении в корзину -->
     <div id="modal-variant-select" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center">
@@ -174,7 +171,6 @@
         </div>
     </div>
 
-    <!-- 4. Добавление / Редактирование товара (Админ) -->
     <div id="modal-product-form" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-md rounded-2xl p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center">
@@ -236,7 +232,6 @@
         </div>
     </div>
 
-    <!-- 5. Управление скидкой/акцией товара -->
     <div id="modal-discount-form" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center">
@@ -263,7 +258,6 @@
 
     <!-- Скрипт приложения -->
     <script>
-        // Инициализация Supabase
         const SUPABASE_URL = 'https://ehrzjvuuvodudlelazhe.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_5Lj-BMZYANimr2UG2ZCqgQ_MEi6tOHp';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -373,10 +367,17 @@
         }
 
         async function resetSystemToZero() {
-            showConfirm('Полный сброс сайта в 0', 'Вы уверены? Все товары, варианты, заказы, корзины, менеджеры и пользователи будут полностью удалены.', async () => {
+            showConfirm('Полный сброс сайта в 0', 'Вы уверены? Все товары, варианты, заказы (сброс нумерации в 0), корзины, менеджеры и пользователи будут полностью удалены.', async () => {
                 try {
                     await supabaseClient.from('order_items').delete().not('id', 'is', null);
                     await supabaseClient.from('orders').delete().not('id', 'is', null);
+                    
+                    try {
+                        await supabaseClient.rpc('reset_orders_sequence');
+                    } catch (err) {
+                        console.warn('RPC reset_orders_sequence недоступна, сброшены только данные заказов', err);
+                    }
+
                     await supabaseClient.from('product_variants').delete().not('id', 'is', null);
                     await supabaseClient.from('products').delete().not('id', 'is', null);
                     await supabaseClient.from('managers').delete().not('id', 'is', null);
@@ -396,7 +397,7 @@
                     await fetchOrders();
                     await fetchManagers();
                     render();
-                    showToast('Сайт полностью сброшен в начальное состояние!');
+                    showToast('Сайт и нумерация заказов полностью сброшены в начальное состояние!');
                 } catch (e) {
                     console.error(e);
                     showToast('Ошибка при сбросе системы: ' + e.message, 'error');
@@ -487,23 +488,40 @@
                 if (!error && data) {
                     const map = {};
                     for (const p of data) {
+                        // Автоматически удаляем из базы варианты с нулевым или отрицательным количеством, чтобы они не висели у админа
+                        if (p.product_variants) {
+                            for (const v of p.product_variants) {
+                                if (Number(v.quantity) <= 0) {
+                                    await supabaseClient.from('product_variants').delete().eq('id', v.id);
+                                }
+                            }
+                        }
+
+                        // Перезапрашиваем актуальные варианты после очистки нулевых
+                        const { data: freshVariants } = await supabaseClient.from('product_variants').select('*').eq('product_id', p.id);
+                        const validVariants = freshVariants || [];
+
+                        // Если у товара вообще не осталось вариантов, удаляем сам товар из базы и из админки
+                        if (validVariants.length === 0) {
+                            await supabaseClient.from('products').delete().eq('id', p.id);
+                            continue;
+                        }
+
                         const key = p.name.trim().toLowerCase();
                         if (!map[key]) {
                             const varMap = {};
-                            if (p.product_variants) {
-                                for (const v of p.product_variants) {
-                                    const vKey = v.value.trim().toLowerCase();
-                                    if (!varMap[vKey]) {
-                                        varMap[vKey] = { ...v };
-                                    } else {
-                                        varMap[vKey].quantity += Number(v.quantity || 0);
-                                        await supabaseClient.from('product_variants').delete().eq('id', v.id);
-                                    }
+                            for (const v of validVariants) {
+                                const vKey = v.value.trim().toLowerCase();
+                                if (!varMap[vKey]) {
+                                    varMap[vKey] = { ...v };
+                                } else {
+                                    varMap[vKey].quantity += Number(v.quantity || 0);
+                                    await supabaseClient.from('product_variants').delete().eq('id', v.id);
                                 }
                             }
                             map[key] = { ...p, product_variants: Object.values(varMap) };
                         } else {
-                            for (const v of (p.product_variants || [])) {
+                            for (const v of validVariants) {
                                 const vKey = v.value.trim().toLowerCase();
                                 const existingVar = map[key].product_variants.find(item => item.value.trim().toLowerCase() === vKey);
                                 if (existingVar) {
@@ -1258,7 +1276,7 @@
                         <h3 class="text-sm font-semibold text-amber-400">В работе (${inProgress.length})</h3>
                         ${inProgress.length === 0 ? '<p class="text-xs text-zinc-600">Нет заказов в работе</p>' : inProgress.map(o => {
                             const cleanUsername = (o.username || '').replace('@', '');
-                            const phoneNum = o.phone || state.phone || 'Не указан';
+                            const phoneNum = o.phone || 'Не указан';
                             return `
                                 <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-2">
                                     <div class="flex justify-between text-xs text-zinc-400">
@@ -1266,8 +1284,8 @@
                                         <span>${new Date(o.created_at).toLocaleString()}</span>
                                     </div>
                                     <div class="bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-800 space-y-1 text-xs">
-                                        <div>Телефон: <a href="tel:${phoneNum}" class="text-accent underline font-medium">${phoneNum}</a></div>
-                                        <div>Telegram: ${cleanUsername ? `<a href="https://t.me/${cleanUsername}" target="_blank" class="text-accent underline font-medium">@${cleanUsername}</a>` : '<span class="text-zinc-500">Не указан</span>'}</div>
+                                        <div>Телефон: ${phoneNum !== 'Не указан' ? `<a href="tel:${phoneNum}" class="text-accent underline font-medium">${phoneNum}</a>` : '<span class="text-zinc-500">Не указан</span>'}</div>
+                                        <div>Telegram: ${cleanUsername && cleanUsername !== 'аноним' ? `<a href="https://t.me/${cleanUsername}" target="_blank" class="text-accent underline font-medium">@${cleanUsername}</a>` : '<span class="text-zinc-500">Не указан</span>'}</div>
                                     </div>
                                     <div class="space-y-1">
                                         ${(o.order_items || []).map(i => `<div class="text-sm flex justify-between"><span>${i.product_name} (${i.variant_name})</span><span>${i.quantity} шт. x ${i.price} ₽</span></div>`).join('')}
@@ -1288,7 +1306,7 @@
                         <h3 class="text-sm font-semibold text-emerald-400">Выполненные (${completed.length})</h3>
                         ${completed.length === 0 ? '<p class="text-xs text-zinc-600">Нет выполненных заказов</p>' : completed.map(o => {
                             const cleanUsername = (o.username || '').replace('@', '');
-                            const phoneNum = o.phone || state.phone || 'Не указан';
+                            const phoneNum = o.phone || 'Не указан';
                             return `
                                 <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-2 opacity-75">
                                     <div class="flex justify-between text-xs text-zinc-400">
@@ -1296,8 +1314,8 @@
                                         <span>${new Date(o.created_at).toLocaleDateString()}</span>
                                     </div>
                                     <div class="bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-800 space-y-1 text-xs">
-                                        <div>Телефон: <a href="tel:${phoneNum}" class="text-accent underline font-medium">${phoneNum}</a></div>
-                                        <div>Telegram: ${cleanUsername ? `<a href="https://t.me/${cleanUsername}" target="_blank" class="text-accent underline font-medium">@${cleanUsername}</a>` : '<span class="text-zinc-500">Не указан</span>'}</div>
+                                        <div>Телефон: ${phoneNum !== 'Не указан' ? `<a href="tel:${phoneNum}" class="text-accent underline font-medium">${phoneNum}</a>` : '<span class="text-zinc-500">Не указан</span>'}</div>
+                                        <div>Telegram: ${cleanUsername && cleanUsername !== 'аноним' ? `<a href="https://t.me/${cleanUsername}" target="_blank" class="text-accent underline font-medium">@${cleanUsername}</a>` : '<span class="text-zinc-500">Не указан</span>'}</div>
                                     </div>
                                     <div class="space-y-1">
                                         ${(o.order_items || []).map(i => `<div class="text-sm flex justify-between"><span>${i.product_name} (${i.variant_name})</span><span>${i.quantity} шт.</span></div>`).join('')}
@@ -1660,9 +1678,13 @@
             const totalRetail = state.cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
             const totalWholesale = state.cart.reduce((sum, i) => sum + (i.wholesalePrice * i.qty), 0);
 
+            // Безопасная отправка контактов: если поле пустое, отправляем "аноним" и пустую строку без подстановки чужих или дефолтных данных
+            const safeUsername = (state.user && state.user.trim() !== '') ? state.user.trim() : 'аноним';
+            const safePhone = (state.phone && state.phone.trim() !== '') ? state.phone.trim() : '';
+
             const { data: orderData, error: orderError } = await supabaseClient.from('orders').insert({
-                username: state.user || 'Аноним',
-                phone: state.phone || '',
+                username: safeUsername,
+                phone: safePhone,
                 status: 'in_progress',
                 total_retail: totalRetail,
                 total_wholesale: totalWholesale
@@ -1693,6 +1715,7 @@
                     if (variant) {
                         const newQty = variant.quantity - item.qty;
                         if (newQty <= 0) {
+                            // Удаляем вариант, если его количество стало 0
                             await supabaseClient.from('product_variants').delete().eq('id', variant.id);
                         } else {
                             await supabaseClient.from('product_variants').update({ quantity: newQty }).eq('id', variant.id);
@@ -1789,10 +1812,30 @@
         }
 
         async function completeOrder(orderId) {
+            const order = (state.orders || []).find(o => String(o.id) === String(orderId));
+            if (order && order.order_items) {
+                // При нажатии кнопки "Выполнить" зарезервированные товары окончательно удаляются из вкладки "Товар" / базы данных
+                for (const item of order.order_items) {
+                    const product = (state.products || []).find(p => p.id === item.product_id);
+                    if (product && product.product_variants) {
+                        const variant = product.product_variants.find(v => v.id === item.variant_id);
+                        if (variant) {
+                            const remainingQty = variant.quantity - item.quantity;
+                            if (remainingQty <= 0) {
+                                await supabaseClient.from('product_variants').delete().eq('id', variant.id);
+                            } else {
+                                await supabaseClient.from('product_variants').update({ quantity: remainingQty }).eq('id', variant.id);
+                            }
+                        }
+                    }
+                }
+            }
+
             await supabaseClient.from('orders').update({ status: 'completed' }).eq('id', orderId);
+            await fetchProducts();
             await fetchOrders();
             render();
-            showToast('Заказ отмечен как выполненный');
+            showToast('Заказ выполнен, зарезервированные товары удалены со склада');
         }
 
         async function deleteCompletedOrder(orderId) {
@@ -1964,16 +2007,16 @@
             variantRows.forEach(row => {
                 const vName = row.querySelector('.v-name').value.trim();
                 const vQty = Number(row.querySelector('.v-qty').value);
-                if (vName) {
+                if (vName && vQty > 0) { // Игнорируем варианты с пустым именем или нулевым/отрицательным количеством
                     const key = vName.toLowerCase();
                     if (!variantsMap[key]) {
                         variantsMap[key] = {
                             type: category === 'железо' ? 'color' : 'flavor',
                             value: vName,
-                            quantity: vQty || 0
+                            quantity: vQty
                         };
                     } else {
-                        variantsMap[key].quantity += (vQty || 0);
+                        variantsMap[key].quantity += vQty;
                     }
                 }
             });
@@ -1981,7 +2024,7 @@
             const variantsData = Object.values(variantsMap);
 
             if (variantsData.length === 0) {
-                showToast('Добавьте хотя бы один вариант (вкус/цвет)!', 'error');
+                showToast('Добавьте хотя бы один вариант с количеством больше 0!', 'error');
                 return;
             }
 
