@@ -240,10 +240,16 @@
         const SUPABASE_KEY = 'sb_publishable_5Lj-BMZYANimr2UG2ZCqgQ_MEi6tOHp';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // Состояние приложения
+        // Состояние приложения (автоматический сброс активной вкладки, если роль пользователя 'user', а вкладка админская)
+        let initialRole = localStorage.getItem('reflex_role') || 'user';
+        let initialTab = (localStorage.getItem('reflex_role') === 'admin') ? 'admin_home' : 'home';
+        if (initialRole !== 'admin') {
+            initialTab = 'home';
+        }
+
         let state = {
-            role: localStorage.getItem('reflex_role') || 'user', 
-            activeTab: (localStorage.getItem('reflex_role') === 'admin') ? 'admin_home' : 'home', 
+            role: initialRole, 
+            activeTab: initialTab, 
             user: localStorage.getItem('reflex_username') || '',
             phone: localStorage.getItem('reflex_phone') || '',
             isProfileEditing: false, 
@@ -493,6 +499,15 @@
                 const adminLogoutBtn = document.getElementById('admin-logout-btn');
                 const adminLoginMenuItem = document.getElementById('admin-login-menu-item');
                 
+                // Проверка: если роль пользователя 'user', но почему-то открыта вкладка админа, выкидываем в обычный интерфейс
+                if (state.role !== 'admin') {
+                    state.role = 'user';
+                    localStorage.setItem('reflex_role', 'user');
+                    if (state.activeTab.startsWith('admin_')) {
+                        state.activeTab = 'home';
+                    }
+                }
+
                 if (state.role === 'admin') {
                     roleBadge.textContent = 'Админ';
                     roleBadge.className = 'text-xs px-2 py-0.5 rounded-full bg-accent text-white font-medium';
@@ -561,6 +576,13 @@
         }
 
         function switchTab(tab) {
+            // Защита: если пользователь пытается переключиться на админскую вкладку, не будучи админом
+            if (tab.startsWith('admin_') && state.role !== 'admin') {
+                showToast('Доступ запрещен', 'error');
+                state.activeTab = 'home';
+                render();
+                return;
+            }
             state.activeTab = tab;
             render();
             window.scrollTo(0, 0);
