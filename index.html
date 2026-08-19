@@ -178,7 +178,7 @@
         </div>
     </div>
 
-    <!-- 5. Управление скидкой/акцией товара (Интерфейс вместо модального окна браузера) -->
+    <!-- 5. Управление скидкой/акцией товара -->
     <div id="modal-discount-form" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center">
@@ -297,7 +297,7 @@
             cancelBtn.addEventListener('click', handleCancel);
         }
 
-        // Полный сброс системы в 0 (кроме пароля)
+        // Полный сброс системы в 0
         async function resetSystemToZero() {
             showConfirm('Полный сброс сайта в 0', 'Вы уверены? Все товары, варианты, заказы и корзины будут полностью удалены. Пароль администратора сохранится.', async () => {
                 try {
@@ -321,6 +321,42 @@
             });
         }
 
+        // Точечная проверка остатков: удаляется или корректируется только закончившийся вариант (вкус/цвет)
+        function validateCartStock() {
+            if (!state.cart || state.cart.length === 0) return;
+
+            let removedFlavors = false;
+            const updatedCart = [];
+
+            for (const item of state.cart) {
+                const product = (state.products || []).find(p => p.id === item.productId);
+                if (!product) {
+                    removedFlavors = true;
+                    continue; // Товар полностью удален из базы
+                }
+
+                const variant = (product.product_variants || []).find(v => v.id === item.variantId);
+                if (!variant || variant.quantity <= 0) {
+                    removedFlavors = true;
+                    continue; // Конкретный вкус/вариант закончился, удаляем только его из корзины
+                }
+
+                if (item.qty > variant.quantity) {
+                    item.qty = variant.quantity; // Корректируем количество, если на складе стало меньше
+                }
+
+                item.maxQty = variant.quantity;
+                updatedCart.push(item);
+            }
+
+            if (removedFlavors) {
+                showToast('Некоторые вкусы или товары из вашей корзины закончились и были удалены', 'error');
+            }
+
+            state.cart = updatedCart;
+            localStorage.setItem('reflex_cart', JSON.stringify(state.cart));
+        }
+
         // Запуск при загрузке
         window.addEventListener('DOMContentLoaded', async () => {
             try {
@@ -329,6 +365,7 @@
                 }
                 await fetchProducts();
                 await fetchOrders();
+                validateCartStock();
                 render();
 
                 setInterval(async () => {
@@ -353,7 +390,7 @@
             }
         });
 
-        // Загрузка товаров с автоматической группировкой одинаковых названий и объединением вкусов
+        // Загрузка товаров с группировкой
         async function fetchProducts() {
             try {
                 const { data, error } = await supabaseClient.from('products').select('*, product_variants(*)');
@@ -362,7 +399,6 @@
                     for (const p of data) {
                         const key = p.name.trim().toLowerCase();
                         if (!map[key]) {
-                            // Клонируем структуру товара и объединяем внутри одинаковые вкусы/цвета
                             const varMap = {};
                             if (p.product_variants) {
                                 for (const v of p.product_variants) {
@@ -371,14 +407,12 @@
                                         varMap[vKey] = { ...v };
                                     } else {
                                         varMap[vKey].quantity += Number(v.quantity || 0);
-                                        // Удаляем дубликат из базы
                                         await supabaseClient.from('product_variants').delete().eq('id', v.id);
                                     }
                                 }
                             }
                             map[key] = { ...p, product_variants: Object.values(varMap) };
                         } else {
-                            // Если карточка товара дублируется целиком в базе, объединяем в первую
                             for (const v of (p.product_variants || [])) {
                                 const vKey = v.value.trim().toLowerCase();
                                 const existingVar = map[key].product_variants.find(item => item.value.trim().toLowerCase() === vKey);
@@ -394,7 +428,6 @@
                         }
                     }
                     
-                    // Обновляем остатки и дубликаты вариантов в основном объекте для чистоты
                     for (const mainKey of Object.keys(map)) {
                         const prod = map[mainKey];
                         if (!prod.product_variants || prod.product_variants.length === 0) {
@@ -403,6 +436,7 @@
                         }
                     }
                     state.products = Object.values(map);
+                    validateCartStock();
                 }
             } catch (e) {
                 console.error(e);
@@ -528,7 +562,6 @@
 
             container.innerHTML = `
                 <div class="space-y-4">
-                    <!-- Красивая главная страница с пузырем приветствия -->
                     <div class="bg-gradient-to-r from-accent/30 via-cardBg to-accent/20 border border-zinc-700/60 rounded-2xl p-4 shadow-xl flex items-center space-x-3">
                         <div class="w-10 h-10 rounded-xl bg-accent flex items-center justify-center text-white shrink-0 shadow-lg shadow-accent/40">
                             <i data-lucide="sparkles" class="w-5 h-5"></i>
@@ -1122,7 +1155,6 @@
                                     </div>
                                 </div>
                                 <div class="flex space-x-1.5 items-center">
-                                    <!-- Кнопка акции слева от карандашика -->
                                     <button onclick="openDiscountModal(${p.id})" title="Управление акцией/скидкой" class="w-8 h-8 ${p.old_price && p.old_price > p.retail_price ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'bg-zinc-800 text-zinc-400'} hover:bg-zinc-700 rounded-xl flex items-center justify-center transition">
                                         <i data-lucide="tag" class="w-4 h-4"></i>
                                     </button>
@@ -1200,11 +1232,9 @@
             let newRetailPrice = Number(document.getElementById('discount-new-price').value);
 
             if (clearDiscount || !newRetailPrice || newRetailPrice >= oldPrice) {
-                // Снимаем акцию, возвращаем оригинальную цену
                 await supabaseClient.from('products').update({ retail_price: oldPrice, old_price: null }).eq('id', productId);
                 showToast('Акция успешно убрана');
             } else {
-                // Устанавливаем акцию (old_price становится старой ценой, retail_price — новой)
                 await supabaseClient.from('products').update({ retail_price: newRetailPrice, old_price: oldPrice }).eq('id', productId);
                 showToast('Акция и скидка успешно применены!');
             }
@@ -1279,6 +1309,7 @@
             addVariantToCart(productId, variantId);
         }
 
+        // Изменение количества конкретного варианта в корзине
         function updateCartQty(idx, delta) {
             const item = state.cart[idx];
             const product = (state.products || []).find(p => p.id === item.productId);
@@ -1296,11 +1327,13 @@
             item.qty += delta;
             if (item.qty <= 0) {
                 state.cart.splice(idx, 1);
+                showToast('Вкус удален из корзины');
             }
             localStorage.setItem('reflex_cart', JSON.stringify(state.cart));
             render();
         }
 
+        // Оформление заказа со строгой проверкой наличия
         async function checkoutOrder() {
             if (!state.user) {
                 showToast('Пожалуйста, укажите ваш юз в профиле!', 'error');
@@ -1308,6 +1341,27 @@
                 return;
             }
             if (state.cart.length === 0) return;
+
+            await fetchProducts();
+
+            for (const item of state.cart) {
+                const product = (state.products || []).find(p => p.id === item.productId);
+                if (!product) {
+                    showToast(`Товар "${item.name}" больше недоступен. Корзина будет обновлена.`, 'error');
+                    validateCartStock();
+                    render();
+                    return;
+                }
+
+                const variant = (product.product_variants || []).find(v => v.id === item.variantId);
+                if (!variant || variant.quantity < item.qty) {
+                    const available = variant ? variant.quantity : 0;
+                    showToast(`Вкус "${item.variantName}" товара "${item.name}" остался в количестве: ${available} шт.`, 'error');
+                    validateCartStock();
+                    render();
+                    return;
+                }
+            }
 
             const totalRetail = state.cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
             const totalWholesale = state.cart.reduce((sum, i) => sum + (i.wholesalePrice * i.qty), 0);
@@ -1337,6 +1391,7 @@
 
             await supabaseClient.from('order_items').insert(itemsToInsert);
 
+            // Списываем со склада
             for (const item of state.cart) {
                 const product = (state.products || []).find(p => p.id === item.productId);
                 if (product) {
@@ -1367,9 +1422,9 @@
             showToast('Заказ успешно оформлен!');
         }
 
-        // Отмена заказа с возвратом и объединением одинаковых вкусов/цветов в ту же карточку
+        // Отмена заказа с возвратом на склад
         async function cancelOrder(orderId) {
-            showConfirm('Отмена заказа', 'Вы действительно хотите отменить этот заказ? Товары вернутся в корзину и на склад с объединением одинаковых вкусов.', async () => {
+            showConfirm('Отмена заказа', 'Вы действительно хотите отменить этот заказ? Товары вернутся в корзину и на склад.', async () => {
                 const order = (state.orders || []).find(o => String(o.id) === String(orderId));
                 if (!order) return;
 
@@ -1421,8 +1476,7 @@
                         }
                     }
 
-                    // Проверяем, есть ли уже такой вариант в корзине, чтобы объединить количество и там
-                    const existingCartIndex = state.cart.findIndex(ci => ci.productId === targetProductId && ci.variantName.trim().toLowerCase() === item.variant_name.trim().toLowerCase());
+                    const existingCartIndex = state.cart.findIndex(ci => ci.productId === targetProductId && ci.variantId === targetVariantId);
                     if (existingCartIndex > -1) {
                         state.cart[existingCartIndex].qty += item.quantity;
                     } else {
@@ -1576,7 +1630,6 @@
             lucide.createIcons();
         }
 
-        // Сохранение товара с автоматическим объединением одинаковых вкусов внутри формы
         async function saveProduct() {
             const id = document.getElementById('edit-product-id').value;
             const name = document.getElementById('p-name').value.trim();
@@ -1627,12 +1680,11 @@
             }
 
             if (productId) {
-                // Сохраняем текущую акцию, если она была задана
                 const existingProd = (state.products || []).find(p => p.id == productId);
                 let updateData = { name, category, subcategory, retail_price, wholesale_price, image_url, is_featured };
                 if (existingProd && existingProd.old_price && existingProd.old_price > existingProd.retail_price) {
                     if (existingProd.old_price === retail_price) {
-                        updateData.old_price = null; // Сбрасываем акцию если цена совпала
+                        updateData.old_price = null;
                     }
                 }
 
