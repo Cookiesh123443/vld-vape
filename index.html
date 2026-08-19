@@ -117,17 +117,17 @@
         </div>
     </div>
 
-    <!-- Модальные окна -->
+    <!-- Модальное окно входа в админку (указывается ТОЛЬКО пароль, при этом юз и номер строго проверяются в профиле) -->
     <div id="modal-admin-login" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center">
-                <h3 id="admin-login-title" class="text-lg font-bold">Вход для работников</h3>
+                <h3 class="text-lg font-bold">Вход для работников</h3>
                 <button onclick="closeModal('modal-admin-login')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
-            <p class="text-xs text-zinc-400">Введите пароль разработчика (убедитесь, что в вашем профиле предварительно указаны юз и номер телефона):</p>
+            <p class="text-xs text-zinc-400">Введите пароль администратора (в вашем профиле предварительно обязательно должны быть указаны юз и номер телефона):</p>
             <div class="space-y-3">
                 <div>
-                    <label class="text-xs text-zinc-400 mb-1 block">Пароль разработчика</label>
+                    <label class="text-xs text-zinc-400 mb-1 block">Пароль администратора</label>
                     <div class="relative">
                         <input type="password" id="admin-password-input" placeholder="Введите пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 pr-10 text-sm focus:outline-none focus:border-accent">
                         <button type="button" onclick="togglePasswordVisibility('admin-password-input', 'eye-icon')" class="absolute right-3 top-3 text-zinc-400 hover:text-white transition">
@@ -136,16 +136,18 @@
                     </div>
                 </div>
             </div>
-            <button onclick="submitAdminLogin()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Стать работником</button>
+            <button onclick="submitAdminLogin()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Войти</button>
         </div>
     </div>
 
+    <!-- Модальное окно смены пароля (при смене пароля все роли админ меняются на пользователь) -->
     <div id="modal-change-password" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center">
-                <h3 class="text-lg font-bold">Смена пароля разработчика</h3>
+                <h3 class="text-lg font-bold">Смена пароля администратора</h3>
                 <button onclick="closeModal('modal-change-password')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
+            <p class="text-xs text-yellow-400/90">Внимание: при смене пароля все существующие роли администраторов автоматически сбросятся на «пользователь»!</p>
             <div class="space-y-3">
                 <div>
                     <label class="text-xs text-zinc-400 mb-1 block">Новый пароль</label>
@@ -157,10 +159,11 @@
                     </div>
                 </div>
             </div>
-            <button onclick="submitChangePassword()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Сменить пароль</button>
+            <button onclick="submitChangePassword()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Сменить пароль и сбросить админов</button>
         </div>
     </div>
 
+    <!-- Модальное окно выбора варианта товара -->
     <div id="modal-variant-select" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center">
@@ -177,7 +180,6 @@
             <div class="flex justify-between items-center">
                 <h3 id="product-form-title" class="text-lg font-bold">Добавить товар</h3>
                 <div class="flex items-center space-x-2">
-                    <!-- КНОПКА ИИ -->
                     <button type="button" onclick="openAiModal()" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 shadow-lg shadow-purple-900/30 transition">
                         <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
                         <span>ИИ Загрузка</span>
@@ -251,16 +253,15 @@
                 <button onclick="closeModal('modal-ai-import')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
 
-            <!-- ПОЛЕ 1: Промпт для ИИ -->
             <div class="space-y-1.5">
                 <div class="flex justify-between items-center">
-                    <label class="text-xs font-semibold text-zinc-300">1. Промпт для ИИ (скопируйте и отправьте в ИИ с фото/текстом)</label>
+                    <label class="text-xs font-semibold text-zinc-300">1. Промпт для ИИ</label>
                     <button type="button" onclick="copyAiPrompt()" class="text-xs text-accent hover:underline flex items-center space-x-1">
                         <i data-lucide="copy" class="w-3.5 h-3.5"></i>
                         <span>Копировать промпт</span>
                     </button>
                 </div>
-                <textarea id="ai-prompt-text" readonly rows="7" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-3 text-xs text-zinc-300 font-mono focus:outline-none select-all">Распознай данные о товарах из прикрепленной накладной, фото или текста. Выдай ответ СТРОГО в виде чистого JSON-массива без лишних слов, комментариев и символов markdown (без ```json ... ```), чтобы я мог сразу вставить его в систему.
+                <textarea id="ai-prompt-text" readonly rows="7" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-3 text-xs text-zinc-300 font-mono focus:outline-none select-all">Распознай данные о товарах из прикрепленной накладной, фото или текста. Выдай ответ СТРОГО в виде чистого JSON-массива без лишних слов, комментариев и символов markdown (without ```json ... ```), чтобы я мог сразу вставить его в систему.
 
 Формат JSON:
 [
@@ -277,12 +278,10 @@
   }
 ]
 Примечания:
-- Возможные категории строго: "жидкость", "железо", "одноразки", "снюс/пластинки".
-- Если количество для вкуса не указано в накладной, ставь по умолчанию 1.
-- Не включай поле для фото, оно добавляется вручную.</textarea>
+- Категории строго: "жидкость", "железо", "одноразки", "снюс/пластинки".
+- Если количество не указано, ставь 1.</textarea>
             </div>
 
-            <!-- ПОЛЕ 2: Вставка JSON -->
             <div class="space-y-1.5">
                 <label class="text-xs font-semibold text-zinc-300">2. Вставьте готовый JSON от ИИ сюда:</label>
                 <textarea id="ai-json-input" placeholder="[ { 'name': '...', ... } ]" rows="6" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-3 text-xs text-zinc-200 font-mono focus:outline-none focus:border-accent"></textarea>
@@ -294,6 +293,7 @@
         </div>
     </div>
 
+    <!-- Модальное окно управления скидкой/акцией -->
     <div id="modal-discount-form" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center">
@@ -318,18 +318,15 @@
         </div>
     </div>
 
-    <!-- Скрипт приложения -->
+    <!-- Основной скрипт приложения -->
     <script>
         const SUPABASE_URL = 'https://ehrzjvuuvodudlelazhe.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_5Lj-BMZYANimr2UG2ZCqgQ_MEi6tOHp';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        let initialRole = localStorage.getItem('reflex_role') === 'admin' ? 'admin' : 'user';
-        let initialTab = (initialRole === 'admin') ? 'admin_home' : 'home';
-
         let state = {
-            role: initialRole, 
-            activeTab: initialTab, 
+            role: 'user', 
+            activeTab: 'home', 
             user: localStorage.getItem('reflex_username') || '',
             phone: localStorage.getItem('reflex_phone') || '',
             isProfileEditing: false, 
@@ -373,17 +370,12 @@
                 toast.innerHTML = `<span>${message}</span>`;
                 container.appendChild(toast);
                 
-                setTimeout(() => {
-                    toast.classList.remove('translate-y-2', 'opacity-0');
-                }, 10);
-
+                setTimeout(() => { toast.classList.remove('translate-y-2', 'opacity-0'); }, 10);
                 setTimeout(() => {
                     toast.classList.add('translate-y-2', 'opacity-0');
                     setTimeout(() => toast.remove(), 300);
                 }, 3000);
-            } catch (e) {
-                console.error(e);
-            }
+            } catch (e) { console.error(e); }
         }
 
         function showConfirm(title, text, onConfirm) {
@@ -397,17 +389,8 @@
             modal.classList.remove('hidden');
             lucide.createIcons();
 
-            const handleOk = () => {
-                modal.classList.add('hidden');
-                cleanup();
-                onConfirm();
-            };
-
-            const handleCancel = () => {
-                modal.classList.add('hidden');
-                cleanup();
-            };
-
+            const handleOk = () => { modal.classList.add('hidden'); cleanup(); onConfirm(); };
+            const handleCancel = () => { modal.classList.add('hidden'); cleanup(); };
             const cleanup = () => {
                 okBtn.removeEventListener('click', handleOk);
                 cancelBtn.removeEventListener('click', handleCancel);
@@ -428,7 +411,6 @@
             lucide.createIcons();
         }
 
-        // Функции для работы с ИИ модалкой
         function openAiModal() {
             document.getElementById('ai-json-input').value = '';
             openModal('modal-ai-import');
@@ -453,9 +435,7 @@
                 let cleanedJson = rawJson.replace(/```json/g, '').replace(/```/g, '').trim();
                 const items = JSON.parse(cleanedJson);
 
-                if (!Array.isArray(items)) {
-                    throw new Error('JSON должен быть массивом товаров [...]');
-                }
+                if (!Array.isArray(items)) throw new Error('JSON должен быть массивом товаров [...]');
 
                 let addedCount = 0;
                 for (const item of items) {
@@ -472,19 +452,11 @@
                     if (existingProduct) {
                         productId = existingProduct.id;
                         await supabaseClient.from('products').update({
-                            category,
-                            subcategory,
-                            retail_price: retailPrice,
-                            wholesale_price: wholesalePrice
+                            category, subcategory, retail_price: retailPrice, wholesale_price: wholesalePrice
                         }).eq('id', productId);
                     } else {
                         const { data: newProd, error: prodErr } = await supabaseClient.from('products').insert({
-                            name,
-                            category,
-                            subcategory,
-                            retail_price: retailPrice,
-                            wholesale_price: wholesalePrice,
-                            is_featured: true
+                            name, category, subcategory, retail_price: retailPrice, wholesale_price: wholesalePrice, is_featured: true
                         }).select().single();
 
                         if (prodErr || !newProd) continue;
@@ -500,16 +472,9 @@
                         const matchVar = (existingVars || []).find(ev => ev.value.trim().toLowerCase() === vValue.trim().toLowerCase());
 
                         if (matchVar) {
-                            await supabaseClient.from('product_variants').update({
-                                quantity: matchVar.quantity + vQty
-                            }).eq('id', matchVar.id);
+                            await supabaseClient.from('product_variants').update({ quantity: matchVar.quantity + vQty }).eq('id', matchVar.id);
                         } else {
-                            await supabaseClient.from('product_variants').insert({
-                                product_id: productId,
-                                type: vType,
-                                value: vValue,
-                                quantity: vQty
-                            });
+                            await supabaseClient.from('product_variants').insert({ product_id: productId, type: vType, value: vValue, quantity: vQty });
                         }
                     }
                     addedCount++;
@@ -531,12 +496,7 @@
                 try {
                     await supabaseClient.from('order_items').delete().not('id', 'is', null);
                     await supabaseClient.from('orders').delete().not('id', 'is', null);
-                    
-                    try {
-                        await supabaseClient.rpc('reset_orders_sequence');
-                    } catch (err) {
-                        console.warn('RPC reset_orders_sequence недоступна, сброшены только данные заказов', err);
-                    }
+                    try { await supabaseClient.rpc('reset_orders_sequence'); } catch (err) {}
 
                     await supabaseClient.from('product_variants').delete().not('id', 'is', null);
                     await supabaseClient.from('products').delete().not('id', 'is', null);
@@ -557,7 +517,7 @@
                     await fetchOrders();
                     await fetchManagers();
                     render();
-                    showToast('Сайт и нумерация заказов полностью сброшены в начальное состояние!');
+                    showToast('Сайт полностью сброшен в начальное состояние!');
                 } catch (e) {
                     console.error(e);
                     showToast('Ошибка при сбросе системы: ' + e.message, 'error');
@@ -567,37 +527,58 @@
 
         function validateCartStock() {
             if (!state.cart || state.cart.length === 0) return;
-
             let removedFlavors = false;
             const updatedCart = [];
 
             for (const item of state.cart) {
                 const product = (state.products || []).find(p => p.id === item.productId);
-                if (!product) {
-                    removedFlavors = true;
-                    continue;
-                }
+                if (!product) { removedFlavors = true; continue; }
 
                 const variant = (product.product_variants || []).find(v => v.id === item.variantId);
-                if (!variant || variant.quantity <= 0) {
-                    removedFlavors = true;
-                    continue;
-                }
+                if (!variant || variant.quantity <= 0) { removedFlavors = true; continue; }
 
-                if (item.qty > variant.quantity) {
-                    item.qty = variant.quantity;
-                }
-
+                if (item.qty > variant.quantity) item.qty = variant.quantity;
                 item.maxQty = variant.quantity;
                 updatedCart.push(item);
             }
 
-            if (removedFlavors) {
-                showToast('Некоторые вкусы или товары из вашей корзины закончились и были удалены', 'error');
-            }
-
+            if (removedFlavors) showToast('Некоторые вкусы или товары из вашей корзины закончились и были удалены', 'error');
             state.cart = updatedCart;
             localStorage.setItem('reflex_cart', JSON.stringify(state.cart));
+        }
+
+        // Проверка роли пользователя при старте приложения
+        async function checkUserRoleOnStartup() {
+            try {
+                if (state.user) {
+                    const { data: dbUser } = await supabaseClient.from('user').select('роль, номер').eq('юз', state.user).maybeSingle();
+                    if (dbUser) {
+                        if (dbUser.номер) {
+                            state.phone = dbUser.номер;
+                            localStorage.setItem('reflex_phone', dbUser.номер);
+                        }
+                        // Если в базе роль админ и при этом заполнены юз и номер — оставляем админа, иначе сбрасываем на пользователя
+                        if (dbUser.роль === 'админ' && state.user && state.phone) {
+                            state.role = 'admin';
+                            localStorage.setItem('reflex_role', 'admin');
+                        } else {
+                            state.role = 'user';
+                            localStorage.setItem('reflex_role', 'user');
+                            await supabaseClient.from('user').update({ роль: 'пользователь' }).eq('юз', state.user);
+                        }
+                    } else {
+                        state.role = 'user';
+                        localStorage.setItem('reflex_role', 'user');
+                    }
+                } else {
+                    state.role = 'user';
+                    localStorage.setItem('reflex_role', 'user');
+                }
+            } catch (e) {
+                console.error(e);
+                state.role = 'user';
+                localStorage.setItem('reflex_role', 'user');
+            }
         }
 
         window.addEventListener('DOMContentLoaded', async () => {
@@ -606,14 +587,7 @@
                     Notification.requestPermission();
                 }
 
-                if (state.user && state.role === 'admin') {
-                    const { data: dbUser } = await supabaseClient.from('user').select('роль').eq('юз', state.user).maybeSingle();
-                    if (!dbUser || dbUser.роль !== 'админ') {
-                        state.role = 'user';
-                        localStorage.setItem('reflex_role', 'user');
-                    }
-                }
-
+                await checkUserRoleOnStartup();
                 await fetchProducts();
                 await fetchOrders();
                 await fetchManagers();
@@ -630,12 +604,9 @@
                         if (window.Notification && Notification.permission === 'granted') {
                             new Notification('VLD VAPE', { body: 'Поступил новый заказ в обработку!' });
                         }
-                        if (state.activeTab === 'admin_orders' || state.activeTab === 'admin_home') {
-                            render();
-                        }
+                        if (state.activeTab === 'admin_orders' || state.activeTab === 'admin_home') render();
                     }
                 }, 10000);
-
             } catch (e) {
                 console.error(e);
                 showToast('Ошибка инициализации приложения', 'error');
@@ -650,9 +621,7 @@
                     for (const p of data) {
                         if (p.product_variants) {
                             for (const v of p.product_variants) {
-                                if (Number(v.quantity) <= 0) {
-                                    await supabaseClient.from('product_variants').delete().eq('id', v.id);
-                                }
+                                if (Number(v.quantity) <= 0) await supabaseClient.from('product_variants').delete().eq('id', v.id);
                             }
                         }
 
@@ -669,9 +638,8 @@
                             const varMap = {};
                             for (const v of validVariants) {
                                 const vKey = v.value.trim().toLowerCase();
-                                if (!varMap[vKey]) {
-                                    varMap[vKey] = { ...v };
-                                } else {
+                                if (!varMap[vKey]) varMap[vKey] = { ...v };
+                                else {
                                     varMap[vKey].quantity += Number(v.quantity || 0);
                                     await supabaseClient.from('product_variants').delete().eq('id', v.id);
                                 }
@@ -692,31 +660,24 @@
                             await supabaseClient.from('products').delete().eq('id', p.id);
                         }
                     }
-                    
                     state.products = Object.values(map);
                     validateCartStock();
                 }
-            } catch (e) {
-                console.error(e);
-            }
+            } catch (e) { console.error(e); }
         }
 
         async function fetchOrders() {
             try {
                 const { data, error } = await supabaseClient.from('orders').select('*, order_items(*)');
                 if (!error && data) state.orders = data;
-            } catch (e) {
-                console.error(e);
-            }
+            } catch (e) { console.error(e); }
         }
 
         async function fetchManagers() {
             try {
                 const { data, error } = await supabaseClient.from('managers').select('*');
                 if (!error && data) state.managers = data;
-            } catch (e) {
-                console.error(e);
-            }
+            } catch (e) { console.error(e); }
         }
 
         function render() {
@@ -725,12 +686,11 @@
                 const adminLogoutBtn = document.getElementById('admin-logout-btn');
                 const adminLoginMenuItem = document.getElementById('admin-login-menu-item');
                 
+                // Проверка ролей: если роль не admin, переводим пользователя на обычный сайт
                 if (state.role !== 'admin') {
                     state.role = 'user';
                     localStorage.setItem('reflex_role', 'user');
-                    if (state.activeTab.startsWith('admin_')) {
-                        state.activeTab = 'home';
-                    }
+                    if (state.activeTab.startsWith('admin_')) state.activeTab = 'home';
                 }
 
                 if (state.role === 'admin') {
@@ -835,8 +795,7 @@
         function renderUserHome(container) {
             const featured = (state.products || []).filter(p => {
                 if (!p.is_featured) return false;
-                const hasStock = p.product_variants && p.product_variants.some(v => v.quantity > 0);
-                return hasStock;
+                return p.product_variants && p.product_variants.some(v => v.quantity > 0);
             });
 
             container.innerHTML = `
@@ -847,7 +806,7 @@
                         </div>
                         <div>
                             <h2 class="text-sm font-bold tracking-wide text-zinc-100">Добро пожаловать в VLD VAPE!</h2>
-                            <p class="text-xs text-zinc-400 mt-0.5">Лучший выбор жидкостей, устройств и всего остального</p>
+                            <p class="text-xs text-zinc-400 mt-0.5">Лучший выбор жидкостей и устройств</p>
                         </div>
                     </div>
 
@@ -920,17 +879,13 @@
                                 (p.subcategory && p.subcategory.toLowerCase().includes(query)) || 
                                 v.value.toLowerCase().includes(query);
                             
-                            if (matchesSearch) {
-                                variantCards.push({ product: p, variant: v });
-                            }
+                            if (matchesSearch) variantCards.push({ product: p, variant: v });
                         }
                     });
                 }
             });
 
-            if (variantCards.length === 0) {
-                return '<p class="col-span-2 text-center text-zinc-500 py-10">Товары не найдены</p>';
-            }
+            if (variantCards.length === 0) return '<p class="col-span-2 text-center text-zinc-500 py-10">Товары не найдены</p>';
 
             return variantCards.map(item => {
                 const p = item.product;
@@ -964,8 +919,7 @@
 
             const currentCategoryProducts = (state.products || []).filter(p => {
                 if (p.category !== state.catalogCategory) return false;
-                const hasStock = p.product_variants && p.product_variants.some(v => v.quantity > 0);
-                return hasStock;
+                return p.product_variants && p.product_variants.some(v => v.quantity > 0);
             });
             
             const subcategories = ['all', ...new Set(currentCategoryProducts.map(p => p.subcategory).filter(Boolean))];
@@ -1128,7 +1082,7 @@
 
             const container = document.getElementById('managers-list-container');
             if (state.managers.length === 0) {
-                container.innerHTML = `<p class="text-xs text-zinc-500 text-center py-4">Менеджеры пока не добавлены администратором в разделе Ещё -> Менеджеры</p>`;
+                container.innerHTML = `<p class="text-xs text-zinc-500 text-center py-4">Менеджеры пока не добавлены</p>`;
             } else {
                 container.innerHTML = state.managers.map(m => `
                     <div onclick="contactManager('${m.username}', '${orderId}')" class="bg-zinc-900 border border-zinc-800 hover:border-accent p-3 rounded-xl flex items-center justify-between cursor-pointer transition">
@@ -1167,7 +1121,7 @@
                     </div>
                     <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
                         <div>
-                            <label class="text-xs text-zinc-400 mb-1 block">Ваш Юз (username)</label>
+                            <label class="text-xs text-zinc-400 mb-1 block">Ваш Юз (username) <span class="text-red-400">*</span></label>
                             ${isEditing ? `
                                 <input type="text" id="profile-username" value="${state.user}" placeholder="@username" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-accent">
                             ` : `
@@ -1175,13 +1129,14 @@
                             `}
                         </div>
                         <div>
-                            <label class="text-xs text-zinc-400 mb-1 block">Номер телефона</label>
+                            <label class="text-xs text-zinc-400 mb-1 block">Номер телефона <span class="text-red-400">*</span></label>
                             ${isEditing ? `
                                 <input type="tel" id="profile-phone" value="${state.phone}" placeholder="+7 (999) 000-00-00" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-accent">
                             ` : `
                                 <div class="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-200">${state.phone || '<span class="text-zinc-600">Не указан</span>'}</div>
                             `}
                         </div>
+                        <p class="text-[11px] text-zinc-500">Примечание: Юз и номер строго обязательны для работников</p>
                         ${isEditing ? `
                             <button onclick="saveProfile()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Сохранить изменения</button>
                         ` : ''}
@@ -1189,7 +1144,7 @@
 
                     <div class="bg-cardBg border border-red-900/40 rounded-2xl p-4 space-y-2 mt-4">
                         <h3 class="text-sm font-bold text-red-400">Удаление аккаунта</h3>
-                        <p class="text-xs text-zinc-400">Для удаления введите ваш юз и номер телефона ниже:</p>
+                        <p class="text-xs text-zinc-400">Для удаления введите ваши данные ниже:</p>
                         <input type="text" id="delete-confirm-username" placeholder="@username" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-red-500">
                         <input type="tel" id="delete-confirm-phone" placeholder="+7 (999) 000-00-00" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-red-500">
                         <button onclick="deleteAccount()" class="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-2.5 rounded-xl font-medium transition text-xs border border-red-500/30">Удалить аккаунт</button>
@@ -1205,9 +1160,11 @@
         }
 
         async function saveProfile() {
-            const valUser = document.getElementById('profile-username').value.trim();
+            let valUser = document.getElementById('profile-username').value.trim();
             const valPhone = document.getElementById('profile-phone').value.trim();
             
+            if (valUser && !valUser.startsWith('@')) valUser = '@' + valUser;
+
             state.user = valUser;
             state.phone = valPhone;
             state.isProfileEditing = false;
@@ -1223,9 +1180,7 @@
                     } else {
                         await supabaseClient.from('user').insert({ юз: valUser, номер: valPhone, роль: 'пользователь' });
                     }
-                } catch (e) {
-                    console.error(e);
-                }
+                } catch (e) { console.error(e); }
             }
 
             showToast('Данные успешно сохранены!');
@@ -1233,8 +1188,10 @@
         }
 
         async function deleteAccount() {
-            const uInput = document.getElementById('delete-confirm-username').value.trim();
+            let uInput = document.getElementById('delete-confirm-username').value.trim();
             const pInput = document.getElementById('delete-confirm-phone').value.trim();
+
+            if (uInput && !uInput.startsWith('@')) uInput = '@' + uInput;
 
             if (!uInput || !pInput) {
                 showToast('Введите юз и номер для подтверждения удаления!', 'error');
@@ -1246,12 +1203,8 @@
                 return;
             }
 
-            showConfirm('Удаление аккаунта', 'Вы уверены, что хотите удалить свой аккаунт и очистить данные?', async () => {
-                try {
-                    await supabaseClient.from('user').delete().eq('юз', state.user);
-                } catch (e) {
-                    console.error(e);
-                }
+            showConfirm('Удаление аккаунта', 'Вы уверены, что хотите удалить свой аккаунт?', async () => {
+                try { await supabaseClient.from('user').delete().eq('юз', state.user); } catch (e) {}
 
                 state.user = '';
                 state.phone = '';
@@ -1277,30 +1230,20 @@
                         <button onclick="setAdminHomeSubTab('stats')" class="flex-1 py-2 rounded-xl text-xs font-medium transition ${state.adminHomeSubTab === 'stats' ? 'bg-accent text-white' : 'text-zinc-400'}">Статистика</button>
                         <button onclick="setAdminHomeSubTab('product')" class="flex-1 py-2 rounded-xl text-xs font-medium transition ${state.adminHomeSubTab === 'product' ? 'bg-accent text-white' : 'text-zinc-400'}">Товар (Главная)</button>
                     </div>
-                    
                     <div id="admin-home-subcontent"></div>
                 </div>
             `;
 
             const subContainer = document.getElementById('admin-home-subcontent');
-            if (state.adminHomeSubTab === 'product') {
-                renderUserHome(subContainer);
-            } else {
-                renderAdminStats(subContainer);
-            }
+            if (state.adminHomeSubTab === 'product') renderUserHome(subContainer);
+            else renderAdminStats(subContainer);
         }
 
         function renderAdminStats(container) {
             const filteredOrders = (state.orders || []).filter(o => {
-                if (state.adminStatsFilter === 'today') {
-                    return new Date(o.created_at).toDateString() === new Date().toDateString();
-                }
-                if (state.adminStatsFilter === '7days') {
-                    return new Date(o.created_at) >= new Date(Date.now() - 7*24*60*60*1000);
-                }
-                if (state.adminStatsFilter === '30days') {
-                    return new Date(o.created_at) >= new Date(Date.now() - 30*24*60*60*1000);
-                }
+                if (state.adminStatsFilter === 'today') return new Date(o.created_at).toDateString() === new Date().toDateString();
+                if (state.adminStatsFilter === '7days') return new Date(o.created_at) >= new Date(Date.now() - 7*24*60*60*1000);
+                if (state.adminStatsFilter === '30days') return new Date(o.created_at) >= new Date(Date.now() - 30*24*60*60*1000);
                 return true;
             });
 
@@ -1389,22 +1332,8 @@
                     data: {
                         labels: labels.length ? labels.reverse() : ['Нет данных'],
                         datasets: [
-                            {
-                                label: 'Выручка',
-                                data: revData.length ? revData.reverse() : [0],
-                                borderColor: '#7c3aed',
-                                backgroundColor: 'rgba(124, 58, 237, 0.1)',
-                                fill: true,
-                                tension: 0.3
-                            },
-                            {
-                                label: 'Прибыль',
-                                data: profData.length ? profData.reverse() : [0],
-                                borderColor: '#10b981',
-                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                                fill: true,
-                                tension: 0.3
-                            }
+                            { label: 'Выручка', data: revData.length ? revData.reverse() : [0], borderColor: '#7c3aed', backgroundColor: 'rgba(124, 58, 237, 0.1)', fill: true, tension: 0.3 },
+                            { label: 'Прибыль', data: profData.length ? profData.reverse() : [0], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.3 }
                         ]
                     },
                     options: {
@@ -1416,9 +1345,7 @@
                         }
                     }
                 });
-            } catch (e) {
-                console.error(e);
-            }
+            } catch (e) { console.error(e); }
         }
 
         function renderAdminOrders(container) {
@@ -1548,15 +1475,15 @@
                                 <i data-lucide="trash-2" class="w-4 h-4"></i><span>Сбросить сайт (Очистить всё)</span>
                             </button>
                             <button onclick="logoutAdmin()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
-                                <i data-lucide="log-out" class="w-4 h-4"></i><span>Выйти из админки</span>
+                                <i data-lucide="log-out" class="w-4 h-4"></i><span>Выйти</span>
                             </button>
                         </div>
                     ` : `
                         <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
                             <h3 class="text-sm font-bold">Добавить менеджера</h3>
                             <div class="space-y-2">
-                                <input type="text" id="new-manager-name" placeholder="Имя менеджера (например, Иван)" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
-                                <input type="text" id="new-manager-username" placeholder="Юз телеграм (например, @manager_tg)" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
+                                <input type="text" id="new-manager-name" placeholder="Имя менеджера" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
+                                <input type="text" id="new-manager-username" placeholder="Юз телеграм (@username)" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
                                 <button onclick="addNewManager()" class="w-full bg-accent hover:bg-accentHover py-2.5 rounded-xl font-medium transition text-xs text-white">Добавить менеджера</button>
                             </div>
 
@@ -1603,7 +1530,6 @@
 
                 nameField.value = '';
                 usernameField.value = '';
-
                 await fetchManagers();
                 render();
                 showToast('Менеджер успешно добавлен!');
@@ -1625,6 +1551,7 @@
             openModal('modal-change-password');
         }
 
+        // РЕАЛИЗАЦИЯ: При смене пароля админа все роли админ меняются на пользователь
         async function submitChangePassword() {
             const newPassword = document.getElementById('new-admin-password').value.trim();
             if (!newPassword) {
@@ -1632,13 +1559,96 @@
                 return;
             }
             try {
-                await supabaseClient.from('admin_settings').upsert({ key: 'admin_password', value: newPassword });
+                // Сохраняем новый пароль в таблицу setting (supabase -> setting -> key, value)
+                await supabaseClient.from('setting').upsert({ key: 'admin_password', value: newPassword });
+
+                // Сбрасываем роли ВСЕХ пользователей с роли 'админ' на 'пользователь' в базе данных
+                await supabaseClient.from('user').update({ роль: 'пользователь' }).eq('роль', 'админ');
+
+                // Переводим текущего клиента в статус обычного пользователя
+                state.role = 'user';
+                localStorage.setItem('reflex_role', 'user');
+
                 closeModal('modal-change-password');
-                showToast('Пароль администратора успешно изменен!');
+                render();
+                showToast('Пароль успешно изменен! Все роли администраторов сброшены на «пользователь».');
             } catch (e) {
                 console.error(e);
                 showToast('Ошибка при смене пароля', 'error');
             }
+        }
+
+        // РЕАЛИЗАЦИЯ: При входе в админ панель в профиле обязательны юз и номер, а в модалке указывается ТОЛЬКО пароль
+        function openAdminLoginModal() {
+            if (!state.user || !state.phone) {
+                showToast('Для входа в админ-панель в вашем профиле обязательно должны быть указаны юз и номер телефона!', 'error');
+                switchTab('profile');
+                return;
+            }
+            document.getElementById('admin-password-input').value = '';
+            openModal('modal-admin-login');
+        }
+
+        async function submitAdminLogin() {
+            const passwordInput = document.getElementById('admin-password-input').value.trim();
+            if (!passwordInput) {
+                showToast('Введите пароль!', 'error');
+                return;
+            }
+
+            if (!state.user || !state.phone) {
+                showToast('В профиле обязательно должны быть указаны юз и номер!', 'error');
+                closeModal('modal-admin-login');
+                switchTab('profile');
+                return;
+            }
+
+            try {
+                // Получаем пароль из supabase -> setting -> key, value (admin_password)
+                const { data: settingData } = await supabaseClient.from('setting').select('value').eq('key', 'admin_password').maybeSingle();
+                let correctPassword = settingData ? settingData.value : 'admin';
+
+                if (passwordInput !== correctPassword) {
+                    showToast('Неверный пароль администратора!', 'error');
+                    return;
+                }
+
+                // Успешный вход: обновляем запись текущего пользователя в таблице user, устанавливая роль 'админ'
+                await supabaseClient.from('user').upsert({
+                    юз: state.user,
+                    номер: state.phone,
+                    роль: 'админ'
+                }, { onConflict: 'юз' });
+
+                state.role = 'admin';
+                localStorage.setItem('reflex_role', 'admin');
+
+                closeModal('modal-admin-login');
+                switchTab('admin_home');
+                showToast('Вы успешно вошли в админ-панель!');
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка при проверке пароля', 'error');
+            }
+        }
+
+        // Выход из админки (переход на обычный сайт)
+        async function logoutAdmin() {
+            if (state.user) {
+                try {
+                    await supabaseClient.from('user').update({ роль: 'пользователь' }).eq('юз', state.user);
+                } catch (e) { console.error(e); }
+            }
+
+            state.role = 'user';
+            localStorage.setItem('reflex_role', 'user');
+            switchTab('home');
+            showToast('Вы вышли из админ-панели');
+        }
+
+        function toggleAdminMenu() {
+            const dropdown = document.getElementById('admin-dropdown');
+            if (dropdown) dropdown.classList.toggle('hidden');
         }
 
         function openProductModal(product = null) {
@@ -1666,9 +1676,7 @@
             rowsContainer.innerHTML = '';
 
             if (product && product.product_variants && product.product_variants.length > 0) {
-                product.product_variants.forEach(v => {
-                    addVariantRow(v.value, v.quantity, v.id);
-                });
+                product.product_variants.forEach(v => { addVariantRow(v.value, v.quantity, v.id); });
             } else {
                 addVariantRow();
             }
@@ -1680,15 +1688,13 @@
         function updateVariantLabel() {
             const cat = document.getElementById('p-category').value;
             const label = document.getElementById('variants-label');
-            if (label) {
-                label.textContent = (cat === 'железо') ? 'Цвета и количество' : 'Вкусы и количество';
-            }
+            if (label) label.textContent = (cat === 'железо') ? 'Цвета и количество' : 'Вкусы и количество';
         }
 
         function addVariantRow(val = '', qty = 1, varId = '') {
             const container = document.getElementById('variants-rows');
             const cat = document.getElementById('p-category').value;
-            const placeholder = (cat === 'железо') ? 'Цвет (например, Чёрный)' : 'Вкус (например, Мята)';
+            const placeholder = (cat === 'железо') ? 'Цвет' : 'Вкус';
             
             const div = document.createElement('div');
             div.className = 'flex items-center space-x-2 variant-row';
@@ -1739,9 +1745,7 @@
                 const varId = row.querySelector('.variant-id').value;
                 const val = row.querySelector('.variant-value').value.trim();
                 const qty = Number(row.querySelector('.variant-qty').value);
-                if (val && !isNaN(qty) && qty > 0) {
-                    variants.push({ id: varId, value: val, quantity: qty });
-                }
+                if (val && !isNaN(qty) && qty > 0) variants.push({ id: varId, value: val, quantity: qty });
             });
 
             if (variants.length === 0) {
@@ -1759,29 +1763,17 @@
                     }).eq('id', currentProductId);
 
                     const { data: existingVars } = await supabaseClient.from('product_variants').select('*').eq('product_id', currentProductId);
-                    const existingIds = (existingVars || []).map(v => String(v.id));
                     const updatedIds = variants.filter(v => v.id).map(v => String(v.id));
 
                     for (const ev of existingVars) {
-                        if (!updatedIds.includes(String(ev.id))) {
-                            await supabaseClient.from('product_variants').delete().eq('id', ev.id);
-                        }
+                        if (!updatedIds.includes(String(ev.id))) await supabaseClient.from('product_variants').delete().eq('id', ev.id);
                     }
 
                     for (const v of variants) {
                         if (v.id) {
-                            await supabaseClient.from('product_variants').update({
-                                type: vType,
-                                value: v.value,
-                                quantity: v.quantity
-                            }).eq('id', v.id);
+                            await supabaseClient.from('product_variants').update({ type: vType, value: v.value, quantity: v.quantity }).eq('id', v.id);
                         } else {
-                            await supabaseClient.from('product_variants').insert({
-                                product_id: currentProductId,
-                                type: vType,
-                                value: v.value,
-                                quantity: v.quantity
-                            });
+                            await supabaseClient.from('product_variants').insert({ product_id: currentProductId, type: vType, value: v.value, quantity: v.quantity });
                         }
                     }
                 } else {
@@ -1793,12 +1785,7 @@
                     currentProductId = newProd.id;
 
                     for (const v of variants) {
-                        await supabaseClient.from('product_variants').insert({
-                            product_id: currentProductId,
-                            type: vType,
-                            value: v.value,
-                            quantity: v.quantity
-                        });
+                        await supabaseClient.from('product_variants').insert({ product_id: currentProductId, type: vType, value: v.value, quantity: v.quantity });
                     }
                 }
 
@@ -1843,59 +1830,56 @@
 
             if (remove) {
                 const originalPrice = product.old_price || product.retail_price;
-                await supabaseClient.from('products').update({
-                    retail_price: originalPrice,
-                    old_price: null
-                }).eq('id', id);
-            } else {
-                const newPrice = Number(document.getElementById('discount-new-price').value);
-                if (!newPrice || isNaN(newPrice)) {
-                    showToast('Введите корректную новую цену!', 'error');
-                    return;
-                }
-                const oldPrice = product.old_price || product.retail_price;
-                if (newPrice >= oldPrice) {
-                    showToast('Новая цена должна быть меньше старой розничной цены!', 'error');
-                    return;
-                }
-                await supabaseClient.from('products').update({
-                    retail_price: newPrice,
-                    old_price: oldPrice
-                }).eq('id', id);
+                await supabaseClient.from('products').update({ retail_price: originalPrice, old_price: null }).eq('id', product.id);
+                closeModal('modal-discount-form');
+                await fetchProducts();
+                render();
+                showToast('Акция убрана');
+                return;
             }
 
+            const newPrice = Number(document.getElementById('discount-new-price').value);
+            if (isNaN(newPrice) || newPrice <= 0) {
+                showToast('Введите корректную новую цену!', 'error');
+                return;
+            }
+
+            const oldPrice = product.old_price || product.retail_price;
+            if (newPrice >= oldPrice) {
+                showToast('Новая акционная цена должна быть ниже старой!', 'error');
+                return;
+            }
+
+            await supabaseClient.from('products').update({ old_price: oldPrice, retail_price: newPrice }).eq('id', product.id);
             closeModal('modal-discount-form');
             await fetchProducts();
             render();
-            showToast('Скидка успешно обновлена!');
+            showToast('Акция успешно установлена!');
         }
 
         function openVariantModal(productId) {
             const product = (state.products || []).find(p => p.id === productId);
-            if (!product || !product.product_variants) return;
+            if (!product || !product.product_variants || product.product_variants.length === 0) {
+                showToast('Нет доступных вариантов', 'error');
+                return;
+            }
 
             document.getElementById('variant-modal-title').textContent = product.name;
             const container = document.getElementById('variant-list-container');
-            
             container.innerHTML = product.product_variants.map(v => {
                 if (v.quantity <= 0) return '';
                 return `
-                    <div class="bg-zinc-900 border border-zinc-800 p-3 rounded-xl flex items-center justify-between">
+                    <div onclick="addToCart(${product.id}, ${v.id}); closeModal('modal-variant-select');" class="bg-zinc-900 border border-zinc-800 hover:border-accent p-3 rounded-xl flex items-center justify-between cursor-pointer transition">
                         <div>
-                            <h4 class="text-sm font-semibold text-zinc-200">${v.value}</h4>
-                            <p class="text-xs text-zinc-400">В наличии: ${v.quantity} шт.</p>
+                            <span class="text-sm font-semibold text-zinc-200">${v.value}</span>
+                            <span class="text-xs text-zinc-500 block">Остаток: ${v.quantity} шт.</span>
                         </div>
-                        <button onclick="addToCartFromModal(${product.id}, ${v.id})" class="bg-accent hover:bg-accentHover px-3 py-2 rounded-xl text-xs font-medium text-white transition">В корзину</button>
+                        <span class="text-xs font-bold text-accent">${product.retail_price} ₽</span>
                     </div>
                 `;
             }).join('');
 
             openModal('modal-variant-select');
-        }
-
-        function addToCartFromModal(productId, variantId) {
-            addToCart(productId, variantId);
-            closeModal('modal-variant-select');
         }
 
         function addToCart(productId, variantId) {
@@ -1908,13 +1892,17 @@
                 return;
             }
 
-            const existing = state.cart.find(item => item.productId === productId && item.variantId === variantId);
-            if (existing) {
-                if (existing.qty + 1 > variant.quantity) {
-                    showToast('Больше нет в наличии', 'error');
-                    return;
-                }
-                existing.qty += 1;
+            const existingCartItem = state.cart.find(item => item.productId === productId && item.variantId === variantId);
+            const currentCartQty = existingCartItem ? existingCartItem.qty : 0;
+
+            if (currentCartQty + 1 > variant.quantity) {
+                showToast('Нельзя добавить больше, чем есть на складе', 'error');
+                return;
+            }
+
+            if (existingCartItem) {
+                existingCartItem.qty += 1;
+                existingCartItem.maxQty = variant.quantity;
             } else {
                 state.cart.push({
                     productId: product.id,
@@ -1923,15 +1911,15 @@
                     variantName: variant.value,
                     price: product.retail_price,
                     wholesalePrice: product.wholesale_price,
-                    image: product.image_url,
                     qty: 1,
-                    maxQty: variant.quantity
+                    maxQty: variant.quantity,
+                    image: product.image_url
                 });
             }
 
             localStorage.setItem('reflex_cart', JSON.stringify(state.cart));
+            showToast('Товар добавлен в корзину');
             renderNav();
-            showToast('Товар добавлен в корзину!');
         }
 
         function updateCartQty(index, delta) {
@@ -1943,7 +1931,7 @@
                 state.cart.splice(index, 1);
             } else {
                 if (newQty > item.maxQty) {
-                    showToast('Превышено количество в наличии', 'error');
+                    showToast('Достигнут предел остатка на складе', 'error');
                     return;
                 }
                 item.qty = newQty;
@@ -1961,26 +1949,30 @@
                 return;
             }
 
-            proceedCheckout();
+            executeCheckout();
         }
 
-        async function proceedCheckoutWithoutContacts() {
+        function proceedCheckoutWithoutContacts() {
             closeModal('modal-missing-contacts');
-            await proceedCheckout();
+            executeCheckout(true);
         }
 
         function cancelCheckout() {
             closeModal('modal-missing-contacts');
+            showToast('Заказ отменен', 'error');
         }
 
-        async function proceedCheckout() {
+        async function executeCheckout(isAnonymous = false) {
             try {
                 const totalRetail = state.cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
                 const totalWholesale = state.cart.reduce((sum, item) => sum + (item.wholesalePrice * item.qty), 0);
 
+                const usernameToSave = isAnonymous ? 'Аноним' : (state.user || 'Аноним');
+                const phoneToSave = isAnonymous ? 'Не указан' : (state.phone || 'Не указан');
+
                 const { data: orderData, error: orderErr } = await supabaseClient.from('orders').insert({
-                    username: state.user || 'Аноним',
-                    phone: state.phone || 'Не указан',
+                    username: usernameToSave,
+                    phone: phoneToSave,
                     total_retail: totalRetail,
                     total_wholesale: totalWholesale,
                     status: 'in_progress'
@@ -1996,16 +1988,15 @@
                         product_name: item.name,
                         variant_name: item.variantName,
                         quantity: item.qty,
-                        price: item.price,
-                        wholesale_price: item.wholesalePrice
+                        price: item.price
                     });
 
                     const product = (state.products || []).find(p => p.id === item.productId);
                     if (product) {
                         const variant = (product.product_variants || []).find(v => v.id === item.variantId);
                         if (variant) {
-                            const newQty = Math.max(0, variant.quantity - item.qty);
-                            await supabaseClient.from('product_variants').update({ quantity: newQty }).eq('id', variant.id);
+                            const newStock = variant.quantity - item.qty;
+                            await supabaseClient.from('product_variants').update({ quantity: newStock }).eq('id', variant.id);
                         }
                     }
                 }
@@ -2019,7 +2010,7 @@
                 showToast('Заказ успешно оформлен!');
             } catch (e) {
                 console.error(e);
-                showToast('Ошибка оформления заказа', 'error');
+                showToast('Ошибка при оформлении заказа: ' + e.message, 'error');
             }
         }
 
@@ -2029,87 +2020,51 @@
                     const order = (state.orders || []).find(o => String(o.id) === String(orderId));
                     if (order && order.order_items) {
                         for (const item of order.order_items) {
-                            const prod = (state.products || []).find(p => p.name.trim().toLowerCase() === item.product_name.trim().toLowerCase());
-                            if (prod && prod.product_variants) {
-                                const vari = prod.product_variants.find(v => v.value.trim().toLowerCase() === item.variant_name.trim().toLowerCase());
-                                if (vari) {
-                                    await supabaseClient.from('product_variants').update({ quantity: vari.quantity + item.quantity }).eq('id', vari.id);
+                            const product = (state.products || []).find(p => p.name.trim().toLowerCase() === item.product_name.trim().toLowerCase());
+                            if (product && product.product_variants) {
+                                const variant = product.product_variants.find(v => v.value.trim().toLowerCase() === item.variant_name.trim().toLowerCase());
+                                if (variant) {
+                                    await supabaseClient.from('product_variants').update({ quantity: variant.quantity + item.quantity }).eq('id', variant.id);
                                 }
                             }
                         }
                     }
 
-                    await supabaseClient.from('orders').update({ status: 'archived' }).eq('id', orderId);
+                    await supabaseClient.from('order_items').delete().eq('order_id', orderId);
+                    await supabaseClient.from('orders').delete().eq('id', orderId);
+
                     await fetchProducts();
                     await fetchOrders();
                     render();
-                    showToast('Заказ отменен');
+                    showToast('Заказ отменен и удален');
                 } catch (e) {
                     console.error(e);
-                    showToast('Ошибка при отмене заказа', 'error');
+                    showToast('Ошибка отмены заказа', 'error');
                 }
             });
         }
 
         async function completeOrder(orderId) {
-            await supabaseClient.from('orders').update({ status: 'completed' }).eq('id', orderId);
-            await fetchOrders();
-            render();
-            showToast('Заказ выполнен!');
+            try {
+                await supabaseClient.from('orders').update({ status: 'completed' }).eq('id', orderId);
+                await fetchOrders();
+                render();
+                showToast('Заказ помечен как выполненный!');
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка выполнения заказа', 'error');
+            }
         }
 
         async function deleteCompletedOrder(orderId) {
-            await supabaseClient.from('orders').update({ status: 'archived' }).eq('id', orderId);
-            await fetchOrders();
-            render();
-            showToast('Заказ удален из списка');
-        }
-
-        function toggleAdminMenu() {
-            const dropdown = document.getElementById('admin-dropdown');
-            if (dropdown) dropdown.classList.toggle('hidden');
-        }
-
-        function openAdminLoginModal() {
-            toggleAdminMenu();
-            document.getElementById('admin-password-input').value = '';
-            openModal('modal-admin-login');
-        }
-
-        async function submitAdminLogin() {
-            const pass = document.getElementById('admin-password-input').value.trim();
-            if (!pass) {
-                showToast('Введите пароль', 'error');
-                return;
-            }
-
             try {
-                let adminPass = 'admin123';
-                const { data } = await supabaseClient.from('admin_settings').select('*').eq('key', 'admin_password').maybeSingle();
-                if (data && data.value) adminPass = data.value;
-
-                if (pass === adminPass) {
-                    state.role = 'admin';
-                    localStorage.setItem('reflex_role', 'admin');
-                    closeModal('modal-admin-login');
-                    state.activeTab = 'admin_home';
-                    render();
-                    showToast('Добро пожаловать в админку!');
-                } else {
-                    showToast('Неверный пароль', 'error');
-                }
+                await supabaseClient.from('orders').update({ status: 'archived' }).eq('id', orderId);
+                await fetchOrders();
+                render();
+                showToast('Заказ скрыт из истории');
             } catch (e) {
                 console.error(e);
-                showToast('Ошибка авторизации', 'error');
             }
-        }
-
-        function logoutAdmin() {
-            state.role = 'user';
-            localStorage.setItem('reflex_role', 'user');
-            state.activeTab = 'home';
-            render();
-            showToast('Выход из админки выполнен');
         }
     </script>
 </body>
