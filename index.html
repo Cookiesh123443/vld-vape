@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VLD VAPE</title>
-    <meta name="telegram-auth-version" content="2026-08-21-v6">
+    <meta name="telegram-auth-version" content="2026-08-21-v8">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -56,13 +56,13 @@
                 <div id="admin-login-menu-item">
                     <button onclick="openAdminPanel()" class="w-full text-left px-4 py-3 text-sm hover:bg-zinc-700/50 flex items-center space-x-2">
                         <i data-lucide="shield" class="w-4 h-4 text-accent"></i>
-                        <span>Панель работника</span>
+                        <span>Панель администратора</span>
                     </button>
                 </div>
                 <div id="admin-logout-btn" class="hidden">
                     <button onclick="logoutAdmin()" class="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-zinc-700/50 flex items-center space-x-2">
                         <i data-lucide="log-out" class="w-4 h-4"></i>
-                        <span>Выйти из админки</span>
+                        <span>Закрыть панель</span>
                     </button>
                 </div>
             </div>
@@ -324,7 +324,7 @@
     <div id="modal-worker-access" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center">
-                <h3 class="text-lg font-bold">Панель работника</h3>
+                <h3 class="text-lg font-bold">Панель администратора</h3>
                 <button onclick="closeModal('modal-worker-access')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
             <div class="bg-zinc-900/70 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-300 leading-6">
@@ -367,6 +367,11 @@
         }
 
         let state = {
+            // siteRole = роль/режим пользователя на сайте.
+            // dbRole   = реальные права в БД: user/admin/owner.
+            // role     = только производный UI-флаг для старого кода: admin/user.
+            siteRole: 'user',
+            dbRole: 'user',
             role: 'user',
             activeTab: 'home',
             login: '',
@@ -1481,8 +1486,9 @@
                 const { data, error } = await supabaseClient.rpc('get_my_admin_status');
                 if (error) throw error;
 
-                state.role = data?.is_admin ? 'admin' : 'user';
+                state.dbRole = data?.db_role || (data?.is_owner ? 'owner' : (data?.is_admin ? 'admin' : 'user'));
                 state.isOwner = !!data?.is_owner;
+                state.role = data?.is_admin ? 'admin' : 'user';
 
                 if (state.role === 'admin') {
                     closeModal('modal-worker-access');
@@ -2252,7 +2258,13 @@
             if (!profile) return;
 
             state.userId = profile.id;
-            state.role = profile.role === 'admin' ? 'admin' : 'user';
+            state.siteRole = profile.site_role || 'user';
+            state.dbRole = profile.db_role || 'user';
+
+            // Админский интерфейс определяется ТОЛЬКО db_role / owner-status,
+            // а не site_role. Telegram-синхронизация больше не может сбросить admin.
+            state.role = ['admin', 'owner'].includes(state.dbRole) ? 'admin' : 'user';
+
             state.contactUser = profile.contact_username || '';
             state.phone = profile.phone || '';
             state.telegramUser = {
@@ -2291,7 +2303,10 @@
         }
 
         function resetAuthState() {
+            state.siteRole = 'user';
+            state.dbRole = 'user';
             state.role = 'user';
+            state.isOwner = false;
             state.userId = null;
             state.telegramUser = null;
             state.login = '';
@@ -2323,7 +2338,29 @@
             }
 
             if (!data) throw new Error('Профиль Telegram ещё не создан');
+
             applyProfileToState(data);
+
+            // Источник истины для админских прав — SECURITY DEFINER RPC.
+            // Это также корректно определяет владельца через site_owners,
+            // даже если профиль был создан только что.
+            try {
+                const { data: adminStatus, error: adminError } =
+                    await supabaseClient.rpc('get_my_admin_status');
+
+                if (!adminError && adminStatus) {
+                    state.dbRole =
+                        adminStatus.db_role ||
+                        (adminStatus.is_owner ? 'owner' :
+                         adminStatus.is_admin ? 'admin' : 'user');
+
+                    state.isOwner = !!adminStatus.is_owner;
+                    state.role = adminStatus.is_admin ? 'admin' : 'user';
+                }
+            } catch (adminStatusError) {
+                console.warn('Admin status refresh:', adminStatusError);
+            }
+
             return data;
         }
 
@@ -2391,6 +2428,16 @@
                             <div class="text-xs text-zinc-500">
                                 Telegram ID: <span class="text-zinc-300">${escapeHtml(tg.id || '')}</span>
                             </div>
+                            <div class="grid grid-cols-2 gap-2 text-[11px]">
+                                <div class="bg-zinc-900/60 border border-zinc-800 rounded-xl p-2">
+                                    <span class="text-zinc-500 block">Роль сайта</span>
+                                    <span class="text-zinc-200">${escapeHtml(state.siteRole || 'user')}</span>
+                                </div>
+                                <div class="bg-zinc-900/60 border border-zinc-800 rounded-xl p-2">
+                                    <span class="text-zinc-500 block">Права БД</span>
+                                    <span class="text-zinc-200">${escapeHtml(state.dbRole || 'user')}</span>
+                                </div>
+                            </div>
 
                             <div class="text-[10px] text-zinc-500 bg-zinc-900/50 border border-zinc-800 rounded-xl p-3">
                                 Имя, username и фото синхронизируются из Telegram при каждом входе. Контакт и телефон ниже — данные магазина.
@@ -2442,7 +2489,8 @@
         // The SDK object also exists in ordinary browsers. A real Mini App launch
         // is identified by non-empty Telegram.WebApp.initData.
         function isTelegramMiniApp() {
-            return !!(window.Telegram?.WebApp?.initData && window.Telegram.WebApp.initData.trim());
+            const initData = window.Telegram?.WebApp?.initData;
+            return typeof initData === 'string' && initData.trim().length > 0;
         }
 
         function setupTelegramMiniApp() {
@@ -2458,6 +2506,8 @@
         }
 
         async function telegramLogin() {
+            // Внутри настоящего Mini App OAuth не запускаем:
+            // используем Telegram.WebApp.initData → Edge Function → Supabase session.
             if (isTelegramMiniApp()) {
                 await telegramMiniAppLogin(false);
                 return;
@@ -2583,17 +2633,12 @@
         }
 
         async function logoutAdmin() {
-            try {
-                const { error } = await supabaseClient.auth.signOut();
-                if (error) throw error;
-                state.activeTab = 'home';
-                state.adminUserSearch = '';
-                state.isOwner = false;
-                render();
-            } catch (e) {
-                console.error('Admin logout error:', e);
-                showToast('Не удалось выйти', 'error');
-            }
+            // Это НЕ выход из Telegram/Supabase.
+            // Админ-панель использует ту же пользовательскую сессию.
+            state.activeTab = 'home';
+            state.adminUserSearch = '';
+            closeModal('modal-worker-access');
+            render();
         }
 
         async function logoutTelegram() {
@@ -2905,7 +2950,7 @@
             state.selectedAccountId = id;
             const box = document.getElementById('profile-details-content');
             if (!box) return;
-            const isAdmin = account.role === 'admin';
+            const isAdmin = ['admin', 'owner'].includes(account.db_role);
             box.innerHTML = `
                 <div class="space-y-4">
                     <div class="flex items-center gap-3">
@@ -2919,10 +2964,11 @@
                         <div class="bg-zinc-900 rounded-xl p-3"><span class="text-zinc-500">Telegram ID:</span> <span class="text-zinc-200">${escapeHtml(account.telegram_id || '')}</span></div>
                         <div class="bg-zinc-900 rounded-xl p-3"><span class="text-zinc-500">Телефон:</span> <span class="text-zinc-200">${escapeHtml(account.phone || 'не указан')}</span></div>
                         <div class="bg-zinc-900 rounded-xl p-3"><span class="text-zinc-500">Контакт:</span> <span class="text-zinc-200">${escapeHtml(account.contact_username || 'не указан')}</span></div>
-                        <div class="bg-zinc-900 rounded-xl p-3"><span class="text-zinc-500">Роль:</span> <span class="text-zinc-200">${isAdmin ? 'Администратор' : 'Пользователь'}</span></div>
+                        <div class="bg-zinc-900 rounded-xl p-3"><span class="text-zinc-500">Роль на сайте:</span> <span class="text-zinc-200">${escapeHtml(account.site_role || 'user')}</span></div>
+                        <div class="bg-zinc-900 rounded-xl p-3"><span class="text-zinc-500">Роль в БД:</span> <span class="text-zinc-200">${escapeHtml(account.db_role || 'user')}</span></div>
                         <div class="bg-zinc-900 rounded-xl p-3"><span class="text-zinc-500">Дата регистрации:</span> <span class="text-zinc-200">${account.created_at ? new Date(account.created_at).toLocaleString('ru-RU') : '—'}</span></div>
                     </div>
-                    ${state.isOwner && account.id !== state.userId ? `
+                    ${state.isOwner && account.id !== state.userId && account.db_role !== 'owner' ? `
                         <button onclick="setAdminRole('${escapeHtml(account.id)}', ${!isAdmin})" class="w-full ${isAdmin ? 'bg-red-500/10 text-red-300 border-red-500/20' : 'bg-accent text-white border-accent'} border py-2.5 rounded-xl text-xs font-medium">
                             ${isAdmin ? 'Снять права администратора' : 'Назначить администратором'}
                         </button>
@@ -2981,7 +3027,11 @@
                                         <div class="min-w-0 flex-1">
                                             <div class="flex items-center gap-2">
                                                 <span class="font-semibold text-sm text-zinc-100 truncate">${escapeHtml(((account.first_name || '') + ' ' + (account.last_name || '')).trim() || 'Telegram пользователь')}</span>
-                                                ${account.role === 'admin' ? '<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-accent/20 text-accent">Админ</span>' : ''}
+                                                ${account.db_role === 'owner'
+    ? '<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300">Владелец</span>'
+    : account.db_role === 'admin'
+        ? '<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-accent/20 text-accent">Админ</span>'
+        : ''}
                                             </div>
                                             <p class="text-xs text-accent truncate">${account.telegram_username ? '@' + escapeHtml(account.telegram_username) : 'Без username'}</p>
                                             <p class="text-[10px] text-zinc-500">ID: ${escapeHtml(account.telegram_id || '')}</p>
@@ -2998,6 +3048,33 @@
                 </div>`;
             lucide.createIcons();
         }
+
+        // Диагностика авторизации. Можно вызвать в DevTools: window.vldAuthDebug()
+        window.vldAuthDebug = async function () {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            let profile = null;
+            let profileError = null;
+            if (session?.user) {
+                const result = await supabaseClient
+                    .from('profiles')
+                    .select('id,telegram_id,telegram_username,site_role,db_role')
+                    .eq('id', session.user.id)
+                    .maybeSingle();
+                profile = result.data;
+                profileError = result.error?.message || null;
+            }
+            return {
+                miniApp: isTelegramMiniApp(),
+                hasSession: !!session,
+                userId: session?.user?.id || null,
+                profile,
+                profileError,
+                siteRole: state.siteRole,
+                dbRole: state.dbRole,
+                uiRole: state.role,
+                isOwner: state.isOwner
+            };
+        };
 
         setupTelegramMiniApp();
 
