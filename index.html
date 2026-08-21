@@ -28,8 +28,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Telegram Login 2.0 (OIDC) -->
-    <script async src="https://oauth.telegram.org/js/telegram-login.js?3"></script>
     <style>
         body { background-color: #0f0f11; color: #f4f4f5; font-family: system-ui, -apple-system, sans-serif; }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -323,7 +321,14 @@
     <script>
         const SUPABASE_URL = 'https://ehrzjvuuvodudlelazhe.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_5Lj-BMZYANimr2UG2ZCqgQ_MEi6tOHp';
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+            auth: {
+                persistSession: true,
+                autoRefreshToken: true,
+                detectSessionInUrl: true,
+                flowType: 'pkce'
+            }
+        });
 
         function getOrCreateClientId() {
             let id = localStorage.getItem('reflex_client_id');
@@ -2182,13 +2187,13 @@
         }
 
         /* =========================================================
-           VLD VAPE — NEW AUTH LAYER
-           Telegram Login 2.0 (OIDC) + Supabase Auth + profiles
+           VLD VAPE — TELEGRAM OIDC + SUPABASE AUTH
+           Telegram Login 2.0 is configured in Supabase as a custom OIDC
+           provider. The browser never sees the Telegram client secret.
            ========================================================= */
 
-        const TELEGRAM_CLIENT_ID = 8749767581;
+        const TELEGRAM_PROVIDER = 'custom:telegram';
 
-        // Нормализуем состояние. Старые localStorage-ключи больше не используются.
         state.role = 'user';
         state.login = '';
         state.userId = null;
@@ -2227,36 +2232,28 @@
                 const { data: { session } } = await supabaseClient.auth.getSession();
 
                 if (!session?.user) {
-                    state.role = 'user';
-                    state.userId = null;
-                    state.telegramUser = null;
-                    state.login = '';
-                    state.contactUser = '';
-                    state.phone = '';
-                    return;
+                    resetAuthState();
+                    return null;
                 }
 
                 state.userId = session.user.id;
-
-                const { data: profile, error } = await supabaseClient
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', session.user.id)
-                    .single();
-
-                if (error || !profile) {
-                    await supabaseClient.auth.signOut();
-                    throw error || new Error('Профиль Telegram не найден');
-                }
-
-                applyProfileToState(profile);
+                return await refreshCurrentProfile();
             } catch (e) {
                 console.error('Ошибка восстановления сессии:', e);
-                state.role = 'user';
-                state.userId = null;
-                state.telegramUser = null;
-                state.login = '';
+                resetAuthState();
+                return null;
             }
+        }
+
+        function resetAuthState() {
+            state.role = 'user';
+            state.userId = null;
+            state.telegramUser = null;
+            state.login = '';
+            state.contactUser = '';
+            state.phone = '';
+            state.isProfileEditing = false;
+            if (state.activeTab.startsWith('admin_')) state.activeTab = 'home';
         }
 
         async function refreshCurrentProfile() {
@@ -2266,11 +2263,41 @@
                 .from('profiles')
                 .select('*')
                 .eq('id', state.userId)
-                .single();
+                .maybeSingle();
 
             if (error) throw error;
+
+            if (!data) {
+                // Custom OIDC creates auth.users first and the DB trigger creates
+                // profiles immediately after. Give Postgres a short moment if the
+                // auth redirect completed faster than the trigger became visible.
+                await new Promise(resolve => setTimeout(resolve, 150));
+                const retry = await supabaseClient
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', state.userId)
+                    .maybeSingle();
+                if (retry.error) throw retry.error;
+                if (!retry.data) throw new Error('Профиль Telegram ещё не создан');
+                applyProfileToState(retry.data);
+                return retry.data;
+            }
+
             applyProfileToState(data);
             return data;
+        }
+
+        async function waitForAuthProfile(attempts = 8) {
+            for (let i = 0; i < attempts; i++) {
+                try {
+                    const profile = await refreshCurrentProfile();
+                    if (profile) return profile;
+                } catch (e) {
+                    if (i === attempts - 1) throw e;
+                }
+                await new Promise(resolve => setTimeout(resolve, 250));
+            }
+            return null;
         }
 
         function renderUserProfile(container) {
@@ -2285,7 +2312,7 @@
                         <div class="bg-cardBg border border-zinc-800 rounded-2xl p-5 space-y-4">
                             <h3 class="text-accent font-bold">Вход через Telegram</h3>
                             <p class="text-sm text-zinc-400">
-                                Новый Telegram Login 2.0 (OpenID Connect). Логин и пароль больше не нужны.
+                                Без логина и пароля. Авторизация проходит через Telegram Login 2.0 и Supabase Auth.
                             </p>
                             <button onclick="telegramLogin()"
                                 class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl text-white font-medium">
@@ -2315,10 +2342,14 @@
                                 Telegram ID: <span class="text-zinc-300">${escapeHtml(tg.id || '')}</span>
                             </div>
 
+                            <div class="text-[10px] text-zinc-500 bg-zinc-900/50 border border-zinc-800 rounded-xl p-3">
+                                Имя, username и фото синхронизируются из Telegram при каждом входе. Контакт и телефон ниже — данные магазина.
+                            </div>
+
                             ${state.isProfileEditing ? `
                                 <div class="space-y-3 pt-2 border-t border-zinc-800">
                                     <div>
-                                        <label class="text-xs text-zinc-400 mb-1 block">Telegram для связи</label>
+                                        <label class="text-xs text-zinc-400 mb-1 block">Telegram для связи на сайте</label>
                                         <input id="edit-contact-user"
                                             value="${escapeHtml(state.contactUser || '')}"
                                             placeholder="@username"
@@ -2347,6 +2378,7 @@
                             `}
 
                             <div class="space-y-2 pt-2 border-t border-zinc-800">
+                                <button onclick="syncTelegramProfile()" class="w-full bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl text-xs text-zinc-200">Обновить данные Telegram</button>
                                 <button onclick="logoutTelegram()" class="w-full bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl text-red-400 text-sm">Выйти</button>
                                 <button onclick="deleteAccount()" class="w-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 py-2.5 rounded-xl text-red-400 text-xs">Удалить аккаунт</button>
                             </div>
@@ -2358,184 +2390,59 @@
             lucide.createIcons();
         }
 
-        function telegramLogin() {
-            if (!window.Telegram?.Login) {
-                showToast('Telegram Login ещё загружается. Попробуйте через секунду.', 'error');
-                return;
-            }
-
+        async function telegramLogin() {
             try {
-                window.Telegram.Login.auth({
-                    client_id: TELEGRAM_CLIENT_ID,
-                    lang: 'ru'
-                }, onTelegramAuth);
+                showToast('Открываем Telegram…');
+
+                const redirectTo = window.location.origin + window.location.pathname;
+                const { error } = await supabaseClient.auth.signInWithOAuth({
+                    provider: TELEGRAM_PROVIDER,
+                    options: {
+                        redirectTo,
+                        scopes: 'openid profile phone'
+                    }
+                });
+
+                if (error) throw error;
             } catch (e) {
-                console.error(e);
-                showToast('Не удалось открыть Telegram', 'error');
+                console.error('Telegram OIDC start error:', e);
+                showToast(e?.message || 'Не удалось открыть Telegram', 'error');
             }
         }
 
-        async function onTelegramAuth(data) {
-            if (!data || data.error || !data.id_token) {
-                console.error('Telegram auth error:', data);
-                showToast('Telegram не подтвердил авторизацию', 'error');
+        async function syncTelegramProfile() {
+            if (!state.userId) {
+                showToast('Сначала войдите через Telegram', 'error');
                 return;
             }
 
             try {
-                showToast('Проверяем аккаунт Telegram…');
-
-                const response = await fetch(`${SUPABASE_URL}/functions/v1/telegram-auth`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id_token: data.id_token })
-                });
-
-                const result = await response.json();
-
-                if (!response.ok || !result.email || !result.password) {
-                    throw new Error(result?.error || 'Не удалось подтвердить Telegram');
-                }
-
-                const { error: signInError } = await supabaseClient.auth.signInWithPassword({
-                    email: result.email,
-                    password: result.password
-                });
-
-                if (signInError) throw signInError;
-
-                await checkUserRoleOnStartup();
-                await mergeGuestCartIntoDb();
+                showToast('Обновляем данные Telegram…');
+                await waitForAuthProfile(8);
                 await loadCartFromDb();
                 await fetchOrders();
-                await fetchRegisteredAccountsCount();
-
-                showToast('Вход через Telegram выполнен');
                 render();
+                showToast('Данные Telegram обновлены');
             } catch (e) {
-                console.error('Telegram OIDC login error:', e);
-                showToast(e?.message || 'Ошибка Telegram авторизации', 'error');
+                console.error('Telegram profile sync error:', e);
+                showToast('Не удалось обновить данные Telegram', 'error');
             }
         }
 
         async function logoutTelegram() {
             try {
-                await supabaseClient.auth.signOut();
+                const { error } = await supabaseClient.auth.signOut();
+                if (error) throw error;
             } catch (e) {
                 console.error(e);
+                showToast('Не удалось выйти из аккаунта', 'error');
+                return;
             }
 
-            state.role = 'user';
-            state.userId = null;
-            state.telegramUser = null;
-            state.login = '';
-            state.contactUser = '';
-            state.phone = '';
-            state.isProfileEditing = false;
-            state.activeTab = 'home';
-
+            resetAuthState();
             await loadCartFromDb();
             render();
             showToast('Вы вышли из аккаунта');
-        }
-
-        function startEditContacts() {
-            state.isProfileEditing = true;
-            render();
-        }
-
-        function cancelEditContacts() {
-            state.isProfileEditing = false;
-            render();
-        }
-
-        async function saveEditContacts() {
-            if (!state.userId) {
-                showToast('Сначала войдите через Telegram', 'error');
-                return;
-            }
-
-            let contact = document.getElementById('edit-contact-user')?.value.trim() || '';
-            const phone = document.getElementById('edit-contact-phone')?.value.trim() || '';
-
-            if (contact && !contact.startsWith('@')) contact = '@' + contact;
-
-            try {
-                const { data, error } = await supabaseClient
-                    .from('profiles')
-                    .update({
-                        contact_username: contact || null,
-                        phone: phone || null
-                    })
-                    .eq('id', state.userId)
-                    .select('*')
-                    .single();
-
-                if (error) throw error;
-
-                applyProfileToState(data);
-                state.isProfileEditing = false;
-                render();
-                showToast('Контакты обновлены!');
-            } catch (e) {
-                console.error(e);
-                showToast('Ошибка обновления контактов', 'error');
-            }
-        }
-
-        async function deleteAccount() {
-            if (!state.userId) return;
-
-            showConfirm(
-                'Удаление аккаунта',
-                'Профиль и связанные с ним данные будут удалены. Действие необратимо.',
-                async () => {
-                    try {
-                        const { error } = await supabaseClient.rpc('delete_my_account');
-                        if (error) throw error;
-
-                        await supabaseClient.auth.signOut();
-
-                        state.role = 'user';
-                        state.userId = null;
-                        state.telegramUser = null;
-                        state.login = '';
-                        state.contactUser = '';
-                        state.phone = '';
-                        state.cart = [];
-                        state.activeTab = 'home';
-
-                        render();
-                        showToast('Аккаунт удалён');
-                    } catch (e) {
-                        console.error(e);
-                        showToast('Не удалось удалить аккаунт', 'error');
-                    }
-                }
-            );
-        }
-
-        function openAdminPanel() {
-            if (!state.userId) {
-                showToast('Сначала войдите через Telegram', 'error');
-                switchTab('profile');
-                return;
-            }
-
-            if (state.role !== 'admin') {
-                showToast('У вашего Telegram-аккаунта нет прав администратора', 'error');
-                return;
-            }
-
-            switchTab('admin_home');
-        }
-
-        async function logoutAdmin() {
-            if (state.role !== 'admin') return;
-            await refreshCurrentProfile().catch(() => null);
-            state.activeTab = 'home';
-            render();
-            showToast('Вы вышли из панели работника');
         }
 
         async function mergeGuestCartIntoDb() {
@@ -3019,30 +2926,27 @@
             );
         }
 
-        // Одна auth-сессия Supabase = одна сессия Telegram-профиля.
+        // Supabase Auth is the only browser session source.
+        // Custom Telegram OIDC handles the OAuth code exchange and PKCE on Supabase.
         supabaseClient.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_OUT') {
-                state.role = 'user';
-                state.userId = null;
-                state.telegramUser = null;
-                state.login = '';
-                state.contactUser = '';
-                state.phone = '';
-                state.activeTab = 'home';
+                resetAuthState();
                 render();
                 return;
             }
 
-            if (event === 'SIGNED_IN' && session?.user) {
+            if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && session?.user) {
                 try {
                     state.userId = session.user.id;
-                    await refreshCurrentProfile();
+                    await waitForAuthProfile(10);
                     await mergeGuestCartIntoDb();
                     await loadCartFromDb();
                     await fetchOrders();
+                    await fetchRegisteredAccountsCount();
                     render();
                 } catch (e) {
-                    console.error('Ошибка загрузки Telegram-профиля:', e);
+                    console.error('Ошибка синхронизации Telegram-профиля:', e);
+                    showToast('Не удалось загрузить профиль Telegram', 'error');
                 }
             }
         });
