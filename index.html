@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VLD VAPE</title>
-    <meta name="telegram-auth-version" content="2026-08-21-v8">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -27,10 +26,10 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Telegram Mini App SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Telegram Mini App SDK -->
-    <script src="https://telegram.org/js/telegram-web-app.js?61"></script>
     <style>
         body { background-color: #0f0f11; color: #f4f4f5; font-family: system-ui, -apple-system, sans-serif; }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -44,7 +43,7 @@
     <header class="sticky top-0 z-40 bg-darkBg/85 backdrop-blur-md border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
         <div class="flex items-center space-x-2">
             <h1 id="shop-title" class="text-lg font-bold tracking-wide">VLD VAPE</h1>
-            <span id="role-badge" class="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Пользователь</span>
+            <span id="role-badge" class="hidden"></span>
         </div>
         <div class="relative flex items-center space-x-2">
             <div id="header-user-display" class="text-xs text-zinc-400 hidden sm:block"></div>
@@ -54,15 +53,15 @@
             <!-- Выпадающее меню (смещено под кнопку, не перекрывает её) -->
             <div id="admin-dropdown" class="hidden absolute top-full right-0 mt-2 w-52 bg-cardBg border border-zinc-700 rounded-xl shadow-xl overflow-hidden z-50">
                 <div id="admin-login-menu-item">
-                    <button onclick="openAdminPanel()" class="w-full text-left px-4 py-3 text-sm hover:bg-zinc-700/50 flex items-center space-x-2">
+                    <button onclick="openAdminLoginModal()" class="w-full text-left px-4 py-3 text-sm hover:bg-zinc-700/50 flex items-center space-x-2">
                         <i data-lucide="shield" class="w-4 h-4 text-accent"></i>
-                        <span>Панель администратора</span>
+                        <span>Для администраторов / работников</span>
                     </button>
                 </div>
                 <div id="admin-logout-btn" class="hidden">
                     <button onclick="logoutAdmin()" class="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-zinc-700/50 flex items-center space-x-2">
                         <i data-lucide="log-out" class="w-4 h-4"></i>
-                        <span>Закрыть панель</span>
+                        <span>Выйти из админки</span>
                     </button>
                 </div>
             </div>
@@ -116,6 +115,20 @@
             </div>
             <p class="text-xs text-zinc-400">Выберите менеджера, с которым хотите обсудить заказ <span id="ask-order-id-label" class="text-white font-bold"></span>:</p>
             <div id="managers-list-container" class="space-y-2 max-h-60 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <!-- Модальное окно отказа в доступе к админке -->
+    <div id="modal-admin-login" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold">Доступ в админку</h3>
+                <button onclick="closeModal('modal-admin-login')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div id="admin-access-message" class="text-sm text-zinc-300 leading-relaxed">
+                Запросите доступ у администрации сайта.
+            </div>
+            <button id="admin-access-action" onclick="closeModal('modal-admin-login')" class="w-full bg-zinc-800 hover:bg-zinc-700 py-3 rounded-xl font-medium transition text-zinc-200">Закрыть</button>
         </div>
     </div>
 
@@ -320,64 +333,87 @@
         </div>
     </div>
 
-    <!-- Модальное окно: панель работника -->
-    <div id="modal-worker-access" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
-            <div class="flex justify-between items-center">
-                <h3 class="text-lg font-bold">Панель администратора</h3>
-                <button onclick="closeModal('modal-worker-access')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            <div class="bg-zinc-900/70 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-300 leading-6">
-                Запросите доступ у владельца сайта или другого администратора. После назначения вам роли администратора панель станет доступна автоматически.
-            </div>
-        </div>
-    </div>
-
-    <!-- Модальное окно: просмотр пользователя администратором -->
-    <div id="modal-profile-details" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl max-h-[88vh] overflow-y-auto">
-            <div class="flex justify-between items-center">
-                <h3 class="text-lg font-bold">Профиль пользователя</h3>
-                <button onclick="closeModal('modal-profile-details')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            <div id="profile-details-content"></div>
-        </div>
-    </div>
-
     <!-- Основной скрипт приложения -->
     <script>
         const SUPABASE_URL = 'https://ehrzjvuuvodudlelazhe.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_5Lj-BMZYANimr2UG2ZCqgQ_MEi6tOHp';
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-            auth: {
-                persistSession: true,
-                autoRefreshToken: true,
-                detectSessionInUrl: false,
-                flowType: 'pkce'
-            }
-        });
+        const TELEGRAM_AUTH_FUNCTION = SUPABASE_URL + '/functions/v1/telegram-auth';
+        const TELEGRAM_BOT_ID = '8749767581';
+        const OWNER_TELEGRAM_ID = '2112161128';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        function getOrCreateClientId() {
-            let id = localStorage.getItem('reflex_client_id');
-            if (!id) {
-                id = 'guest-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
-                localStorage.setItem('reflex_client_id', id);
+        function getTelegramWebApp() {
+            return window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+        }
+
+        async function authRequest(action, payload = {}) {
+            const headers = {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_KEY
+            };
+            const sessionToken = state.sessionToken || localStorage.getItem('telegram_session_token') || '';
+            if (sessionToken) headers.Authorization = 'Bearer ' + sessionToken;
+            const response = await fetch(TELEGRAM_AUTH_FUNCTION, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ action, ...payload })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || 'Ошибка авторизации');
+            return data;
+        }
+
+        async function authenticateTelegram() {
+            const tg = getTelegramWebApp();
+            if (!tg || !tg.initData) {
+                state.telegramId = '';
+                state.adminGranted = false;
+                state.siteRole = 'user';
+                state.role = 'user';
+                return false;
             }
-            return id;
+
+            tg.ready();
+            try {
+                const data = await authRequest('login', { init_data: tg.initData });
+                state.sessionToken = data.session_token;
+                state.telegramId = String(data.user.telegram_id);
+                state.telegramUser = data.user;
+                state.telegramId = String(data.user.telegram_id);
+                state.contactUser = data.user.contact_username || '';
+                state.phone = data.user.номер || '';
+                state.siteRole = data.user.site_role || 'user';
+                state.adminGranted = Boolean(data.user.admin_granted);
+                state.role = 'user';
+
+                localStorage.setItem('telegram_session_token', state.sessionToken);
+                localStorage.setItem('reflex_contact_user', state.contactUser);
+                localStorage.setItem('reflex_phone', state.phone);
+                localStorage.setItem('reflex_telegram_id', state.telegramId);
+                return true;
+            } catch (e) {
+                console.error('Telegram auth error:', e);
+                localStorage.removeItem('telegram_session_token');
+                state.sessionToken = '';
+                state.telegramId = '';
+                state.adminGranted = false;
+                state.role = 'user';
+                showToast(e.message || 'Не удалось выполнить вход через Telegram', 'error');
+                return false;
+            }
         }
 
         let state = {
-            // role: user/admin/owner
             role: 'user',
-            isOwner: false,
-            activeTab: 'home',
-            login: '',
-            userId: null,
+            siteRole: 'user',
+            adminGranted: false,
+            telegramId: localStorage.getItem('reflex_telegram_id') || '',
             telegramUser: null,
-            contactUser: '',
-            phone: '',
-            clientId: getOrCreateClientId(),
-            isProfileEditing: false,
+            sessionToken: localStorage.getItem('telegram_session_token') || '',
+            activeTab: 'home', 
+            contactUser: localStorage.getItem('reflex_contact_user') || '',
+            phone: localStorage.getItem('reflex_phone') || '',
+            isProfileEditing: false, 
             isPlacingOrder: false,
             cart: [],
             products: [],
@@ -385,12 +421,8 @@
             managers: [],
             accounts: [],
             adminSettingsSubTab: 'general',
-            editingAccountLogin: null,
-            isOwner: false,
-            adminPanelOpen: false,
-            adminUserSearch: '',
-            selectedAccountId: null,
-            adminStatsFilter: 'all',
+            editingAccountLogin: null, 
+            adminStatsFilter: 'all', 
             adminHomeSubTab: 'stats',
             catalogCategory: 'жидкость',
             catalogSubcategory: 'all',
@@ -411,6 +443,7 @@
             }
         };
 
+        
         function showToast(message, type = 'success') {
             try {
                 const container = document.getElementById('toast-container');
@@ -544,7 +577,82 @@
             }
         }
 
+        async function resetSystemToZero() {
+            showConfirm('Полный сброс сайта в 0', 'Вы уверены? Все товары, варианты, заказы, корзины, менеджеры и пользователи будут полностью удалены.', async () => {
+                try {
+                    await supabaseClient.from('order_items').delete().not('id', 'is', null);
+                    await supabaseClient.from('orders').delete().not('id', 'is', null);
+                    await supabaseClient.from('product_variants').delete().not('id', 'is', null);
+                    await supabaseClient.from('products').delete().not('id', 'is', null);
+                    await supabaseClient.from('managers').delete().not('id', 'is', null);
+                    await supabaseClient.from('cart_items').delete().not('id', 'is', null);
+
+                    state.cart = [];
+                    state.searchQuery = '';
+                    state.telegramId = '';
+                    state.contactUser = '';
+                    state.phone = '';
+                    localStorage.removeItem('reflex_contact_user');
+                    localStorage.removeItem('reflex_phone');
+
+                    logoutAdmin();
+
+                    await fetchProducts();
+                    await fetchOrders();
+                    await fetchManagers();
+                    render();
+                    showToast('Сайт полностью сброшен в начальное состояние!');
+                } catch (e) {
+                    console.error(e);
+                    showToast('Ошибка при сбросе системы: ' + e.message, 'error');
+                }
+            });
+        }
+
         // --- Управление корзиной ---
+        async function loadCartFromDb() {
+            if (!state.telegramId) {
+                state.cart = [];
+                return;
+            }
+            try {
+                const { data, error } = await supabaseClient.from('cart_items').select('*').eq('user_identifier', state.telegramId);
+                if (!error && data) {
+                    state.cart = data.map(i => ({
+                        productId: i.product_id,
+                        variantId: i.variant_id,
+                        name: i.name,
+                        variantName: i.variant_name,
+                        price: Number(i.price),
+                        qty: i.qty,
+                        image: i.image,
+                        maxQty: i.max_qty
+                    }));
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function saveCartToDb() {
+            if (!state.telegramId) return;
+            try {
+                await supabaseClient.from('cart_items').delete().eq('user_identifier', state.telegramId);
+                if (state.cart.length > 0) {
+                    const rows = state.cart.map(i => ({
+                        user_identifier: state.telegramId,
+                        product_id: i.productId,
+                        variant_id: i.variantId,
+                        name: i.name,
+                        variant_name: i.variantName,
+                        price: i.price,
+                        qty: i.qty,
+                        image: i.image,
+                        max_qty: i.maxQty
+                    }));
+                    await supabaseClient.from('cart_items').insert(rows);
+                }
+            } catch (e) { console.error(e); }
+        }
+
         async function validateCartStock() {
             if (!state.cart || state.cart.length === 0) return;
             let removedFlavors = false;
@@ -567,12 +675,38 @@
             await saveCartToDb();
         }
 
+        async function checkUserRoleOnStartup() {
+            await authenticateTelegram();
+            if (!state.telegramId) return;
+            try {
+                const data = await authRequest('me');
+                if (data.user) {
+                    state.telegramId = String(data.user.telegram_id);
+                    state.telegramUser = data.user;
+                    state.telegramId = String(data.user.telegram_id);
+                    state.contactUser = data.user.contact_username || '';
+                    state.phone = data.user.номер || '';
+                    state.siteRole = data.user.site_role || 'user';
+                    state.adminGranted = Boolean(data.user.admin_granted);
+                    state.role = 'user';
+                }
+            } catch (e) {
+                console.error('Не удалось обновить профиль Telegram:', e);
+                await authenticateTelegram();
+            }
+        }
+
         window.addEventListener('DOMContentLoaded', async () => {
             try {
                 if (window.Notification && Notification.permission !== 'granted') {
                     Notification.requestPermission();
                 }
 
+                const tg = getTelegramWebApp();
+                if (tg) {
+                    tg.ready();
+                    if (tg.expand) tg.expand();
+                }
                 await checkUserRoleOnStartup();
                 await fetchProducts();
                 await loadCartFromDb();
@@ -587,7 +721,7 @@
                     await fetchOrders();
                     const newInProgress = (state.orders || []).filter(o => o.status === 'in_progress').length;
                     
-                    if (newInProgress > prevInProgress && ['admin','owner'].includes(state.role)) {
+                    if (newInProgress > prevInProgress && state.role === 'admin') {
                         showToast('🔔 Поступил новый заказ!', 'success');
                         if (window.Notification && Notification.permission === 'granted') {
                             new Notification('VLD VAPE', { body: 'Поступил новый заказ в обработку!' });
@@ -602,11 +736,11 @@
         });
 
         async function fetchRegisteredAccountsCount() {
+            if (!state.adminGranted || !state.sessionToken) return;
             try {
-                const { count, error } = await supabaseClient
-                    .from('profiles')
-                    .select('id', { count: 'exact', head: true });
-                if (!error) state.registeredAccountsCount = Number(count || 0);
+                const data = await authRequest('list-users');
+                state.accounts = data.users || [];
+                state.registeredAccountsCount = state.accounts.length;
             } catch (e) {
                 console.error(e);
             }
@@ -646,15 +780,14 @@
             } catch (e) { console.error(e); }
         }
 
-        async function fetchAccounts(search = state.adminUserSearch || '') {
+        async function fetchAccounts() {
             try {
-                const { data, error } = await supabaseClient.rpc('admin_list_profiles', { p_search: search || '' });
-                if (error) throw error;
-                state.accounts = data || [];
+                const data = await authRequest('list-users');
+                state.accounts = data.users || [];
+                state.registeredAccountsCount = state.accounts.length;
             } catch (e) {
-                console.error('admin_list_profiles:', e);
-                state.accounts = [];
-                showToast(e?.message || 'Не удалось загрузить пользователей', 'error');
+                console.error('Ошибка загрузки учётных записей:', e);
+                showToast(e.message || 'Не удалось загрузить учётные записи', 'error');
             }
         }
 
@@ -674,28 +807,23 @@
                 const adminLoginMenuItem = document.getElementById('admin-login-menu-item');
                 const headerUserDisplay = document.getElementById('header-user-display');
 
-                if (!['admin','owner'].includes(state.role)) {
-                    state.adminPanelOpen = false;
+                if (state.role !== 'admin') {
                     if (state.activeTab.startsWith('admin_')) state.activeTab = 'home';
                 }
 
-                if (['admin','owner'].includes(state.role)) {
-                    roleBadge.textContent = state.isOwner ? 'Владелец' : 'Админ';
-                    roleBadge.className = 'text-xs px-2 py-0.5 rounded-full bg-accent text-white font-medium';
-                    if (adminLogoutBtn) adminLogoutBtn.classList.toggle('hidden', !state.adminPanelOpen);
-                    if (adminLoginMenuItem) adminLoginMenuItem.classList.toggle('hidden', state.adminPanelOpen);
-                    if (state.adminPanelOpen && !state.activeTab.startsWith('admin_')) state.activeTab = 'admin_settings';
+                if (state.role === 'admin') {
+                    if (adminLogoutBtn) adminLogoutBtn.classList.remove('hidden');
+                    if (adminLoginMenuItem) adminLoginMenuItem.classList.add('hidden');
+                    if (!state.activeTab.startsWith('admin_')) state.activeTab = 'admin_home';
                 } else {
-                    roleBadge.textContent = 'Пользователь';
-                    roleBadge.className = 'text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400';
                     if (adminLogoutBtn) adminLogoutBtn.classList.add('hidden');
                     if (adminLoginMenuItem) adminLoginMenuItem.classList.remove('hidden');
                     if (state.activeTab.startsWith('admin_')) state.activeTab = 'home';
                 }
 
-                if (state.login) {
+                if (state.telegramId) {
                     if (headerUserDisplay) {
-                        headerUserDisplay.textContent = state.login;
+                        headerUserDisplay.textContent = state.telegramUser?.username ? '@' + state.telegramUser.username : (state.telegramUser?.display_name || 'Telegram');
                         headerUserDisplay.classList.remove('hidden');
                     }
                 } else {
@@ -713,7 +841,7 @@
 
         function renderNav() {
             const nav = document.getElementById('bottom-nav');
-            if (!['admin','owner'].includes(state.role) || !state.adminPanelOpen) {
+            if (state.role === 'user') {
                 nav.innerHTML = `
                     <button onclick="switchTab('home')" class="flex flex-col items-center py-1 px-3 ${state.activeTab === 'home' ? 'text-accent' : 'text-zinc-400'}">
                         <i data-lucide="home" class="w-5 h-5"></i><span class="text-[10px] mt-1">Главная</span>
@@ -756,17 +884,11 @@
         }
 
         function switchTab(tab) {
-            if (tab.startsWith('admin_')) {
-                if (!['admin','owner'].includes(state.role)) {
-                    showToast('Доступ запрещен', 'error');
-                    state.activeTab = 'home';
-                    state.adminPanelOpen = false;
-                    render();
-                    return;
-                }
-                state.adminPanelOpen = true;
-            } else if (['admin','owner'].includes(state.role)) {
-                state.adminPanelOpen = false;
+            if (tab.startsWith('admin_') && state.role !== 'admin') {
+                showToast('Доступ запрещен', 'error');
+                state.activeTab = 'home';
+                render();
+                return;
             }
             state.activeTab = tab;
             render();
@@ -776,9 +898,9 @@
                 fetchOrders().then(() => { if (state.activeTab === tab) render(); });
             }
 
-            if (tab === 'admin_settings') {
-                fetchAccounts(state.adminUserSearch || '').then(() => {
-                    if (state.activeTab === 'admin_settings') render();
+            if (tab === 'admin_settings' && state.adminSettingsSubTab === 'accounts') {
+                fetchAccounts().then(() => {
+                    if (state.activeTab === 'admin_settings' && state.adminSettingsSubTab === 'accounts') render();
                 });
             }
         }
@@ -842,7 +964,7 @@
                     <div id="home-products-grid" class="grid grid-cols-2 gap-3">
                         ${featured.length === 0 ? '<p class="col-span-2 text-center text-zinc-500 py-10">Нет товаров на главной</p>' : featured.map(p => renderProductCard(p)).join('')}
                     </div>
-                    <div id="home-stock-total" class="text-center text-xs text-zinc-500 pt-1">${(['admin','owner'].includes(state.role) && featured.length > 0) ? `Всего в наличии на главной: <span class="text-zinc-300 font-semibold">${totalStock} шт.</span>` : ''}</div>
+                    <div id="home-stock-total" class="text-center text-xs text-zinc-500 pt-1">${(state.role === 'admin' && featured.length > 0) ? `Всего в наличии на главной: <span class="text-zinc-300 font-semibold">${totalStock} шт.</span>` : ''}</div>
                 </div>
             `;
             lucide.createIcons();
@@ -861,7 +983,7 @@
             grid.innerHTML = filtered.length === 0 ? '<p class="col-span-2 text-center text-zinc-500 py-10">Ничего не найдено</p>' : filtered.map(p => renderProductCard(p)).join('');
             const totalStock = filtered.reduce((sum, p) => sum + getProductStock(p), 0);
             const totalEl = document.getElementById('home-stock-total');
-            if (totalEl) totalEl.innerHTML = (['admin','owner'].includes(state.role) && filtered.length > 0) ? `Всего в наличии на главной: <span class="text-zinc-300 font-semibold">${totalStock} шт.</span>` : '';
+            if (totalEl) totalEl.innerHTML = (state.role === 'admin' && filtered.length > 0) ? `Всего в наличии на главной: <span class="text-zinc-300 font-semibold">${totalStock} шт.</span>` : '';
             lucide.createIcons();
         }
 
@@ -884,17 +1006,17 @@
                         ${p.is_pinned ? '<span class="bg-amber-500/90 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow flex items-center"><i data-lucide="pin" class="w-3 h-3"></i></span>' : ''}
                     </div>
                     <div>
-                        <img src="${p.image_url || 'https://via.placeholder.com/150'}" alt="${p.name}" onclick="openImagePreview(${JSON.stringify(p.id)})" class="w-full h-36 object-cover rounded-xl mb-3 cursor-pointer">
+                        <img src="${p.image_url || 'https://via.placeholder.com/150'}" alt="${p.name}" onclick="openImagePreview(${p.id})" class="w-full h-36 object-cover rounded-xl mb-3 cursor-pointer">
                         <h4 class="font-semibold text-sm line-clamp-1">${p.name}</h4>
                         <p class="text-xs text-zinc-400 truncate">${p.subcategory || ''}</p>
-                        ${['admin','owner'].includes(state.role) ? `<p class="text-[11px] text-zinc-500 mt-0.5">Остаток: <span class="${stock > 0 ? 'text-zinc-300' : 'text-red-400'} font-medium">${stock} шт.</span></p>` : ''}
+                        ${state.role === 'admin' ? `<p class="text-[11px] text-zinc-500 mt-0.5">Остаток: <span class="${stock > 0 ? 'text-zinc-300' : 'text-red-400'} font-medium">${stock} шт.</span></p>` : ''}
                     </div>
                     <div class="flex items-center justify-between mt-3 min-h-[2rem]">
                         <div class="flex flex-col justify-end">
                             <span class="text-[11px] text-zinc-500 line-through h-[14px] leading-[14px]">${hasDiscount ? p.old_price + ' ₽' : ''}</span>
                             <span class="font-bold text-sm text-accent leading-none">${p.retail_price} ₽</span>
                         </div>
-                        <button onclick="openVariantModal(${JSON.stringify(p.id)})" title="${inCartQty > 0 ? 'В корзине: ' + inCartQty : 'Добавить в корзину'}" class="w-8 h-8 rounded-full flex items-center justify-center text-white transition ${inCartQty > 0 ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-accent hover:bg-accentHover'}">
+                        <button onclick="openVariantModal(${p.id})" title="${inCartQty > 0 ? 'В корзине: ' + inCartQty : 'Добавить в корзину'}" class="w-8 h-8 rounded-full flex items-center justify-center text-white transition ${inCartQty > 0 ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-accent hover:bg-accentHover'}">
                             ${inCartQty > 0 ? `<span class="text-[11px] font-bold">${inCartQty}</span>` : '<i data-lucide="plus" class="w-4 h-4"></i>'}
                         </button>
                     </div>
@@ -952,11 +1074,11 @@
                             ${hasDiscount ? '<span class="bg-red-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">АКЦИЯ</span>' : ''}
                         </div>
                         <div>
-                            <img src="${p.image_url || 'https://via.placeholder.com/150'}" alt="${p.name}" onclick="openImagePreview(${JSON.stringify(p.id)})" class="w-full h-36 object-cover rounded-xl mb-3 cursor-pointer">
+                            <img src="${p.image_url || 'https://via.placeholder.com/150'}" alt="${p.name}" onclick="openImagePreview(${p.id})" class="w-full h-36 object-cover rounded-xl mb-3 cursor-pointer">
                             <h4 class="font-semibold text-sm line-clamp-1">${p.name}</h4>
                             <p class="text-xs text-zinc-400 truncate">${p.subcategory || ''}</p>
                             <p class="text-xs font-medium text-purple-300 mt-1">${v.type === 'flavor' ? 'Вкус' : 'Цвет'}: ${v.value}</p>
-                            ${['admin','owner'].includes(state.role) ? `<p class="text-[11px] text-zinc-500 mt-0.5">Остаток: <span class="text-zinc-300 font-medium">${v.quantity} шт.</span></p>` : ''}
+                            ${state.role === 'admin' ? `<p class="text-[11px] text-zinc-500 mt-0.5">Остаток: <span class="text-zinc-300 font-medium">${v.quantity} шт.</span></p>` : ''}
                         </div>
                         <div class="flex items-center justify-between mt-3 min-h-[2rem]">
                             <div class="flex flex-col justify-end">
@@ -965,12 +1087,12 @@
                             </div>
                             ${inCartQty > 0 ? `
                             <div class="flex items-center bg-zinc-900 border border-accent rounded-full overflow-hidden">
-                                <button onclick="changeCatalogCartQty(${JSON.stringify(p.id)}, ${JSON.stringify(v.id)}, -1)" class="w-7 h-8 flex items-center justify-center text-accent hover:bg-accent/10 transition"><i data-lucide="minus" class="w-3.5 h-3.5"></i></button>
+                                <button onclick="changeCatalogCartQty(${p.id}, ${v.id}, -1)" class="w-7 h-8 flex items-center justify-center text-accent hover:bg-accent/10 transition"><i data-lucide="minus" class="w-3.5 h-3.5"></i></button>
                                 <span class="text-xs font-bold w-5 text-center text-zinc-100">${inCartQty}</span>
-                                <button onclick="changeCatalogCartQty(${JSON.stringify(p.id)}, ${JSON.stringify(v.id)}, 1)" class="w-7 h-8 flex items-center justify-center text-accent hover:bg-accent/10 transition"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>
+                                <button onclick="changeCatalogCartQty(${p.id}, ${v.id}, 1)" class="w-7 h-8 flex items-center justify-center text-accent hover:bg-accent/10 transition"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>
                             </div>
                             ` : `
-                            <button onclick="addToCart(${JSON.stringify(p.id)}, ${JSON.stringify(v.id)})" title="Добавить в корзину" class="w-8 h-8 rounded-full flex items-center justify-center text-white bg-accent hover:bg-accentHover transition">
+                            <button onclick="addToCart(${p.id}, ${v.id})" title="Добавить в корзину" class="w-8 h-8 rounded-full flex items-center justify-center text-white bg-accent hover:bg-accentHover transition">
                                 <i data-lucide="plus" class="w-4 h-4"></i>
                             </button>
                             `}
@@ -1139,9 +1261,9 @@
                 container.innerHTML = availableVariants.map(v => {
                     const inCart = state.cart.find(i => i.productId === p.id && i.variantId === v.id);
                     return `
-                    <div onclick="addToCart(${JSON.stringify(p.id)}, ${JSON.stringify(v.id)})" class="bg-zinc-900 border ${inCart ? 'border-emerald-600' : 'border-zinc-800'} hover:border-accent p-3 rounded-xl flex items-center justify-between cursor-pointer transition">
+                    <div onclick="addToCart(${p.id}, ${v.id})" class="bg-zinc-900 border ${inCart ? 'border-emerald-600' : 'border-zinc-800'} hover:border-accent p-3 rounded-xl flex items-center justify-between cursor-pointer transition">
                         <div>
-                            <span class="text-xs text-zinc-400 block">${v.type === 'flavor' ? 'Вкус' : 'Цвет'}${['admin','owner'].includes(state.role) ? ' • Остаток: ' + v.quantity + ' шт.' : ''}</span>
+                            <span class="text-xs text-zinc-400 block">${v.type === 'flavor' ? 'Вкус' : 'Цвет'}${state.role === 'admin' ? ' • Остаток: ' + v.quantity + ' шт.' : ''}</span>
                             <h4 class="text-sm font-semibold text-zinc-200">${v.value} ${inCart ? `<span class="text-emerald-400 text-xs">(в корзине: ${inCart.qty})</span>` : ''}</h4>
                         </div>
                         <span class="text-xs font-bold text-accent">${p.retail_price} ₽</span>
@@ -1341,8 +1463,7 @@
         function getMyActiveOrder() {
             return (state.orders || []).find(o => {
                 if (o.status !== 'in_progress') return false;
-                if (state.login) return o.user_login === state.login;
-                return o.client_id === state.clientId;
+                return o.user_login === state.telegramId;
             }) || null;
         }
 
@@ -1372,11 +1493,207 @@
             closeModal('modal-missing-contacts');
         }
 
+        async function executeCheckout() {
+            // Берём снимок выбранных товаров ДО любых запросов/изменений корзины.
+            // В заказ должны попасть только они, а остальные позиции остаются в корзине.
+            const selectedItems = getSelectedCartItems().map(item => ({ ...item }));
+
+            if (selectedItems.length === 0) {
+                showToast('Выберите товары для оформления', 'error');
+                return;
+            }
+
+            if (getMyActiveOrder()) {
+                showToast('У вас уже есть заказ в работе', 'error');
+                return;
+            }
+
+            if (state.isPlacingOrder) return;
+            state.isPlacingOrder = true;
+
+            const checkoutBtn = document.getElementById('checkout-order-btn');
+            if (checkoutBtn) {
+                checkoutBtn.disabled = true;
+                checkoutBtn.textContent = 'Оформляем заказ...';
+                checkoutBtn.classList.add('opacity-60', 'cursor-not-allowed');
+            }
+
+            let totalRetail = 0;
+            let totalWholesale = 0;
+            const itemsToInsert = [];
+            const processedKeys = new Set();
+
+            try {
+                // Обрабатываем ТОЛЬКО выбранные позиции.
+                for (const item of selectedItems) {
+                    const product = (state.products || []).find(
+                        p => String(p.id) === String(item.productId)
+                    );
+                    if (!product) continue;
+
+                    const qty = Number(item.qty) || 0;
+                    const price = Number(item.price) || 0;
+                    if (qty <= 0) continue;
+
+                    // Не допускаем повторную обработку одной позиции.
+                    const key = `${item.productId}:${item.variantId}`;
+                    if (processedKeys.has(key)) continue;
+                    processedKeys.add(key);
+
+                    totalRetail += price * qty;
+                    totalWholesale += Number(product.wholesale_price || 0) * qty;
+
+                    itemsToInsert.push({
+                        product_name: item.name,
+                        variant_name: item.variantName,
+                        quantity: qty,
+                        price: price
+                    });
+
+                    // Списываем со склада только выбранное количество.
+                    const { data: varData, error: varError } = await supabaseClient
+                        .from('product_variants')
+                        .select('quantity')
+                        .eq('id', item.variantId)
+                        .single();
+
+                    if (varError) throw varError;
+
+                    const availableQty = Number(varData?.quantity || 0);
+                    if (availableQty < qty) {
+                        throw new Error(
+                            `Недостаточно товара "${item.name}" (${item.variantName}). Доступно: ${availableQty} шт.`
+                        );
+                    }
+
+                    const { error: stockError } = await supabaseClient
+                        .from('product_variants')
+                        .update({ quantity: availableQty - qty })
+                        .eq('id', item.variantId);
+
+                    if (stockError) throw stockError;
+                }
+
+                if (itemsToInsert.length === 0) {
+                    throw new Error('Не удалось подготовить выбранные товары');
+                }
+
+                const { data: orderData, error: orderErr } = await supabaseClient
+                    .from('orders')
+                    .insert({
+                        username: state.contactUser || 'не указано',
+                        phone: state.phone || 'не указан',
+                        total_retail: totalRetail,
+                        total_wholesale: totalWholesale,
+                        status: 'in_progress',
+                        user_login: state.telegramId,
+                        client_id: null
+                    })
+                    .select()
+                    .single();
+
+                if (orderErr || !orderData) {
+                    throw orderErr || new Error('Не удалось создать заказ');
+                }
+
+                for (const item of itemsToInsert) {
+                    const { error: itemError } = await supabaseClient
+                        .from('order_items')
+                        .insert({
+                            order_id: orderData.id,
+                            product_name: item.product_name,
+                            variant_name: item.variant_name,
+                            quantity: item.quantity,
+                            price: item.price
+                        });
+
+                    if (itemError) throw itemError;
+                }
+
+                // Удаляем из корзины ТОЛЬКО те позиции, которые были оформлены.
+                const selectedKeys = new Set(
+                    selectedItems.map(i => `${i.productId}:${i.variantId}`)
+                );
+
+                state.cart = state.cart.filter(
+                    item => !selectedKeys.has(`${item.productId}:${item.variantId}`)
+                );
+
+                // После оформления снимаем выделение.
+                state.selectedCartItems.clear();
+
+                await saveCartToDb();
+                await fetchProducts();
+                await fetchOrders();
+
+                switchTab('orders');
+                showToast('Заказ успешно оформлен!');
+            } catch (e) {
+                console.error('Ошибка оформления заказа:', e);
+                showToast(
+                    e?.message || 'Ошибка при оформлении заказа',
+                    'error'
+                );
+
+                // Если создание заказа не удалось после списания склада,
+                // пытаемся вернуть уже списанные выбранные позиции.
+                // Это не затрагивает остальные товары корзины.
+                if (!itemsToInsert.length) {
+                    // Ничего со склада ещё не списывали.
+                }
+
+                if (state.activeTab === 'cart') render();
+            } finally {
+                state.isPlacingOrder = false;
+            }
+        }
+
+        async function cancelOrder(orderId) {
+            showConfirm('Отмена заказа', 'Вы уверены, что хотите отменить этот заказ?', async () => {
+                try {
+                    const order = (state.orders || []).find(o => o.id == orderId);
+                    if (order && order.order_items) {
+                        for (const item of order.order_items) {
+                            // Ищем товар в БД по имени
+                            const { data: prodData } = await supabaseClient
+                                .from('products')
+                                .select('id')
+                                .ilike('name', item.product_name)
+                                .limit(1);
+
+                            if (prodData && prodData.length > 0) {
+                                const productId = prodData[0].id;
+                                // Ищем вариант в БД по product_id и value
+                                const { data: varData } = await supabaseClient
+                                    .from('product_variants')
+                                    .select('id, quantity')
+                                    .eq('product_id', productId)
+                                    .ilike('value', item.variant_name)
+                                    .limit(1);
+
+                                if (varData && varData.length > 0) {
+                                    const newQty = Number(varData[0].quantity || 0) + Number(item.quantity);
+                                    await supabaseClient.from('product_variants').update({ quantity: newQty }).eq('id', varData[0].id);
+                                }
+                            }
+                        }
+                    }
+                    await supabaseClient.from('orders').delete().eq('id', orderId);
+                    await fetchProducts();
+                    await fetchOrders();
+                    render();
+                    showToast('Заказ отменен, товар возвращен на склад');
+                } catch (e) {
+                    console.error(e);
+                    showToast('Ошибка отмены заказа', 'error');
+                }
+            });
+        }
+
         function renderUserOrders(container) {
             const myOrders = (state.orders || []).filter(o => {
                 if (o.status === 'archived') return false;
-                if (state.login) return o.user_login === state.login;
-                return o.client_id === state.clientId;
+                return o.user_login === state.telegramId;
             });
             const inProgress = myOrders.filter(o => o.status === 'in_progress');
             const completed = myOrders.filter(o => o.status === 'completed');
@@ -1475,78 +1792,188 @@
             window.open(tgUrl, '_blank');
         }
 
-        function toggleAdminMenu() {
-            const dropdown = document.getElementById('admin-dropdown');
-            if (dropdown) dropdown.classList.toggle('hidden');
+        // --- Профиль / Авторизация ---
+
+        function renderUserProfile(container) {
+            const isLoggedIn = Boolean(state.telegramId);
+
+            container.innerHTML = `
+                <div class="space-y-4 max-w-sm mx-auto pt-4">
+                    <h2 class="text-lg font-bold">Профиль аккаунта</h2>
+                    ${!isLoggedIn ? `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <h3 class="text-sm font-bold text-accent">Вход через Telegram</h3>
+                            <p class="text-xs text-zinc-400 leading-relaxed">
+                                Вход выполняется автоматически при открытии Mini App через Telegram.
+                                Отдельной регистрации и пароля нет.
+                            </p>
+                            <div class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-xs text-zinc-400 text-center">
+                                Откройте это приложение из Telegram Mini App — вход произойдёт автоматически.
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-zinc-400">Telegram ID</span>
+                                <span class="font-bold text-sm text-zinc-200">${escapeHtml(state.telegramId)}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-zinc-400">Telegram</span>
+                                <span class="font-bold text-sm text-zinc-200">${escapeHtml(state.telegramUser?.username ? '@' + state.telegramUser.username : (state.telegramUser?.display_name || 'Пользователь'))}</span>
+                            </div>
+                            ${!state.isProfileEditing ? `
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs text-zinc-400">Юз для связи</span>
+                                    <span class="font-medium text-sm text-zinc-200">${escapeHtml(state.contactUser || 'Не указано')}</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs text-zinc-400">Номер телефона</span>
+                                    <span class="font-medium text-sm text-zinc-200">${escapeHtml(state.phone || 'Не указано')}</span>
+                                </div>
+                                <button onclick="startEditContacts()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-2.5 rounded-xl font-medium transition text-xs flex items-center justify-center space-x-2 mt-1">
+                                    <i data-lucide="edit-3" class="w-4 h-4 text-accent"></i><span>Изменить юз и номер</span>
+                                </button>
+                            ` : `
+                                <div>
+                                    <label class="text-xs text-zinc-400 mb-1 block">Юз</label>
+                                    <input type="text" id="edit-contact-user" value="${escapeHtml(state.contactUser)}" placeholder="@username" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-zinc-400 mb-1 block">Номер телефона</label>
+                                    <input type="tel" id="edit-contact-phone" value="${escapeHtml(state.phone)}" placeholder="+7 (999) 000-00-00" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button onclick="cancelEditContacts()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl text-xs font-medium transition">Отмена</button>
+                                    <button onclick="saveEditContacts()" class="flex-1 bg-accent hover:bg-accentHover py-2.5 rounded-xl text-xs font-medium transition text-white">Сохранить</button>
+                                </div>
+                            `}
+                        </div>
+
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <h3 class="text-sm font-bold">Управление аккаунтом</h3>
+                            <button onclick="logoutUser()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-red-400 py-3 rounded-xl font-medium transition text-xs flex items-center justify-center space-x-2">
+                                <i data-lucide="log-out" class="w-4 h-4"></i><span>Выйти из аккаунта</span>
+                            </button>
+                        </div>
+                    `}
+                </div>
+            `;
+            lucide.createIcons();
         }
+
+
+        function startEditContacts() {
+            state.isProfileEditing = true;
+            render();
+        }
+
+        function cancelEditContacts() {
+            state.isProfileEditing = false;
+            render();
+        }
+
+        async function saveEditContacts() {
+            if (!state.sessionToken) return;
+            let contact = (document.getElementById('edit-contact-user')?.value || '').trim();
+            const phone = (document.getElementById('edit-contact-phone')?.value || '').trim();
+            if (contact && !contact.startsWith('@')) contact = '@' + contact;
+            try {
+                const data = await authRequest('update-profile', {
+                    contact_username: contact,
+                    phone
+                });
+                state.contactUser = data.user.contact_username || '';
+                state.phone = data.user.номер || '';
+                state.isProfileEditing = false;
+                localStorage.setItem('reflex_contact_user', state.contactUser);
+                localStorage.setItem('reflex_phone', state.phone);
+                render();
+                showToast('Профиль обновлён');
+            } catch (e) {
+                console.error(e);
+                showToast(e.message || 'Ошибка обновления профиля', 'error');
+            }
+        }
+
+
+        function logoutUser() {
+            if (state.sessionToken) {
+                authRequest('logout').catch(() => {});
+            }
+            state.telegramId = '';
+            state.contactUser = '';
+            state.phone = '';
+            state.telegramId = '';
+            state.telegramUser = null;
+            state.sessionToken = '';
+            state.adminGranted = false;
+            state.siteRole = 'user';
+            state.role = 'user';
+            state.isProfileEditing = false;
+            localStorage.removeItem('telegram_session_token');
+            localStorage.removeItem('reflex_contact_user');
+            localStorage.removeItem('reflex_phone');
+            localStorage.removeItem('reflex_telegram_id');
+            state.cart = [];
+            state.activeTab = 'home';
+            render();
+            showToast('Вы вышли из аккаунта');
+        }
+
 
         
-        // Owner-only administrator management
-        async function setUserAdminRole(userId, makeAdmin = true) {
-            if (!state.isOwner) {
-                showToast('Только владелец может назначать администраторов', 'error');
+
+        
+
+        
+
+        // --- Вход в админку ---
+        // Версия пароля позволяет глобально инвалидировать старые автоидентификаторы.
+        
+
+        async function openAdminLoginModal() {
+            if (!state.telegramId) {
+                showToast('Откройте Mini App через Telegram для входа', 'error');
                 return;
             }
 
             try {
-                const { error } = await supabaseClient.rpc('set_user_admin', {
-                    target_user_id: userId,
-                    make_admin: makeAdmin
-                });
-
-                if (error) throw error;
-
-                showToast(makeAdmin ? 'Администратор назначен' : 'Администратор снят');
-                await fetchAccounts(state.adminUserSearch || '');
-            } catch (e) {
-                console.error('set admin error:', e);
-                showToast('Не удалось изменить статус', 'error');
-            }
-        }
-
-
-        function requireTelegramMiniApp() {
-            return !!(window.Telegram &&
-                Telegram.WebApp &&
-                Telegram.WebApp.initData);
-        }
-
-async function openAdminPanel() {
-            const dropdown = document.getElementById('admin-dropdown');
-            if (dropdown) dropdown.classList.add('hidden');
-            if (!state.userId) {
-                switchTab('profile');
-                showToast('Сначала войдите через Telegram', 'error');
-                return;
-            }
-
-            try {
-                const { data, error } = await supabaseClient.rpc('get_my_admin_status');
-                if (error) throw error;
-
-                state.role = data?.role || (data?.is_owner ? 'owner' : (data?.is_admin ? 'admin' : 'user'));
-                state.isOwner = state.role === 'owner' || !!data?.is_owner;
-
-                if (['admin','owner'].includes(state.role)) {
-                    state.adminPanelOpen = true;
-                    closeModal('modal-worker-access');
-                    await fetchAccounts(state.adminUserSearch || '');
+                const data = await authRequest('me');
+                state.adminGranted = Boolean(data.user?.admin_granted);
+                if (state.adminGranted) {
+                    state.role = 'admin';
                     state.activeTab = 'admin_home';
-                    switchTab('admin_home');
+                    render();
+                    showToast('Доступ в админку подтверждён');
                     return;
                 }
 
-                openModal('modal-worker-access');
+                const message = document.getElementById('admin-access-message');
+                const action = document.getElementById('admin-access-action');
+                if (message) message.textContent = 'Для входа в админку у этого аккаунта нет выданного доступа. Запросите доступ у администрации сайта.';
+                if (action) action.textContent = 'Понятно';
+                openModal('modal-admin-login');
             } catch (e) {
-                console.error('Worker access check error:', e);
-                openModal('modal-worker-access');
-                showToast('Не удалось проверить доступ', 'error');
+                showToast(e.message || 'Не удалось проверить доступ', 'error');
             }
         }
 
-        async function checkWorkerAccess() {
-            closeModal('modal-worker-access');
-            await openAdminPanel();
+
+        
+
+        
+
+        function logoutAdmin() {
+            state.role = 'user';
+            state.activeTab = 'home';
+            render();
+            showToast('Вы вышли из админки');
+        }
+
+
+        function toggleAdminMenu() {
+            const dropdown = document.getElementById('admin-dropdown');
+            if (dropdown) dropdown.classList.toggle('hidden');
         }
 
         // --- Восстановленная система управления товарами в админке ---
@@ -2086,21 +2513,21 @@ async function openAdminPanel() {
                                 </div>
                                 <div class="flex flex-col space-y-1.5 items-center shrink-0">
                                     <div class="flex space-x-1">
-                                        <button onclick="toggleProductPin(${JSON.stringify(p.id)})" title="${p.is_pinned ? 'Открепить' : 'Закрепить'}" class="w-8 h-8 ${p.is_pinned ? 'bg-amber-500/30 text-amber-400' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} rounded-xl flex items-center justify-center transition">
+                                        <button onclick="toggleProductPin(${p.id})" title="${p.is_pinned ? 'Открепить' : 'Закрепить'}" class="w-8 h-8 ${p.is_pinned ? 'bg-amber-500/30 text-amber-400' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} rounded-xl flex items-center justify-center transition">
                                             <i data-lucide="pin" class="w-4 h-4"></i>
                                         </button>
-                                        <button onclick="toggleProductArchive(${JSON.stringify(p.id)})" title="В архив" class="w-8 h-8 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 rounded-xl flex items-center justify-center transition">
+                                        <button onclick="toggleProductArchive(${p.id})" title="В архив" class="w-8 h-8 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 rounded-xl flex items-center justify-center transition">
                                             <i data-lucide="archive" class="w-4 h-4"></i>
                                         </button>
                                     </div>
                                     <div class="flex space-x-1">
-                                        <button onclick="openDiscountModal(${JSON.stringify(p.id)})" title="Акция" class="w-8 h-8 ${isDiscount ? 'bg-red-500/20 text-red-400' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} rounded-xl flex items-center justify-center transition">
+                                        <button onclick="openDiscountModal(${p.id})" title="Акция" class="w-8 h-8 ${isDiscount ? 'bg-red-500/20 text-red-400' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} rounded-xl flex items-center justify-center transition">
                                             <i data-lucide="tag" class="w-4 h-4"></i>
                                         </button>
-                                        <button onclick="editProduct(${JSON.stringify(p.id)})" title="Редактировать" class="w-8 h-8 bg-zinc-800 hover:bg-zinc-700 rounded-xl flex items-center justify-center text-zinc-300 transition">
+                                        <button onclick="editProduct(${p.id})" title="Редактировать" class="w-8 h-8 bg-zinc-800 hover:bg-zinc-700 rounded-xl flex items-center justify-center text-zinc-300 transition">
                                             <i data-lucide="edit-2" class="w-4 h-4"></i>
                                         </button>
-                                        <button onclick="deleteProduct(${JSON.stringify(p.id)})" title="Удалить" class="w-8 h-8 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl flex items-center justify-center transition">
+                                        <button onclick="deleteProduct(${p.id})" title="Удалить" class="w-8 h-8 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl flex items-center justify-center transition">
                                             <i data-lucide="trash-2" class="w-4 h-4"></i>
                                         </button>
                                     </div>
@@ -2132,10 +2559,10 @@ async function openAdminPanel() {
                                             </div>
                                         </div>
                                         <div class="flex flex-col space-y-1 items-center shrink-0">
-                                            <button onclick="toggleProductArchive(${JSON.stringify(p.id)})" title="Восстановить" class="px-3 py-2 bg-accent/20 hover:bg-accent/30 text-accent rounded-xl text-xs font-medium flex items-center space-x-1 transition">
+                                            <button onclick="toggleProductArchive(${p.id})" title="Восстановить" class="px-3 py-2 bg-accent/20 hover:bg-accent/30 text-accent rounded-xl text-xs font-medium flex items-center space-x-1 transition">
                                                 <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i><span>Вернуть</span>
                                             </button>
-                                            <button onclick="deleteProduct(${JSON.stringify(p.id)})" title="Удалить навсегда" class="w-full px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs flex items-center justify-center space-x-1 transition">
+                                            <button onclick="deleteProduct(${p.id})" title="Удалить навсегда" class="w-full px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs flex items-center justify-center space-x-1 transition">
                                                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i><span>Удалить</span>
                                             </button>
                                         </div>
@@ -2217,46 +2644,97 @@ async function openAdminPanel() {
             }
         }
 
-        async function saveManager() {
-            const nameField = document.getElementById('new-manager-name');
-            const usernameField = document.getElementById('new-manager-username');
-            if (!nameField || !usernameField) return;
+        function renderAdminSettings(container) {
+            container.innerHTML = `
+                <div class="space-y-4 max-w-md mx-auto pt-4">
+                    <h2 class="text-lg font-bold">Настройки администратора</h2>
 
-            const name = nameField.value.trim();
-            let username = usernameField.value.trim();
+                    <div class="grid grid-cols-2 gap-1 bg-cardBg p-1 rounded-2xl border border-zinc-800">
+                        <button onclick="state.adminSettingsSubTab='general'; render();"
+                            class="py-2 rounded-xl text-[11px] font-medium transition ${state.adminSettingsSubTab === 'general' ? 'bg-accent text-white' : 'text-zinc-400'}">
+                            Основные
+                        </button>
+                        <button onclick="state.adminSettingsSubTab='accounts'; fetchAccounts().then(render);"
+                            class="py-2 rounded-xl text-[11px] font-medium transition ${state.adminSettingsSubTab === 'accounts' ? 'bg-accent text-white' : 'text-zinc-400'}">
+                            Пользователи (${state.accounts.length})
+                        </button>
+                    </div>
 
-            if (!name || !username) {
-                showToast('Заполните имя и юз менеджера!', 'error');
+                    ${state.adminSettingsSubTab === 'general' ? `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <p class="text-xs text-zinc-400 leading-relaxed">
+                                Авторизация выполняется только через Telegram Mini App. Паролей пользователей и пароля админки больше нет.
+                            </p>
+                            ${String(state.telegramId) === OWNER_TELEGRAM_ID ? `
+                                <div class="bg-accent/10 border border-accent/30 rounded-xl p-3 text-xs text-zinc-300">
+                                    Вы — владелец системы. Только владелец может назначать администраторов.
+                                </div>
+                            ` : ''}
+                            <button onclick="logoutAdmin()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
+                                <i data-lucide="log-out" class="w-4 h-4"></i><span>Выйти из админки</span>
+                            </button>
+                        </div>
+                    ` : `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-sm font-bold">Пользователи</h3>
+                                    <p class="text-[10px] text-zinc-500 mt-0.5">Только просмотр. Удаление аккаунтов отключено.</p>
+                                </div>
+                                <button onclick="fetchAccounts().then(render)" class="p-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300" title="Обновить">
+                                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                            <div class="space-y-2 max-h-[65vh] overflow-y-auto">
+                                ${state.accounts.length === 0 ? '<p class="text-xs text-zinc-500 text-center py-8">Пользователи не найдены</p>' :
+                                state.accounts.map(account => `
+                                    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-3">
+                                        <div class="flex items-start justify-between gap-2">
+                                            <div class="min-w-0">
+                                                <div class="font-semibold text-sm text-zinc-100 truncate">${escapeHtml(account.display_name || (account.telegram_username ? '@' + account.telegram_username : 'Пользователь'))}</div>
+                                                <p class="text-[11px] text-zinc-500 mt-1">Telegram ID: ${escapeHtml(account.telegram_id)}</p>
+                                                <p class="text-xs text-zinc-400 mt-1">Номер: ${escapeHtml(account.номер || 'не указан')}</p>
+                                                <p class="text-xs text-zinc-400 mt-0.5">US: ${escapeHtml(account.contact_username || 'не указан')}</p>
+                                                <p class="text-[11px] text-zinc-500 mt-1">Сайт: ${escapeHtml(account.site_role || 'user')}</p>
+                                                <p class="text-[11px] ${account.admin_granted ? 'text-accent' : 'text-zinc-500'} mt-0.5">
+                                                    Админ-доступ: ${account.admin_granted ? 'выдан' : 'нет'}
+                                                </p>
+                                            </div>
+                                            ${String(state.telegramId) === OWNER_TELEGRAM_ID && String(account.telegram_id) !== OWNER_TELEGRAM_ID ? `
+                                                <button onclick="setAdminAccess('${escapeHtml(account.telegram_id)}', ${account.admin_granted ? 'false' : 'true'})"
+                                                    class="shrink-0 px-3 py-2 rounded-xl text-[11px] font-medium ${account.admin_granted ? 'bg-red-500/10 text-red-300 border border-red-500/20' : 'bg-accent text-white'}">
+                                                    ${account.admin_granted ? 'Забрать админку' : 'Выдать админку'}
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `}
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        async function setAdminAccess(telegramId, granted) {
+            if (String(state.telegramId) !== OWNER_TELEGRAM_ID) {
+                showToast('Назначать администраторов может только владелец', 'error');
                 return;
             }
-
-            if (username.startsWith('@')) username = username.substring(1);
-
             try {
-                if (state.editingManagerId) {
-                    const { error } = await supabaseClient.from('managers').update({ name, username }).eq('id', state.editingManagerId);
-                    if (error) {
-                        showToast('Ошибка при сохранении менеджера', 'error');
-                        return;
-                    }
-                    state.editingManagerId = null;
-                    await fetchManagers();
-                    render();
-                    showToast('Данные менеджера обновлены!');
-                } else {
-                    const { error } = await supabaseClient.from('managers').insert({ name, username });
-                    if (error) {
-                        showToast('Ошибка при добавлении менеджера', 'error');
-                        return;
-                    }
-                    await fetchManagers();
-                    render();
-                    showToast('Менеджер успешно добавлен!');
-                }
+                await authRequest('set-admin', {
+                    telegram_id: String(telegramId),
+                    admin_granted: Boolean(granted)
+                });
+                await fetchAccounts();
+                render();
+                showToast(granted ? 'Админка выдана' : 'Админка забрана');
             } catch (e) {
-                showToast('Ошибка подключения к базе данных', 'error');
+                showToast(e.message || 'Не удалось изменить доступ', 'error');
             }
         }
+
 
         function startEditManager(id) {
             state.editingManagerId = id;
@@ -2275,828 +2753,6 @@ async function openAdminPanel() {
             render();
             showToast('Менеджер удален');
         }
-
-        /* =========================================================
-           VLD VAPE — TELEGRAM MINI APP AUTH
-           Авторизация только через Telegram Mini App.
-           ========================================================= */
-
-        const TELEGRAM_PROVIDER = 'custom:telegram';
-
-        state.role = 'user';
-        state.login = '';
-        state.userId = null;
-        state.telegramUser = null;
-        state.contactUser = '';
-        state.phone = '';
-        state.isProfileEditing = false;
-        state.miniAppAuthInProgress = false;
-
-        function applyProfileToState(profile) {
-            if (!profile) return;
-
-            state.userId = profile.id;
-            state.role = profile.role || 'user';
-            state.isOwner = state.role === 'owner';
-
-            // Права определяются одной ролью,
-            // а не site_role. Telegram-синхронизация больше не может сбросить admin.
-            state.role = ['admin', 'owner'].includes(state.role) ? state.role : 'user';
-
-            state.contactUser = profile.contact_username || '';
-            state.phone = profile.phone || '';
-            state.telegramUser = {
-                id: Number(profile.telegram_id),
-                username: profile.telegram_username || '',
-                first_name: profile.first_name || '',
-                last_name: profile.last_name || '',
-                photo_url: profile.photo_url || ''
-            };
-
-            state.login = profile.telegram_username
-                ? '@' + profile.telegram_username
-                : (profile.first_name || `Telegram ${profile.telegram_id}`);
-
-            if (state.role !== 'admin' && state.activeTab.startsWith('admin_')) {
-                state.activeTab = 'home';
-            }
-        }
-
-        async function checkUserRoleOnStartup() {
-            try {
-                const { data: { session } } = await supabaseClient.auth.getSession();
-
-                if (!session?.user) {
-                    resetAuthState();
-                    return null;
-                }
-
-                state.userId = session.user.id;
-                return await refreshCurrentProfile();
-            } catch (e) {
-                console.error('Ошибка восстановления сессии:', e);
-                resetAuthState();
-                return null;
-            }
-        }
-
-        function resetAuthState() {
-            state.role = 'user';
-            state.isOwner = false;
-            state.isOwner = false;
-            state.adminPanelOpen = false;
-            state.userId = null;
-            state.telegramUser = null;
-            state.login = '';
-            state.contactUser = '';
-            state.phone = '';
-            state.isProfileEditing = false;
-            if (state.activeTab.startsWith('admin_')) state.activeTab = 'home';
-        }
-
-        async function refreshCurrentProfile() {
-            if (!state.userId) return null;
-
-            let { data, error } = await supabaseClient
-                .from('profiles')
-                .select('*')
-                .eq('id', state.userId)
-                .maybeSingle();
-
-            if (error) throw error;
-
-            // Custom OIDC creates auth.users first. A database trigger normally
-            // creates profiles, but this fallback also makes an already-created
-            // OIDC account self-healing. The RPC is SECURITY DEFINER and only
-            // accepts the currently authenticated user.
-            if (!data) {
-                const { data: synced, error: syncError } = await supabaseClient.rpc('sync_my_telegram_profile');
-                if (syncError) throw syncError;
-                data = synced;
-            }
-
-            if (!data) throw new Error('Профиль Telegram ещё не создан');
-
-            applyProfileToState(data);
-
-            // Источник истины для админских прав — SECURITY DEFINER RPC.
-            // Это также корректно определяет владельца через site_owners,
-            // даже если профиль был создан только что.
-            try {
-                const { data: adminStatus, error: adminError } =
-                    await supabaseClient.rpc('get_my_admin_status');
-
-                if (!adminError && adminStatus) {
-                    state.role =
-                        adminStatus.db_role ||
-                        (adminStatus.is_owner ? 'owner' :
-                         adminStatus.is_admin ? 'admin' : 'user');
-
-                    state.isOwner = !!adminStatus.is_owner;
-                    state.role = state.isOwner ? 'owner' : (adminStatus.is_admin ? 'admin' : 'user');
-                }
-            } catch (adminStatusError) {
-                console.warn('Admin status refresh:', adminStatusError);
-            }
-
-            return data;
-        }
-
-        async function waitForAuthProfile(attempts = 8) {
-            for (let i = 0; i < attempts; i++) {
-                try {
-                    const profile = await refreshCurrentProfile();
-                    if (profile) return profile;
-                } catch (e) {
-                    if (i === attempts - 1) throw e;
-                }
-                await new Promise(resolve => setTimeout(resolve, 250));
-            }
-            return null;
-        }
-
-        function renderUserProfile(container) {
-            const logged = !!state.userId;
-            const tg = state.telegramUser || {};
-
-            container.innerHTML = `
-                <div class="space-y-4 max-w-sm mx-auto pt-4">
-                    <h2 class="text-lg font-bold">Профиль аккаунта</h2>
-
-                    ${!logged ? `
-                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-5 space-y-4">
-                            <h3 class="text-accent font-bold">Вход через Telegram</h3>
-                            ${isTelegramMiniApp() ? `
-                                <div class="rounded-xl bg-zinc-900/70 border border-zinc-800 p-3 text-sm text-zinc-300">
-                                    Вы открыли сайт внутри Telegram. Авторизация выполняется автоматически через Telegram Mini App.
-                                </div>
-                                <button onclick="telegramMiniAppLogin(true)"
-                                    class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl text-white font-medium">
-                                    Повторить авторизацию
-                                </button>
-                            ` : `
-                                <p class="text-sm text-zinc-400">
-                                    Вход доступен только через Telegram Mini App.
-                                </p>
-                                <button onclick="openTelegramOnly()"
-                                    class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl text-white font-medium">
-                                    Перейти в Telegram
-                                </button>
-                                <p class="text-xs text-zinc-500 text-center">
-                                    Откройте бота @vlvvape_bot для авторизации
-                                </p>
-                            `}
-                            <div class="text-[10px] text-zinc-600 text-center">
-                                При первом входе профиль создаётся автоматически.
-                            </div>
-                        </div>
-                    ` : `
-                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-4">
-                            <div class="flex items-center gap-3">
-                                ${tg.photo_url
-                                    ? `<img src="${escapeHtml(tg.photo_url)}" class="w-12 h-12 rounded-full object-cover border border-zinc-700">`
-                                    : `<div class="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center"><i data-lucide="user" class="w-5 h-5 text-zinc-500"></i></div>`}
-                                <div class="min-w-0">
-                                    <div class="font-bold truncate">
-                                        ${escapeHtml(((tg.first_name || '') + ' ' + (tg.last_name || '')).trim() || 'Пользователь Telegram')}
-                                    </div>
-                                    <div class="text-accent text-sm truncate">
-                                        ${tg.username ? '@' + escapeHtml(tg.username) : 'Без username'}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="text-xs text-zinc-500">
-                                Telegram ID: <span class="text-zinc-300">${escapeHtml(tg.id || '')}</span>
-                            </div>
-                        </div>
-                    `}
-                </div>
-            `;
-
-            lucide.createIcons();
-        }
-
-        // The SDK object also exists in ordinary browsers. A real Mini App launch
-        // is identified by non-empty Telegram.WebApp.initData.
-        function isTelegramMiniApp() {
-            const initData = window.Telegram?.WebApp?.initData;
-            return typeof initData === 'string' && initData.trim().length > 0;
-        }
-
-        function setupTelegramMiniApp() {
-            if (!isTelegramMiniApp()) return;
-            try {
-                const tg = window.Telegram.WebApp;
-                tg.ready();
-                tg.expand();
-                document.documentElement.classList.add('telegram-mini-app');
-            } catch (e) {
-                console.warn('Telegram Mini App setup warning:', e);
-            }
-        }
-
-        async function telegramLogin() {
-            // Внутри настоящего Mini App OAuth не запускаем:
-            // используем Telegram.WebApp.initData → Edge Function → Supabase session.
-            if (isTelegramMiniApp()) {
-                await telegramMiniAppLogin(false);
-                return;
-            }
-            openTelegramOnly();
-        }
-
-        function isTelegramMiniAppOnly(){
-    return !!(window.Telegram?.WebApp?.initData);
-}
-
-function openTelegramOnly(){
-    window.open('https://t.me/vldvape_bot','_blank');
-}
-
-async function telegramMiniAppLogin(manualRetry = false) {
-            const tg = window.Telegram?.WebApp;
-            const initData = tg?.initData;
-
-            if (!initData) {
-                if (manualRetry) showToast('Telegram Mini App data не получены. Откройте сайт из Telegram.', 'error');
-                return false;
-            }
-
-            if (state.miniAppAuthInProgress) return false;
-            state.miniAppAuthInProgress = true;
-
-            try {
-                if (manualRetry) showToast('Проверяем Telegram…');
-
-                const response = await fetch(`${SUPABASE_URL}/functions/v1/telegram-mini-auth`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ initData })
-                });
-
-                const result = await response.json().catch(() => ({}));
-                if (!response.ok) {
-                    throw new Error(result.error || `Telegram auth error (${response.status})`);
-                }
-
-                if (!result.session?.access_token || !result.session?.refresh_token) {
-                    throw new Error('Сервер Telegram не вернул Supabase session');
-                }
-
-                const { error: sessionError } = await supabaseClient.auth.setSession({
-                    access_token: result.session.access_token,
-                    refresh_token: result.session.refresh_token
-                });
-                if (sessionError) throw sessionError;
-
-                state.userId = result.user?.id || state.userId;
-                await waitForAuthProfile(10);
-                await mergeGuestCartIntoDb();
-                await loadCartFromDb();
-                await fetchOrders();
-                await fetchRegisteredAccountsCount();
-                render();
-
-                if (manualRetry) showToast('Вход через Telegram выполнен');
-                return true;
-            } catch (e) {
-                console.error('Telegram Mini App auth error:', e);
-                showToast(e?.message || 'Не удалось авторизоваться через Telegram', 'error');
-                return false;
-            } finally {
-                state.miniAppAuthInProgress = false;
-            }
-        }
-
-        function startEditContacts() {
-            if (!state.userId) { showToast('Сначала войдите через Telegram', 'error'); return; }
-            state.isProfileEditing = true;
-            render();
-        }
-
-        function cancelEditContacts() {
-            state.isProfileEditing = false;
-            render();
-        }
-
-        async function saveEditContacts() {
-            if (!state.userId) { showToast('Сначала войдите через Telegram', 'error'); return; }
-            let contact = document.getElementById('edit-contact-user')?.value.trim() || '';
-            const phone = document.getElementById('edit-contact-phone')?.value.trim() || '';
-            if (contact && !contact.startsWith('@')) contact = '@' + contact;
-            try {
-                const { data, error } = await supabaseClient.rpc('update_my_contacts', {
-                    p_contact_username: contact || null,
-                    p_phone: phone || null
-                });
-                if (error) throw error;
-                applyProfileToState(data);
-                state.isProfileEditing = false;
-                render();
-                showToast('Контакты сохранены');
-            } catch (e) {
-                console.error('update_my_contacts:', e);
-                showToast(e?.message || 'Не удалось сохранить контакты', 'error');
-            }
-        }
-
-        async function syncTelegramProfile() {
-            if (!state.userId) {
-                showToast('Сначала войдите через Telegram', 'error');
-                return;
-            }
-
-            try {
-                showToast('Обновляем данные Telegram…');
-                await waitForAuthProfile(8);
-                await loadCartFromDb();
-                await fetchOrders();
-                render();
-                showToast('Данные Telegram обновлены');
-            } catch (e) {
-                console.error('Telegram profile sync error:', e);
-                showToast('Не удалось обновить данные Telegram', 'error');
-            }
-        }
-
-        async function logoutAdmin() {
-            // Закрываем только административный интерфейс.
-            // Telegram/Supabase сессия пользователя НЕ завершается.
-            state.adminPanelOpen = false;
-            state.activeTab = 'home';
-            state.adminUserSearch = '';
-            closeModal('modal-worker-access');
-            const dropdown = document.getElementById('admin-dropdown');
-            if (dropdown) dropdown.classList.add('hidden');
-            render();
-        }
-
-        async function logoutTelegram() {
-            try {
-                const { error } = await supabaseClient.auth.signOut();
-                if (error) throw error;
-            } catch (e) {
-                console.error(e);
-                showToast('Не удалось выйти из аккаунта', 'error');
-                return;
-            }
-
-            resetAuthState();
-            await loadCartFromDb();
-            render();
-            showToast('Вы вышли из аккаунта');
-        }
-
-        async function mergeGuestCartIntoDb() {
-            if (!state.userId) return;
-
-            const guestCart = JSON.parse(localStorage.getItem('reflex_cart') || '[]');
-            if (!guestCart.length) return;
-
-            const { data: dbRows, error } = await supabaseClient
-                .from('cart_items')
-                .select('*')
-                .eq('user_id', state.userId);
-
-            if (error) throw error;
-
-            const merged = [...(dbRows || []).map(i => ({
-                productId: i.product_id,
-                variantId: i.variant_id,
-                name: i.name,
-                variantName: i.variant_name,
-                price: Number(i.price),
-                qty: Number(i.qty),
-                image: i.image,
-                maxQty: Number(i.max_qty || 0)
-            }))];
-
-            for (const item of guestCart) {
-                const existing = merged.find(x =>
-                    String(x.productId) === String(item.productId) &&
-                    String(x.variantId) === String(item.variantId)
-                );
-
-                if (existing) existing.qty += Number(item.qty || 0);
-                else merged.push({ ...item });
-            }
-
-            state.cart = merged;
-            localStorage.removeItem('reflex_cart');
-            await saveCartToDb();
-        }
-
-        async function loadCartFromDb() {
-            if (!state.userId) {
-                state.cart = JSON.parse(localStorage.getItem('reflex_cart') || '[]');
-                return;
-            }
-
-            try {
-                const { data, error } = await supabaseClient
-                    .from('cart_items')
-                    .select('*')
-                    .eq('user_id', state.userId);
-
-                if (error) throw error;
-
-                state.cart = (data || []).map(i => ({
-                    productId: i.product_id,
-                    variantId: i.variant_id,
-                    name: i.name,
-                    variantName: i.variant_name,
-                    price: Number(i.price),
-                    qty: Number(i.qty),
-                    image: i.image,
-                    maxQty: Number(i.max_qty || 0)
-                }));
-            } catch (e) {
-                console.error('Ошибка загрузки корзины:', e);
-            }
-        }
-
-        async function saveCartToDb() {
-            if (!state.userId) {
-                localStorage.setItem('reflex_cart', JSON.stringify(state.cart));
-                return;
-            }
-
-            try {
-                const { error: deleteError } = await supabaseClient
-                    .from('cart_items')
-                    .delete()
-                    .eq('user_id', state.userId);
-
-                if (deleteError) throw deleteError;
-
-                if (state.cart.length > 0) {
-                    const rows = state.cart.map(i => ({
-                        user_id: state.userId,
-                        product_id: i.productId,
-                        variant_id: i.variantId,
-                        name: i.name,
-                        variant_name: i.variantName,
-                        price: Number(i.price),
-                        qty: Number(i.qty),
-                        image: i.image || null,
-                        max_qty: Number(i.maxQty || 0)
-                    }));
-
-                    const { error: insertError } = await supabaseClient
-                        .from('cart_items')
-                        .insert(rows);
-
-                    if (insertError) throw insertError;
-                }
-            } catch (e) {
-                console.error('Ошибка сохранения корзины:', e);
-            }
-        }
-
-        function getMyActiveOrder() {
-            return (state.orders || []).find(o =>
-                o.status === 'in_progress' &&
-                state.userId &&
-                o.user_id === state.userId
-            ) || null;
-        }
-
-        function renderUserOrders(container) {
-            const myOrders = (state.orders || []).filter(o =>
-                o.status !== 'archived' && state.userId && o.user_id === state.userId
-            );
-
-            const inProgress = myOrders.filter(o => o.status === 'in_progress');
-            const completed = myOrders.filter(o => o.status === 'completed');
-
-            container.innerHTML = `
-                <div class="space-y-4">
-                    <h2 class="text-lg font-bold">Мои заказы</h2>
-                    ${!state.userId ? `
-                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-5 text-center">
-                            <p class="text-sm text-zinc-400 mb-3">Войдите через Telegram, чтобы видеть историю заказов.</p>
-                            <button onclick="switchTab('profile')" class="bg-accent hover:bg-accentHover px-4 py-2.5 rounded-xl text-sm text-white">Войти</button>
-                        </div>
-                    ` : `
-                        <div class="space-y-3">
-                            <h3 class="text-sm font-semibold text-amber-400">В работе (${inProgress.length})</h3>
-                            ${inProgress.length === 0 ? '<p class="text-xs text-zinc-600">Нет заказов в работе</p>' : inProgress.map(o => `
-                                <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-2">
-                                    <div class="flex justify-between text-xs text-zinc-400">
-                                        <span>Заказ #${String(o.id).slice(0,6)}</span>
-                                        <span>${new Date(o.created_at).toLocaleString()}</span>
-                                    </div>
-                                    <div class="space-y-1">
-                                        ${(o.order_items || []).map(i => `<div class="text-sm flex justify-between"><span>${escapeHtml(i.product_name)} (${escapeHtml(i.variant_name)})</span><span>${i.quantity} шт.</span></div>`).join('')}
-                                    </div>
-                                    <div class="pt-2 border-t border-zinc-800 flex items-center justify-between">
-                                        <span class="font-bold text-accent">${o.total_retail} ₽</span>
-                                        <button onclick="askAboutOrder('${o.id}')" class="px-3 py-2 bg-zinc-800 rounded-xl text-xs">Вопрос</button>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-
-                        <div class="space-y-3 pt-3">
-                            <h3 class="text-sm font-semibold text-emerald-400">Выполненные (${completed.length})</h3>
-                            ${completed.length === 0 ? '<p class="text-xs text-zinc-600">Нет выполненных заказов</p>' : completed.map(o => `
-                                <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-2 opacity-75">
-                                    <div class="flex justify-between text-xs text-zinc-400">
-                                        <span>Заказ #${String(o.id).slice(0,6)}</span>
-                                        <span>${new Date(o.created_at).toLocaleDateString()}</span>
-                                    </div>
-                                    <div class="space-y-1">
-                                        ${(o.order_items || []).map(i => `<div class="text-sm flex justify-between"><span>${escapeHtml(i.product_name)} (${escapeHtml(i.variant_name)})</span><span>${i.quantity} шт.</span></div>`).join('')}
-                                    </div>
-                                    <div class="pt-2 border-t border-zinc-800">
-                                        <span class="font-bold text-sm text-zinc-300">${o.total_retail} ₽</span>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    `}
-                </div>
-            `;
-            lucide.createIcons();
-        }
-
-        async function executeCheckout() {
-            const selectedItems = getSelectedCartItems().map(item => ({ ...item }));
-
-            if (!state.userId) {
-                showToast('Для оформления заказа войдите через Telegram', 'error');
-                switchTab('profile');
-                return;
-            }
-
-            if (!selectedItems.length) {
-                showToast('Выберите товары для оформления', 'error');
-                return;
-            }
-
-            if (getMyActiveOrder()) {
-                showToast('У вас уже есть заказ в работе', 'error');
-                return;
-            }
-
-            if (state.isPlacingOrder) return;
-            state.isPlacingOrder = true;
-
-            try {
-                const items = selectedItems.map(item => ({
-                    product_id: item.productId,
-                    variant_id: item.variantId,
-                    quantity: Number(item.qty) || 0
-                })).filter(x => x.quantity > 0);
-
-                const { data: orderId, error } = await supabaseClient.rpc('place_order', {
-                    p_items: items,
-                    p_contact_username: state.contactUser || null,
-                    p_phone: state.phone || null,
-                    p_client_id: state.clientId
-                });
-
-                if (error) throw error;
-
-                const selectedKeys = new Set(selectedItems.map(i => `${i.productId}:${i.variantId}`));
-                state.cart = state.cart.filter(item => !selectedKeys.has(`${item.productId}:${item.variantId}`));
-                state.selectedCartItems.clear();
-
-                await saveCartToDb();
-                await fetchProducts();
-                await fetchOrders();
-
-                switchTab('orders');
-                showToast(`Заказ #${String(orderId).slice(0,6)} успешно оформлен!`);
-            } catch (e) {
-                console.error(e);
-                showToast(e?.message || 'Ошибка при оформлении заказа', 'error');
-            } finally {
-                state.isPlacingOrder = false;
-            }
-        }
-
-        async function cancelOrder(orderId) {
-            showConfirm('Отмена заказа', 'Вы уверены, что хотите отменить этот заказ?', async () => {
-                try {
-                    const { error } = await supabaseClient.rpc('cancel_order', { p_order_id: orderId });
-                    if (error) throw error;
-
-                    await fetchProducts();
-                    await fetchOrders();
-                    render();
-                    showToast('Заказ отменен, товар возвращен на склад');
-                } catch (e) {
-                    console.error(e);
-                    showToast(e?.message || 'Ошибка отмены заказа', 'error');
-                }
-            });
-        }
-
-        function checkoutOrder() {
-            if (!state.userId) {
-                showToast('Для оформления заказа войдите через Telegram', 'error');
-                switchTab('profile');
-                return;
-            }
-
-            if (state.isPlacingOrder) return;
-            if (getMyActiveOrder()) {
-                showToast('Нельзя оформить новый заказ, пока текущий не выполнен или не отменен', 'error');
-                return;
-            }
-            if (!getSelectedCartItems().length) {
-                showToast('Выберите товары для оформления', 'error');
-                return;
-            }
-            if (!state.contactUser && !state.phone) {
-                openModal('modal-missing-contacts');
-                return;
-            }
-            executeCheckout();
-        }
-
-        async function fetchRegisteredAccountsCount() {
-            try {
-                const { count, error } = await supabaseClient
-                    .from('profiles')
-                    .select('id', { count: 'exact', head: true });
-
-                if (!error) state.registeredAccountsCount = Number(count || 0);
-            } catch (e) {
-                console.error(e);
-            }
-        }
-
-        async function clearAdminUserSearch() {
-            state.adminUserSearch = '';
-            await fetchAccounts('');
-            render();
-        }
-
-        async function openAccountDetails(id) {
-            const account = state.accounts.find(a => a.id === id);
-            if (!account) return;
-            state.selectedAccountId = id;
-            const box = document.getElementById('profile-details-content');
-            if (!box) return;
-            const isAdmin = ['admin', 'owner'].includes(account.db_role);
-            box.innerHTML = `
-                <div class="space-y-4">
-                    <div class="flex items-center gap-3">
-                        ${account.photo_url ? `<img src="${escapeHtml(account.photo_url)}" class="w-14 h-14 rounded-full object-cover border border-zinc-700">` : `<div class="w-14 h-14 rounded-full bg-zinc-800 flex items-center justify-center"><i data-lucide="user" class="w-6 h-6 text-zinc-500"></i></div>`}
-                        <div class="min-w-0">
-                            <div class="font-bold text-base truncate">${escapeHtml(((account.first_name || '') + ' ' + (account.last_name || '')).trim() || 'Telegram пользователь')}</div>
-                            <div class="text-accent text-sm">${account.telegram_username ? '@' + escapeHtml(account.telegram_username) : 'Без username'}</div>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 gap-2 text-xs">
-                        <div class="bg-zinc-900 rounded-xl p-3"><span class="text-zinc-500">Telegram ID:</span> <span class="text-zinc-200">${escapeHtml(account.telegram_id || '')}</span></div>
-                        <div class="bg-zinc-900 rounded-xl p-3"><span class="text-zinc-500">Телефон:</span> <span class="text-zinc-200">${escapeHtml(account.phone || 'не указан')}</span></div>
-                        <div class="bg-zinc-900 rounded-xl p-3"><span class="text-zinc-500">Контакт:</span> <span class="text-zinc-200">${escapeHtml(account.contact_username || 'не указан')}</span></div>
-                        <div class="bg-zinc-900 rounded-xl p-3"><span class="text-zinc-500">Дата регистрации:</span> <span class="text-zinc-200">${account.created_at ? new Date(account.created_at).toLocaleString('ru-RU') : '—'}</span></div>
-                    </div>
-                    ${state.isOwner && account.id !== state.userId && account.db_role !== 'owner' ? `
-                        <button onclick="setAdminRole('${escapeHtml(account.id)}', ${!isAdmin})" class="w-full ${isAdmin ? 'bg-red-500/10 text-red-300 border-red-500/20' : 'bg-accent text-white border-accent'} border py-2.5 rounded-xl text-xs font-medium">
-                            ${isAdmin ? 'Снять права администратора' : 'Назначить администратором'}
-                        </button>
-                    ` : ''}
-                </div>`;
-            openModal('modal-profile-details');
-            lucide.createIcons();
-        }
-
-        async function setAdminRole(profileId, makeAdmin) {
-            if (!state.isOwner) {
-                showToast('Назначать администраторов может только владелец сайта', 'error');
-                return;
-            }
-            try {
-                const { error } = await supabaseClient.rpc('owner_set_admin_role', { p_profile_id: profileId, p_is_admin: makeAdmin });
-                if (error) throw error;
-                await fetchAccounts(state.adminUserSearch || '');
-                closeModal('modal-profile-details');
-                render();
-                showToast(makeAdmin ? 'Пользователь назначен администратором' : 'Права администратора сняты');
-            } catch (e) {
-                console.error('owner_set_admin_role:', e);
-                showToast(e?.message || 'Не удалось изменить роль', 'error');
-            }
-        }
-
-        function renderAdminSettings(container) {
-            container.innerHTML = `
-                <div class="space-y-4 max-w-md mx-auto pt-4">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h2 class="text-lg font-bold">Пользователи</h2>
-                            <p class="text-[11px] text-zinc-500 mt-1">Только просмотр. Нажмите на пользователя, чтобы открыть подробности.</p>
-                        </div>
-                        ${state.isOwner ? '<span class="text-[10px] px-2 py-1 rounded-full bg-accent/15 text-accent">Владелец</span>' : '<span class="text-[10px] px-2 py-1 rounded-full bg-zinc-800 text-zinc-400">Администратор</span>'}
-                    </div>
-                    <div class="relative">
-                        <i data-lucide="search" class="absolute left-3 top-3 w-4 h-4 text-zinc-500"></i>
-                        <input id="admin-user-search" type="search" value="${escapeHtml(state.adminUserSearch || '')}"
-                            oninput="state.adminUserSearch=this.value; clearTimeout(window.__adminUserSearchTimer); window.__adminUserSearchTimer=setTimeout(async()=>{await fetchAccounts(state.adminUserSearch); if(state.activeTab==='admin_settings') render();},250)"
-                            placeholder="Поиск по имени, username или Telegram ID"
-                            class="w-full bg-cardBg border border-zinc-700 rounded-2xl pl-9 pr-10 py-3 text-xs focus:outline-none focus:border-accent">
-                        ${state.adminUserSearch ? '<button onclick="clearAdminUserSearch()" class="absolute right-3 top-2.5 text-zinc-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>' : ''}
-                    </div>
-                    <div class="bg-cardBg border border-zinc-800 rounded-2xl p-3">
-                        <div class="flex items-center justify-between mb-3">
-                            <span class="text-xs text-zinc-400">Найдено: ${state.accounts.length}</span>
-                            <button onclick="fetchAccounts(state.adminUserSearch || '').then(render)" class="p-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
-                        </div>
-                        <div class="space-y-2 max-h-[65vh] overflow-y-auto">
-                            ${state.accounts.length === 0 ? '<p class="text-xs text-zinc-500 text-center py-8">Пользователи не найдены</p>' : state.accounts.map(account => `
-                                <button onclick="openAccountDetails('${escapeHtml(account.id)}')" class="w-full text-left bg-zinc-900 border border-zinc-800 hover:border-accent/50 rounded-2xl p-3 transition">
-                                    <div class="flex items-center gap-3">
-                                        ${account.photo_url ? `<img src="${escapeHtml(account.photo_url)}" class="w-10 h-10 rounded-full object-cover">` : `<div class="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center shrink-0"><i data-lucide="user" class="w-4 h-4 text-zinc-500"></i></div>`}
-                                        <div class="min-w-0 flex-1">
-                                            <div class="flex items-center gap-2">
-                                                <span class="font-semibold text-sm text-zinc-100 truncate">${escapeHtml(((account.first_name || '') + ' ' + (account.last_name || '')).trim() || 'Telegram пользователь')}</span>
-                                                ${account.db_role === 'owner'
-    ? '<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300">Владелец</span>'
-    : account.db_role === 'admin'
-        ? '<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-accent/20 text-accent">Админ</span>'
-        : ''}
-                                            </div>
-                                            <p class="text-xs text-accent truncate">${account.telegram_username ? '@' + escapeHtml(account.telegram_username) : 'Без username'}</p>
-                                            <p class="text-[10px] text-zinc-500">ID: ${escapeHtml(account.telegram_id || '')}</p>
-                                        </div>
-                                        <i data-lucide="chevron-right" class="w-4 h-4 text-zinc-600 shrink-0"></i>
-                                    </div>
-                                </button>
-                            `).join('')}
-                        </div>
-                    </div>
-                    <button onclick="logoutAdmin()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
-                        <i data-lucide="log-out" class="w-4 h-4"></i><span>Выйти</span>
-                    </button>
-                </div>`;
-            lucide.createIcons();
-        }
-
-        // Диагностика авторизации. Можно вызвать в DevTools: window.vldAuthDebug()
-        window.vldAuthDebug = async function () {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            let profile = null;
-            let profileError = null;
-            if (session?.user) {
-                const result = await supabaseClient
-                    .from('profiles')
-                    .select('id,telegram_id,telegram_username,role')
-                    .eq('id', session.user.id)
-                    .maybeSingle();
-                profile = result.data;
-                profileError = result.error?.message || null;
-            }
-            return {
-                miniApp: isTelegramMiniApp(),
-                hasSession: !!session,
-                userId: session?.user?.id || null,
-                profile,
-                profileError,
-                role: state.role,
-                isOwner: state.isOwner
-            };
-        };
-
-        setupTelegramMiniApp();
-
-        // Авторизация выполняется только через Telegram Mini App.
-        (async () => {
-            if (isTelegramMiniApp()) {
-                await telegramMiniAppLogin(false);
-            }
-        })();
-
-        // Supabase session используется только после Telegram Mini App авторизации.
-        supabaseClient.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'SIGNED_OUT') {
-                resetAuthState();
-                render();
-                return;
-            }
-
-            if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && session?.user) {
-                try {
-                    state.userId = session.user.id;
-                    await waitForAuthProfile(10);
-                    await mergeGuestCartIntoDb();
-                    await loadCartFromDb();
-                    await fetchOrders();
-                    await fetchRegisteredAccountsCount();
-                    render();
-                } catch (e) {
-                    console.error('Ошибка синхронизации Telegram-профиля:', e);
-                    showToast('Не удалось загрузить профиль Telegram', 'error');
-                }
-            }
-        });
-
-
     </script>
 </body>
 </html>
