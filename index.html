@@ -28,6 +28,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Telegram Mini App SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js?61"></script>
     <style>
         body { background-color: #0f0f11; color: #f4f4f5; font-family: system-ui, -apple-system, sans-serif; }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -2202,6 +2204,7 @@
         state.phone = '';
         state.authMode = 'telegram';
         state.isProfileEditing = false;
+        state.miniAppAuthInProgress = false;
 
         function applyProfileToState(profile) {
             if (!profile) return;
@@ -2311,13 +2314,23 @@
                     ${!logged ? `
                         <div class="bg-cardBg border border-zinc-800 rounded-2xl p-5 space-y-4">
                             <h3 class="text-accent font-bold">Вход через Telegram</h3>
-                            <p class="text-sm text-zinc-400">
-                                Без логина и пароля. Авторизация проходит через Telegram Login 2.0 и Supabase Auth.
-                            </p>
-                            <button onclick="telegramLogin()"
-                                class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl text-white font-medium">
-                                Войти через Telegram
-                            </button>
+                            ${isTelegramMiniApp() ? `
+                                <div class="rounded-xl bg-zinc-900/70 border border-zinc-800 p-3 text-sm text-zinc-300">
+                                    Вы открыли сайт внутри Telegram. Авторизация выполняется автоматически через Telegram Mini App.
+                                </div>
+                                <button onclick="telegramMiniAppLogin(true)"
+                                    class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl text-white font-medium">
+                                    Повторить авторизацию
+                                </button>
+                            ` : `
+                                <p class="text-sm text-zinc-400">
+                                    В обычном браузере используется Telegram Login 2.0 через Supabase OIDC.
+                                </p>
+                                <button onclick="telegramLogin()"
+                                    class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl text-white font-medium">
+                                    Войти через Telegram
+                                </button>
+                            `}
                             <div class="text-[10px] text-zinc-600 text-center">
                                 При первом входе профиль создаётся автоматически.
                             </div>
@@ -2390,22 +2403,96 @@
             lucide.createIcons();
         }
 
+        function isTelegramMiniApp() {
+            return !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData);
+        }
+
+        function setupTelegramMiniApp() {
+            try {
+                const tg = window.Telegram?.WebApp;
+                if (!tg) return;
+                tg.ready();
+                tg.expand();
+                document.documentElement.classList.add('telegram-mini-app');
+            } catch (e) {
+                console.warn('Telegram Mini App setup warning:', e);
+            }
+        }
+
         async function telegramLogin() {
+            if (isTelegramMiniApp()) {
+                await telegramMiniAppLogin(false);
+                return;
+            }
+
             try {
                 showToast('Открываем Telegram…');
 
                 const redirectTo = window.location.origin + window.location.pathname;
                 const { error } = await supabaseClient.auth.signInWithOAuth({
-                    provider: 'custom:telegram',
-                    options: {
-                        redirectTo: 'https://cookiesh123443.github.io/vld-vape/'
-                    }
+                    provider: TELEGRAM_PROVIDER,
+                    options: { redirectTo }
                 });
 
                 if (error) throw error;
             } catch (e) {
                 console.error('Telegram OIDC start error:', e);
                 showToast(e?.message || 'Не удалось открыть Telegram', 'error');
+            }
+        }
+
+        async function telegramMiniAppLogin(manualRetry = false) {
+            const tg = window.Telegram?.WebApp;
+            const initData = tg?.initData;
+
+            if (!initData) {
+                if (manualRetry) showToast('Telegram Mini App data не получены. Откройте сайт из Telegram.', 'error');
+                return false;
+            }
+
+            if (state.miniAppAuthInProgress) return false;
+            state.miniAppAuthInProgress = true;
+
+            try {
+                if (manualRetry) showToast('Проверяем Telegram…');
+
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/telegram-mini-auth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData })
+                });
+
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(result.error || `Telegram auth error (${response.status})`);
+                }
+
+                if (!result.session?.access_token || !result.session?.refresh_token) {
+                    throw new Error('Сервер Telegram не вернул Supabase session');
+                }
+
+                const { error: sessionError } = await supabaseClient.auth.setSession({
+                    access_token: result.session.access_token,
+                    refresh_token: result.session.refresh_token
+                });
+                if (sessionError) throw sessionError;
+
+                state.userId = result.user?.id || state.userId;
+                await waitForAuthProfile(10);
+                await mergeGuestCartIntoDb();
+                await loadCartFromDb();
+                await fetchOrders();
+                await fetchRegisteredAccountsCount();
+                render();
+
+                if (manualRetry) showToast('Вход через Telegram выполнен');
+                return true;
+            } catch (e) {
+                console.error('Telegram Mini App auth error:', e);
+                showToast(e?.message || 'Не удалось авторизоваться через Telegram', 'error');
+                return false;
+            } finally {
+                state.miniAppAuthInProgress = false;
             }
         }
 
@@ -2925,8 +3012,19 @@
             );
         }
 
-        // Supabase Auth is the only browser session source.
-        // Custom Telegram OIDC handles the OAuth code exchange and PKCE on Supabase.
+        setupTelegramMiniApp();
+
+        // Inside Telegram Mini App, use Telegram.WebApp.initData instead of
+        // opening Telegram OAuth inside Telegram. In a normal browser, the
+        // Custom OIDC provider remains available via the profile button.
+        (async () => {
+            if (isTelegramMiniApp()) {
+                await telegramMiniAppLogin(false);
+            }
+        })();
+
+        // Supabase Auth is the browser session source.
+        // Custom Telegram OIDC is used only outside the Telegram Mini App.
         supabaseClient.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_OUT') {
                 resetAuthState();
