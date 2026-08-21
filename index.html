@@ -26,10 +26,10 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Telegram Mini App SDK -->
-    <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Telegram Mini App SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { background-color: #0f0f11; color: #f4f4f5; font-family: system-ui, -apple-system, sans-serif; }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -43,7 +43,7 @@
     <header class="sticky top-0 z-40 bg-darkBg/85 backdrop-blur-md border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
         <div class="flex items-center space-x-2">
             <h1 id="shop-title" class="text-lg font-bold tracking-wide">VLD VAPE</h1>
-            <span id="role-badge" class="hidden"></span>
+            <span id="role-badge" class="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Пользователь</span>
         </div>
         <div class="relative flex items-center space-x-2">
             <div id="header-user-display" class="text-xs text-zinc-400 hidden sm:block"></div>
@@ -55,7 +55,7 @@
                 <div id="admin-login-menu-item">
                     <button onclick="openAdminLoginModal()" class="w-full text-left px-4 py-3 text-sm hover:bg-zinc-700/50 flex items-center space-x-2">
                         <i data-lucide="shield" class="w-4 h-4 text-accent"></i>
-                        <span>Для администраторов / работников</span>
+                        <span>Для работников</span>
                     </button>
                 </div>
                 <div id="admin-logout-btn" class="hidden">
@@ -118,17 +118,26 @@
         </div>
     </div>
 
-    <!-- Модальное окно отказа в доступе к админке -->
+    <!-- Модальное окно входа в админку -->
     <div id="modal-admin-login" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center">
-                <h3 class="text-lg font-bold">Доступ в админку</h3>
+                <h3 class="text-lg font-bold">Вход для работников</h3>
                 <button onclick="closeModal('modal-admin-login')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
-            <div id="admin-access-message" class="text-sm text-zinc-300 leading-relaxed">
-                Запросите доступ у администрации сайта.
+            <p class="text-xs text-zinc-400">Для входа вы должны быть зарегистрированы и войти в свой аккаунт, а также ввести пароль администратора:</p>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Пароль администратора</label>
+                    <div class="relative">
+                        <input type="password" id="admin-password-input" placeholder="Введите пароль админа" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 pr-10 text-sm focus:outline-none focus:border-accent">
+                        <button type="button" onclick="togglePasswordVisibility('admin-password-input', 'eye-icon')" class="absolute right-3 top-3 text-zinc-400 hover:text-white transition">
+                            <i id="eye-icon" data-lucide="eye" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
             </div>
-            <button id="admin-access-action" onclick="closeModal('modal-admin-login')" class="w-full bg-zinc-800 hover:bg-zinc-700 py-3 rounded-xl font-medium transition text-zinc-200">Закрыть</button>
+            <button onclick="submitAdminLogin()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Войти в админку</button>
         </div>
     </div>
 
@@ -167,6 +176,28 @@
                 <button onclick="resetCatalogFilters()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl text-xs">Сбросить</button>
                 <button onclick="saveCatalogFilters()" class="flex-1 bg-accent hover:bg-accentHover py-2.5 rounded-xl text-xs font-medium text-white">Сохранить</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно смены пароля администратора -->
+    <div id="modal-change-admin-password" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold">Смена пароля администратора</h3>
+                <button onclick="closeModal('modal-change-admin-password')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <p class="text-xs text-amber-400">После смены пароля все текущие администраторы (включая вас) будут понижены до пользователей и должны будут войти заново с новым паролем.</p>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Текущий пароль администратора</label>
+                    <input type="password" id="old-admin-password" placeholder="Текущий пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                </div>
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Новый пароль администратора</label>
+                    <input type="password" id="new-admin-password" placeholder="Новый пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                </div>
+            </div>
+            <button onclick="submitChangeAdminPassword()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Сменить пароль администратора</button>
         </div>
     </div>
 
@@ -337,83 +368,28 @@
     <script>
         const SUPABASE_URL = 'https://ehrzjvuuvodudlelazhe.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_5Lj-BMZYANimr2UG2ZCqgQ_MEi6tOHp';
-        const TELEGRAM_AUTH_FUNCTION = SUPABASE_URL + '/functions/v1/telegram-mini-auth';
-        const TELEGRAM_BOT_ID = '8749767581';
-        const OWNER_TELEGRAM_ID = '2112161128';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        function getTelegramWebApp() {
-            return window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-        }
-
-        async function authRequest(action, payload = {}) {
-            const headers = {
-                'Content-Type': 'application/json',
-                'apikey': SUPABASE_KEY
-            };
-            const sessionToken = state.sessionToken || localStorage.getItem('telegram_session_token') || '';
-            if (sessionToken) headers.Authorization = 'Bearer ' + sessionToken;
-            const response = await fetch(TELEGRAM_AUTH_FUNCTION, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ action, ...payload })
-            });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(data.error || 'Ошибка авторизации');
-            return data;
-        }
-
-        async function authenticateTelegram() {
-            const tg = getTelegramWebApp();
-            if (!tg || !tg.initData) {
-                state.telegramId = '';
-                state.adminGranted = false;
-                state.siteRole = 'user';
-                state.role = 'user';
-                return false;
+        function getOrCreateClientId() {
+            let id = localStorage.getItem('reflex_client_id');
+            if (!id) {
+                id = 'guest-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+                localStorage.setItem('reflex_client_id', id);
             }
-
-            tg.ready();
-            try {
-                const data = await authRequest('login', { init_data: tg.initData });
-                state.sessionToken = data.session_token;
-                state.telegramId = String(data.user.telegram_id);
-                state.telegramUser = data.user;
-                state.telegramId = String(data.user.telegram_id);
-                state.contactUser = data.user.contact_username || '';
-                state.phone = data.user.номер || '';
-                state.siteRole = data.user.site_role || 'user';
-                state.adminGranted = Boolean(data.user.admin_granted);
-                state.role = 'user';
-
-                localStorage.setItem('telegram_session_token', state.sessionToken);
-                localStorage.setItem('reflex_contact_user', state.contactUser);
-                localStorage.setItem('reflex_phone', state.phone);
-                localStorage.setItem('reflex_telegram_id', state.telegramId);
-                return true;
-            } catch (e) {
-                console.error('Telegram auth error:', e);
-                localStorage.removeItem('telegram_session_token');
-                state.sessionToken = '';
-                state.telegramId = '';
-                state.adminGranted = false;
-                state.role = 'user';
-                showToast(e.message || 'Не удалось выполнить вход через Telegram', 'error');
-                return false;
-            }
+            return id;
         }
 
         let state = {
-            role: 'user',
-            siteRole: 'user',
-            adminGranted: false,
-            telegramId: localStorage.getItem('reflex_telegram_id') || '',
-            telegramUser: null,
-            sessionToken: localStorage.getItem('telegram_session_token') || '',
+            role: localStorage.getItem('reflex_role') || 'user', 
             activeTab: 'home', 
+            login: localStorage.getItem('reflex_login') || '',
             contactUser: localStorage.getItem('reflex_contact_user') || '',
             phone: localStorage.getItem('reflex_phone') || '',
+            clientId: getOrCreateClientId(),
             isProfileEditing: false, 
+            authMode: 'telegram',
+            telegramUser: null,
+            isTelegramAuth: false,
             isPlacingOrder: false,
             cart: [],
             products: [],
@@ -443,7 +419,21 @@
             }
         };
 
-        
+        function togglePasswordVisibility(inputId, iconId) {
+            const passwordInput = document.getElementById(inputId);
+            const eyeIcon = document.getElementById(iconId);
+            if (!passwordInput || !eyeIcon) return;
+
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIcon.setAttribute('data-lucide', 'eye-off');
+            } else {
+                passwordInput.type = 'password';
+                eyeIcon.setAttribute('data-lucide', 'eye');
+            }
+            lucide.createIcons();
+        }
+
         function showToast(message, type = 'success') {
             try {
                 const container = document.getElementById('toast-container');
@@ -585,13 +575,15 @@
                     await supabaseClient.from('product_variants').delete().not('id', 'is', null);
                     await supabaseClient.from('products').delete().not('id', 'is', null);
                     await supabaseClient.from('managers').delete().not('id', 'is', null);
+                    await supabaseClient.from('user').delete().not('логин', 'is', null);
                     await supabaseClient.from('cart_items').delete().not('id', 'is', null);
 
                     state.cart = [];
                     state.searchQuery = '';
-                    state.telegramId = '';
+                    state.login = '';
                     state.contactUser = '';
                     state.phone = '';
+                    localStorage.removeItem('reflex_login');
                     localStorage.removeItem('reflex_contact_user');
                     localStorage.removeItem('reflex_phone');
 
@@ -611,12 +603,12 @@
 
         // --- Управление корзиной ---
         async function loadCartFromDb() {
-            if (!state.telegramId) {
-                state.cart = [];
+            if (!state.login) {
+                state.cart = JSON.parse(localStorage.getItem('reflex_cart') || '[]');
                 return;
             }
             try {
-                const { data, error } = await supabaseClient.from('cart_items').select('*').eq('user_identifier', state.telegramId);
+                const { data, error } = await supabaseClient.from('cart_items').select('*').eq('user_identifier', state.login);
                 if (!error && data) {
                     state.cart = data.map(i => ({
                         productId: i.product_id,
@@ -633,12 +625,15 @@
         }
 
         async function saveCartToDb() {
-            if (!state.telegramId) return;
+            if (!state.login) {
+                localStorage.setItem('reflex_cart', JSON.stringify(state.cart));
+                return;
+            }
             try {
-                await supabaseClient.from('cart_items').delete().eq('user_identifier', state.telegramId);
+                await supabaseClient.from('cart_items').delete().eq('user_identifier', state.login);
                 if (state.cart.length > 0) {
                     const rows = state.cart.map(i => ({
-                        user_identifier: state.telegramId,
+                        user_identifier: state.login,
                         product_id: i.productId,
                         variant_id: i.variantId,
                         name: i.name,
@@ -676,23 +671,14 @@
         }
 
         async function checkUserRoleOnStartup() {
-            await authenticateTelegram();
-            if (!state.telegramId) return;
             try {
-                const data = await authRequest('me');
-                if (data.user) {
-                    state.telegramId = String(data.user.telegram_id);
-                    state.telegramUser = data.user;
-                    state.telegramId = String(data.user.telegram_id);
-                    state.contactUser = data.user.contact_username || '';
-                    state.phone = data.user.номер || '';
-                    state.siteRole = data.user.site_role || 'user';
-                    state.adminGranted = Boolean(data.user.admin_granted);
+                const authenticated = await authenticateTelegramUser();
+                if (!authenticated) {
                     state.role = 'user';
+                    localStorage.setItem('reflex_role', 'user');
                 }
             } catch (e) {
-                console.error('Не удалось обновить профиль Telegram:', e);
-                await authenticateTelegram();
+                console.error('Ошибка проверки Telegram-сессии:', e);
             }
         }
 
@@ -702,11 +688,6 @@
                     Notification.requestPermission();
                 }
 
-                const tg = getTelegramWebApp();
-                if (tg) {
-                    tg.ready();
-                    if (tg.expand) tg.expand();
-                }
                 await checkUserRoleOnStartup();
                 await fetchProducts();
                 await loadCartFromDb();
@@ -736,11 +717,11 @@
         });
 
         async function fetchRegisteredAccountsCount() {
-            if (!state.adminGranted || !state.sessionToken) return;
             try {
-                const data = await authRequest('list-users');
-                state.accounts = data.users || [];
-                state.registeredAccountsCount = state.accounts.length;
+                const { count, error } = await supabaseClient
+                    .from('user')
+                    .select('логин', { count: 'exact', head: true });
+                if (!error) state.registeredAccountsCount = Number(count || 0);
             } catch (e) {
                 console.error(e);
             }
@@ -782,12 +763,16 @@
 
         async function fetchAccounts() {
             try {
-                const data = await authRequest('list-users');
-                state.accounts = data.users || [];
-                state.registeredAccountsCount = state.accounts.length;
+                const { data, error } = await supabaseClient
+                    .from('user')
+                    .select('логин, telegram_id, номер, contact_username, роль')
+                    .order('логин', { ascending: true });
+
+                if (error) throw error;
+                state.accounts = data || [];
             } catch (e) {
                 console.error('Ошибка загрузки учётных записей:', e);
-                showToast(e.message || 'Не удалось загрузить учётные записи', 'error');
+                showToast('Не удалось загрузить учётные записи', 'error');
             }
         }
 
@@ -812,18 +797,22 @@
                 }
 
                 if (state.role === 'admin') {
+                    roleBadge.textContent = 'Админ';
+                    roleBadge.className = 'text-xs px-2 py-0.5 rounded-full bg-accent text-white font-medium';
                     if (adminLogoutBtn) adminLogoutBtn.classList.remove('hidden');
                     if (adminLoginMenuItem) adminLoginMenuItem.classList.add('hidden');
                     if (!state.activeTab.startsWith('admin_')) state.activeTab = 'admin_home';
                 } else {
+                    roleBadge.textContent = 'Пользователь';
+                    roleBadge.className = 'text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400';
                     if (adminLogoutBtn) adminLogoutBtn.classList.add('hidden');
                     if (adminLoginMenuItem) adminLoginMenuItem.classList.remove('hidden');
                     if (state.activeTab.startsWith('admin_')) state.activeTab = 'home';
                 }
 
-                if (state.telegramId) {
+                if (state.login) {
                     if (headerUserDisplay) {
-                        headerUserDisplay.textContent = state.telegramUser?.username ? '@' + state.telegramUser.username : (state.telegramUser?.display_name || 'Telegram');
+                        headerUserDisplay.textContent = state.login;
                         headerUserDisplay.classList.remove('hidden');
                     }
                 } else {
@@ -1463,7 +1452,8 @@
         function getMyActiveOrder() {
             return (state.orders || []).find(o => {
                 if (o.status !== 'in_progress') return false;
-                return o.user_login === state.telegramId;
+                if (state.login) return o.user_login === state.login;
+                return o.client_id === state.clientId;
             }) || null;
         }
 
@@ -1586,8 +1576,8 @@
                         total_retail: totalRetail,
                         total_wholesale: totalWholesale,
                         status: 'in_progress',
-                        user_login: state.telegramId,
-                        client_id: null
+                        user_login: state.login || null,
+                        client_id: state.clientId
                     })
                     .select()
                     .single();
@@ -1693,7 +1683,8 @@
         function renderUserOrders(container) {
             const myOrders = (state.orders || []).filter(o => {
                 if (o.status === 'archived') return false;
-                return o.user_login === state.telegramId;
+                if (state.login) return o.user_login === state.login;
+                return o.client_id === state.clientId;
             });
             const inProgress = myOrders.filter(o => o.status === 'in_progress');
             const completed = myOrders.filter(o => o.status === 'completed');
@@ -1793,43 +1784,77 @@
         }
 
         // --- Профиль / Авторизация ---
+        // --- Профиль / Авторизация через Telegram Mini App ---
+        function setAuthMode(mode) {
+            state.authMode = 'telegram';
+            render();
+        }
+
+        function renderTelegramAuthBlock() {
+            const tg = window.Telegram?.WebApp;
+            const tgUser = tg?.initDataUnsafe?.user;
+
+            if (!tg || !tg.initData) {
+                return `
+                    <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-xl bg-sky-500/15 flex items-center justify-center text-sky-400">
+                                <i data-lucide="send" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold">Вход через Telegram</h3>
+                                <p class="text-xs text-zinc-500 mt-0.5">Откройте Mini App из бота Telegram</p>
+                            </div>
+                        </div>
+                        <p class="text-xs text-amber-400">Авторизация по логину и паролю отключена. Для входа откройте приложение через кнопку в вашем Telegram-боте.</p>
+                    </div>
+                `;
+            }
+
+            const name = [tgUser?.first_name, tgUser?.last_name].filter(Boolean).join(' ') || 'Пользователь';
+            const username = tgUser?.username ? '@' + tgUser.username : 'username не указан';
+
+            return `
+                <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-11 h-11 rounded-full bg-sky-500/15 flex items-center justify-center text-sky-400 shrink-0">
+                            <i data-lucide="send" class="w-5 h-5"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <h3 class="text-sm font-bold">Telegram</h3>
+                            <p class="text-xs text-zinc-400 truncate">${escapeHtml(name)}</p>
+                            <p class="text-xs text-zinc-500 truncate">${escapeHtml(username)}</p>
+                        </div>
+                        <span class="ml-auto text-[10px] px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">Подключено</span>
+                    </div>
+                    <p class="text-xs text-zinc-500">Аккаунт создаётся автоматически по Telegram ID. Пароль и отдельная регистрация больше не нужны.</p>
+                </div>
+            `;
+        }
 
         function renderUserProfile(container) {
-            const isLoggedIn = Boolean(state.telegramId);
+            const isLoggedIn = Boolean(state.login);
 
             container.innerHTML = `
                 <div class="space-y-4 max-w-sm mx-auto pt-4">
                     <h2 class="text-lg font-bold">Профиль аккаунта</h2>
-                    ${!isLoggedIn ? `
-                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
-                            <h3 class="text-sm font-bold text-accent">Вход через Telegram</h3>
-                            <p class="text-xs text-zinc-400 leading-relaxed">
-                                Вход выполняется автоматически при открытии Mini App через Telegram.
-                                Отдельной регистрации и пароля нет.
-                            </p>
-                            <div class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-xs text-zinc-400 text-center">
-                                Откройте это приложение из Telegram Mini App — вход произойдёт автоматически.
-                            </div>
-                        </div>
-                    ` : `
+                    ${!isLoggedIn ? renderTelegramAuthBlock() : `
+                        ${renderTelegramAuthBlock()}
+
                         <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
                             <div class="flex justify-between items-center">
-                                <span class="text-xs text-zinc-400">Telegram ID</span>
-                                <span class="font-bold text-sm text-zinc-200">${escapeHtml(state.telegramId)}</span>
+                                <span class="text-xs text-zinc-400">Telegram ID:</span>
+                                <span class="font-bold text-sm text-zinc-200">${escapeHtml(state.telegramUser?.id || state.login)}</span>
                             </div>
                             <div class="flex justify-between items-center">
-                                <span class="text-xs text-zinc-400">Telegram</span>
-                                <span class="font-bold text-sm text-zinc-200">${escapeHtml(state.telegramUser?.username ? '@' + state.telegramUser.username : (state.telegramUser?.display_name || 'Пользователь'))}</span>
+                                <span class="text-xs text-zinc-400">Юз для связи:</span>
+                                <span class="font-medium text-sm text-zinc-200">${escapeHtml(state.contactUser || 'Не указано')}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-zinc-400">Номер телефона:</span>
+                                <span class="font-medium text-sm text-zinc-200">${escapeHtml(state.phone || 'Не указано')}</span>
                             </div>
                             ${!state.isProfileEditing ? `
-                                <div class="flex justify-between items-center">
-                                    <span class="text-xs text-zinc-400">Юз для связи</span>
-                                    <span class="font-medium text-sm text-zinc-200">${escapeHtml(state.contactUser || 'Не указано')}</span>
-                                </div>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-xs text-zinc-400">Номер телефона</span>
-                                    <span class="font-medium text-sm text-zinc-200">${escapeHtml(state.phone || 'Не указано')}</span>
-                                </div>
                                 <button onclick="startEditContacts()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-2.5 rounded-xl font-medium transition text-xs flex items-center justify-center space-x-2 mt-1">
                                     <i data-lucide="edit-3" class="w-4 h-4 text-accent"></i><span>Изменить юз и номер</span>
                                 </button>
@@ -1861,7 +1886,6 @@
             lucide.createIcons();
         }
 
-
         function startEditContacts() {
             state.isProfileEditing = true;
             render();
@@ -1873,103 +1897,163 @@
         }
 
         async function saveEditContacts() {
-            if (!state.sessionToken) return;
-            let contact = (document.getElementById('edit-contact-user')?.value || '').trim();
-            const phone = (document.getElementById('edit-contact-phone')?.value || '').trim();
+            let contact = document.getElementById('edit-contact-user').value.trim();
+            const phone = document.getElementById('edit-contact-phone').value.trim();
             if (contact && !contact.startsWith('@')) contact = '@' + contact;
+
             try {
-                const data = await authRequest('update-profile', {
+                await supabaseClient.from('user').update({
                     contact_username: contact,
-                    phone
-                });
-                state.contactUser = data.user.contact_username || '';
-                state.phone = data.user.номер || '';
-                state.isProfileEditing = false;
+                    номер: phone
+                }).eq('логин', state.login);
+
+                state.contactUser = contact;
+                state.phone = phone;
                 localStorage.setItem('reflex_contact_user', state.contactUser);
                 localStorage.setItem('reflex_phone', state.phone);
+                state.isProfileEditing = false;
                 render();
-                showToast('Профиль обновлён');
+                showToast('Контакты обновлены!');
             } catch (e) {
-                console.error(e);
-                showToast(e.message || 'Ошибка обновления профиля', 'error');
+                showToast('Ошибка обновления контактов', 'error');
             }
         }
 
+        async function authenticateTelegramUser() {
+            const tg = window.Telegram?.WebApp;
+
+            if (!tg || !tg.initData) {
+                state.isTelegramAuth = false;
+                return false;
+            }
+
+            try {
+                tg.ready();
+                tg.expand();
+
+                // initData проверяется на сервере, а не через initDataUnsafe.
+                const { data, error } = await supabaseClient.functions.invoke('telegram-auth', {
+                    body: { initData: tg.initData }
+                });
+
+                if (error) throw error;
+                if (!data?.user) throw new Error('Сервер не вернул пользователя');
+
+                const tgUser = tg.initDataUnsafe?.user || {};
+                state.telegramUser = {
+                    id: data.user.telegram_id ?? tgUser.id,
+                    username: data.user.telegram_username ?? tgUser.username ?? '',
+                    first_name: data.user.telegram_first_name ?? tgUser.first_name ?? '',
+                    last_name: data.user.telegram_last_name ?? tgUser.last_name ?? ''
+                };
+
+                // Стабильный внутренний идентификатор для корзины/заказов.
+                state.login = data.user.login || `tg_${state.telegramUser.id}`;
+                state.contactUser = data.user.contact_username || '';
+                state.phone = data.user.phone || '';
+                state.role = data.user.role === 'админ' ? 'admin' : 'user';
+                state.isTelegramAuth = true;
+
+                localStorage.setItem('reflex_login', state.login);
+                localStorage.setItem('reflex_contact_user', state.contactUser);
+                localStorage.setItem('reflex_phone', state.phone);
+                localStorage.setItem('reflex_role', state.role);
+                localStorage.setItem('reflex_telegram_id', String(state.telegramUser.id));
+
+                return true;
+            } catch (e) {
+                console.error('Telegram auth error:', e);
+                state.isTelegramAuth = false;
+                showToast('Не удалось авторизоваться через Telegram. Проверьте настройку Edge Function.', 'error');
+                return false;
+            }
+        }
 
         function logoutUser() {
-            if (state.sessionToken) {
-                authRequest('logout').catch(() => {});
-            }
-            state.telegramId = '';
+            state.login = '';
             state.contactUser = '';
             state.phone = '';
-            state.telegramId = '';
-            state.telegramUser = null;
-            state.sessionToken = '';
-            state.adminGranted = false;
-            state.siteRole = 'user';
             state.role = 'user';
             state.isProfileEditing = false;
-            localStorage.removeItem('telegram_session_token');
+            state.authMode = 'login';
+            localStorage.removeItem('reflex_login');
             localStorage.removeItem('reflex_contact_user');
             localStorage.removeItem('reflex_phone');
-            localStorage.removeItem('reflex_telegram_id');
+            localStorage.setItem('reflex_role', 'user');
+
             state.cart = [];
-            state.activeTab = 'home';
             render();
             showToast('Вы вышли из аккаунта');
         }
 
+        function openChangeAdminPasswordModal() {
+            document.getElementById('old-admin-password').value = '';
+            document.getElementById('new-admin-password').value = '';
+            openModal('modal-change-admin-password');
+        }
 
-        
+        async function submitChangeAdminPassword() {
+            const oldPass = document.getElementById('old-admin-password').value.trim();
+            const newPass = document.getElementById('new-admin-password').value.trim();
 
-        
-
-        
-
-        // --- Вход в админку ---
-        // Версия пароля позволяет глобально инвалидировать старые автоидентификаторы.
-        
-
-        async function openAdminLoginModal() {
-            if (!state.telegramId) {
-                showToast('Откройте Mini App через Telegram для входа', 'error');
+            if (!oldPass || !newPass) {
+                showToast('Заполните оба поля', 'error');
+                return;
+            }
+            if (oldPass === newPass) {
+                showToast('Новый пароль должен отличаться от старого', 'error');
                 return;
             }
 
             try {
-                const data = await authRequest('me');
-                state.adminGranted = Boolean(data.user?.admin_granted);
-                if (state.adminGranted) {
-                    state.role = 'admin';
-                    state.activeTab = 'admin_home';
-                    render();
-                    showToast('Доступ в админку подтверждён');
+                const adminState = await getAdminPasswordState();
+
+                if (oldPass !== adminState.password) {
+                    showToast('Неверный текущий пароль администратора!', 'error');
                     return;
                 }
 
-                const message = document.getElementById('admin-access-message');
-                const action = document.getElementById('admin-access-action');
-                if (message) message.textContent = 'Для входа в админку у этого аккаунта нет выданного доступа. Запросите доступ у администрации сайта.';
-                if (action) action.textContent = 'Понятно';
-                openModal('modal-admin-login');
+                const { error: passwordError } = await supabaseClient
+                    .from('setting')
+                    .upsert({ key: 'admin_password', value: newPass }, { onConflict: 'key' });
+                if (passwordError) throw passwordError;
+
+                // Новая версия делает все старые сохранённые автологины недействительными.
+                const newVersion = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+                const { error: versionError } = await supabaseClient
+                    .from('setting')
+                    .upsert({ key: 'admin_password_version', value: newVersion }, { onConflict: 'key' });
+                if (versionError) throw versionError;
+
+                // Сбрасываем всех текущих администраторов.
+                const { error: roleError } = await supabaseClient
+                    .from('user').update({ роль: 'пользователь' }).eq('роль', 'админ');
+                if (roleError) throw roleError;
+
+                // На текущем устройстве тоже удаляем автологин.
+                state.role = 'user';
+                localStorage.setItem('reflex_role', 'user');
+                localStorage.removeItem('reflex_admin_password');
+                localStorage.removeItem('reflex_admin_password_version');
+
+                closeModal('modal-change-admin-password');
+                switchTab('home');
+                showToast('Пароль изменён. Все админские сессии и автологины сброшены.');
             } catch (e) {
-                showToast(e.message || 'Не удалось проверить доступ', 'error');
+                console.error('Ошибка смены пароля администратора:', e);
+                showToast('Ошибка смены пароля администратора', 'error');
             }
         }
 
-
-        
-
-        
-
         function logoutAdmin() {
+            if (state.login) {
+                supabaseClient.from('user').update({ роль: 'пользователь' }).eq('логин', state.login).then(() => {});
+            }
             state.role = 'user';
-            state.activeTab = 'home';
-            render();
+            localStorage.setItem('reflex_role', 'user');
+            switchTab('home');
             showToast('Вы вышли из админки');
         }
-
 
         function toggleAdminMenu() {
             const dropdown = document.getElementById('admin-dropdown');
@@ -2645,67 +2729,150 @@
         }
 
         function renderAdminSettings(container) {
+            const editingAccount = state.accounts.find(a => a.логин === state.editingAccountLogin);
+
             container.innerHTML = `
                 <div class="space-y-4 max-w-md mx-auto pt-4">
                     <h2 class="text-lg font-bold">Настройки администратора</h2>
 
-                    <div class="grid grid-cols-2 gap-1 bg-cardBg p-1 rounded-2xl border border-zinc-800">
-                        <button onclick="state.adminSettingsSubTab='general'; render();"
+                    <div class="grid grid-cols-3 gap-1 bg-cardBg p-1 rounded-2xl border border-zinc-800">
+                        <button onclick="state.adminSettingsSubTab='general'; state.editingAccountLogin=null; render();"
                             class="py-2 rounded-xl text-[11px] font-medium transition ${state.adminSettingsSubTab === 'general' ? 'bg-accent text-white' : 'text-zinc-400'}">
                             Основные
                         </button>
-                        <button onclick="state.adminSettingsSubTab='accounts'; fetchAccounts().then(render);"
+                        <button onclick="state.adminSettingsSubTab='accounts'; state.editingAccountLogin=null; fetchAccounts().then(render);"
                             class="py-2 rounded-xl text-[11px] font-medium transition ${state.adminSettingsSubTab === 'accounts' ? 'bg-accent text-white' : 'text-zinc-400'}">
-                            Пользователи (${state.accounts.length})
+                            Аккаунты (${state.accounts.length})
+                        </button>
+                        <button onclick="state.adminSettingsSubTab='managers'; state.editingAccountLogin=null; render();"
+                            class="py-2 rounded-xl text-[11px] font-medium transition ${state.adminSettingsSubTab === 'managers' ? 'bg-accent text-white' : 'text-zinc-400'}">
+                            Менеджеры (${state.managers.length})
                         </button>
                     </div>
 
                     ${state.adminSettingsSubTab === 'general' ? `
                         <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
-                            <p class="text-xs text-zinc-400 leading-relaxed">
-                                Авторизация выполняется только через Telegram Mini App. Паролей пользователей и пароля админки больше нет.
-                            </p>
-                            ${String(state.telegramId) === OWNER_TELEGRAM_ID ? `
-                                <div class="bg-accent/10 border border-accent/30 rounded-xl p-3 text-xs text-zinc-300">
-                                    Вы — владелец системы. Только владелец может назначать администраторов.
-                                </div>
-                            ` : ''}
+                            <button onclick="openChangeAdminPasswordModal()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
+                                <i data-lucide="key" class="w-4 h-4 text-accent"></i><span>Сменить пароль администратора</span>
+                            </button>
+                            <button onclick="resetSystemToZero()" class="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2 border border-red-500/30">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i><span>Сбросить сайт (Очистить всё)</span>
+                            </button>
                             <button onclick="logoutAdmin()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
                                 <i data-lucide="log-out" class="w-4 h-4"></i><span>Выйти из админки</span>
                             </button>
                         </div>
-                    ` : `
+                    ` : state.adminSettingsSubTab === 'accounts' ? `
                         <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <h3 class="text-sm font-bold">Пользователи</h3>
-                                    <p class="text-[10px] text-zinc-500 mt-0.5">Только просмотр. Удаление аккаунтов отключено.</p>
+                                    <h3 class="text-sm font-bold">Учётные записи</h3>
+                                    <p class="text-[10px] text-zinc-500 mt-0.5">Логин, номер телефона и Telegram. Пароли в списке не показываются.</p>
                                 </div>
                                 <button onclick="fetchAccounts().then(render)" class="p-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300" title="Обновить">
                                     <i data-lucide="refresh-cw" class="w-4 h-4"></i>
                                 </button>
                             </div>
-                            <div class="space-y-2 max-h-[65vh] overflow-y-auto">
-                                ${state.accounts.length === 0 ? '<p class="text-xs text-zinc-500 text-center py-8">Пользователи не найдены</p>' :
-                                state.accounts.map(account => `
-                                    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-3">
+
+                            ${editingAccount ? `
+                                <div class="border border-accent/50 bg-accent/5 rounded-2xl p-3 space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <h3 class="text-sm font-bold">Редактирование аккаунта</h3>
+                                        <button onclick="cancelEditAccount()" class="text-zinc-400 hover:text-white p-1">
+                                            <i data-lucide="x" class="w-4 h-4"></i>
+                                        </button>
+                                    </div>
+
+                                    <div class="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs text-zinc-400">
+                                        Telegram ID: <span class="text-zinc-200">${escapeHtml(editingAccount.telegram_id || editingAccount.логин)}</span>
+                                    </div>
+
+                                    <input id="account-edit-phone" type="text"
+                                        value="${escapeHtml(editingAccount.номер || '')}"
+                                        placeholder="Номер телефона"
+                                        class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-accent">
+
+                                    <input id="account-edit-username" type="text"
+                                        value="${escapeHtml(editingAccount.contact_username || '')}"
+                                        placeholder="Telegram / US (@username)"
+                                        class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-accent">
+
+                                    <select id="account-edit-role"
+                                        class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-accent">
+                                        <option value="пользователь" ${editingAccount.роль === 'пользователь' ? 'selected' : ''}>Пользователь</option>
+                                        <option value="админ" ${editingAccount.роль === 'админ' ? 'selected' : ''}>Администратор</option>
+                                    </select>
+
+                                    <div class="flex space-x-2">
+                                        <button onclick="saveAccountChanges()" class="flex-1 bg-accent hover:bg-accentHover py-2.5 rounded-xl text-xs font-medium text-white">
+                                            Сохранить
+                                        </button>
+                                        <button onclick="cancelEditAccount()" class="px-4 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl text-xs text-zinc-300">
+                                            Отмена
+                                        </button>
+                                    </div>
+                                </div>
+                            ` : ''}
+
+                            <div class="space-y-2 max-h-[55vh] overflow-y-auto pr-0.5">
+                                ${state.accounts.length === 0 ? `
+                                    <p class="text-xs text-zinc-500 text-center py-8">Учётных записей пока нет</p>
+                                ` : state.accounts.map(account => `
+                                    <div class="bg-zinc-900 border ${account.логин === state.login ? 'border-accent/50' : 'border-zinc-800'} rounded-2xl p-3">
                                         <div class="flex items-start justify-between gap-2">
                                             <div class="min-w-0">
-                                                <div class="font-semibold text-sm text-zinc-100 truncate">${escapeHtml(account.display_name || (account.telegram_username ? '@' + account.telegram_username : 'Пользователь'))}</div>
-                                                <p class="text-[11px] text-zinc-500 mt-1">Telegram ID: ${escapeHtml(account.telegram_id)}</p>
-                                                <p class="text-xs text-zinc-400 mt-1">Номер: ${escapeHtml(account.номер || 'не указан')}</p>
-                                                <p class="text-xs text-zinc-400 mt-0.5">US: ${escapeHtml(account.contact_username || 'не указан')}</p>
-                                                <p class="text-[11px] text-zinc-500 mt-1">Сайт: ${escapeHtml(account.site_role || 'user')}</p>
-                                                <p class="text-[11px] ${account.admin_granted ? 'text-accent' : 'text-zinc-500'} mt-0.5">
-                                                    Админ-доступ: ${account.admin_granted ? 'выдан' : 'нет'}
+                                                <div class="flex items-center gap-2">
+                                                    <span class="font-semibold text-sm text-zinc-100 truncate">${escapeHtml(account.логин)}</span>
+                                                    <span class="text-[9px] px-1.5 py-0.5 rounded-full ${account.роль === 'админ' ? 'bg-accent/20 text-accent' : 'bg-zinc-800 text-zinc-400'}">
+                                                        ${account.роль === 'админ' ? 'Админ' : 'Пользователь'}
+                                                    </span>
+                                                </div>
+                                                <p class="text-xs text-zinc-400 mt-1">
+                                                    <span class="text-zinc-500">Номер:</span> ${escapeHtml(account.номер || 'не указан')}
+                                                </p>
+                                                <p class="text-xs text-zinc-400 mt-0.5">
+                                                    <span class="text-zinc-500">US:</span> ${escapeHtml(account.contact_username || 'не указан')}
                                                 </p>
                                             </div>
-                                            ${String(state.telegramId) === OWNER_TELEGRAM_ID && String(account.telegram_id) !== OWNER_TELEGRAM_ID ? `
-                                                <button onclick="setAdminAccess('${escapeHtml(account.telegram_id)}', ${account.admin_granted ? 'false' : 'true'})"
-                                                    class="shrink-0 px-3 py-2 rounded-xl text-[11px] font-medium ${account.admin_granted ? 'bg-red-500/10 text-red-300 border border-red-500/20' : 'bg-accent text-white'}">
-                                                    ${account.admin_granted ? 'Забрать админку' : 'Выдать админку'}
+                                            <div class="flex items-center gap-1 shrink-0">
+                                                <button onclick="startEditAccount('${escapeHtml(account.логин)}')" class="p-2 rounded-lg text-zinc-400 hover:text-accent hover:bg-zinc-800" title="Изменить">
+                                                    <i data-lucide="edit-2" class="w-4 h-4"></i>
                                                 </button>
-                                            ` : ''}
+                                                ${account.логин !== state.login ? `
+                                                    <button onclick="deleteAccount('${escapeHtml(account.логин)}')" class="p-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-950/30" title="Удалить">
+                                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                    </button>
+                                                ` : `
+                                                    <span class="text-[9px] text-zinc-600 px-1">Вы</span>
+                                                `}
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <h3 class="text-sm font-bold">${state.editingManagerId ? 'Редактировать менеджера' : 'Добавить менеджера'}</h3>
+                            <div class="space-y-2">
+                                <input type="text" id="new-manager-name" placeholder="Имя менеджера" value="${(() => { const m = state.managers.find(x => x.id == state.editingManagerId); return m ? escapeHtml(m.name) : ''; })()}" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
+                                <input type="text" id="new-manager-username" placeholder="Юз телеграм (@username)" value="${(() => { const m = state.managers.find(x => x.id == state.editingManagerId); return m ? escapeHtml(m.username) : ''; })()}" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
+                                <div class="flex space-x-2">
+                                    <button onclick="saveManager()" class="flex-1 bg-accent hover:bg-accentHover py-2.5 rounded-xl font-medium transition text-xs text-white">${state.editingManagerId ? 'Сохранить изменения' : 'Добавить менеджера'}</button>
+                                    ${state.editingManagerId ? `<button onclick="cancelEditManager()" class="px-4 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl font-medium transition text-xs text-zinc-300">Отмена</button>` : ''}
+                                </div>
+                            </div>
+                            <h3 class="text-sm font-bold pt-3 border-t border-zinc-800">Список менеджеров</h3>
+                            <div class="space-y-2 max-h-48 overflow-y-auto">
+                                ${state.managers.length === 0 ? '<p class="text-xs text-zinc-500 text-center py-2">Менеджеры не добавлены</p>' : state.managers.map(m => `
+                                    <div class="bg-zinc-900 border ${state.editingManagerId == m.id ? 'border-accent' : 'border-zinc-800'} p-2.5 rounded-xl flex items-center justify-between">
+                                        <div>
+                                            <h4 class="text-xs font-semibold text-zinc-200">${escapeHtml(m.name)}</h4>
+                                            <p class="text-[10px] text-accent">@${escapeHtml(m.username).replace('@', '')}</p>
+                                        </div>
+                                        <div class="flex items-center space-x-1">
+                                            <button onclick="startEditManager('${escapeHtml(m.id)}')" class="text-zinc-400 hover:text-accent p-1"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
+                                            <button onclick="deleteManager('${escapeHtml(m.id)}')" class="text-red-400 hover:text-red-300 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                         </div>
                                     </div>
                                 `).join('')}
@@ -2717,24 +2884,129 @@
             lucide.createIcons();
         }
 
-        async function setAdminAccess(telegramId, granted) {
-            if (String(state.telegramId) !== OWNER_TELEGRAM_ID) {
-                showToast('Назначать администраторов может только владелец', 'error');
-                return;
-            }
+        function startEditAccount(login) {
+            state.editingAccountLogin = login;
+            render();
+        }
+
+        function cancelEditAccount() {
+            state.editingAccountLogin = null;
+            render();
+        }
+
+        async function saveAccountChanges() {
+            const originalLogin = state.editingAccountLogin;
+            const phoneField = document.getElementById('account-edit-phone');
+            const usernameField = document.getElementById('account-edit-username');
+            const roleField = document.getElementById('account-edit-role');
+
+            if (!originalLogin || !phoneField || !usernameField || !roleField) return;
+
+            const phone = phoneField.value.trim();
+            let username = usernameField.value.trim();
+            const role = roleField.value;
+
+            if (username && !username.startsWith('@')) username = '@' + username;
+
             try {
-                await authRequest('set-admin', {
-                    telegram_id: String(telegramId),
-                    admin_granted: Boolean(granted)
-                });
+                const { error } = await supabaseClient
+                    .from('user')
+                    .update({
+                        номер: phone,
+                        contact_username: username,
+                        роль: role
+                    })
+                    .eq('логин', originalLogin);
+
+                if (error) throw error;
+
+                if (originalLogin === state.login) {
+                    state.role = role === 'админ' ? 'admin' : 'user';
+                    state.contactUser = username;
+                    state.phone = phone;
+                    localStorage.setItem('reflex_role', state.role);
+                    localStorage.setItem('reflex_contact_user', username);
+                    localStorage.setItem('reflex_phone', phone);
+                }
+
+                state.editingAccountLogin = null;
                 await fetchAccounts();
                 render();
-                showToast(granted ? 'Админка выдана' : 'Админка забрана');
+                showToast('Аккаунт обновлён');
             } catch (e) {
-                showToast(e.message || 'Не удалось изменить доступ', 'error');
+                console.error('Ошибка изменения аккаунта:', e);
+                showToast('Не удалось изменить аккаунт', 'error');
             }
         }
 
+        async function deleteAccount(login) {
+            if (!login || login === state.login) {
+                showToast('Нельзя удалить текущую учётную запись', 'error');
+                return;
+            }
+
+            showConfirm(
+                'Удалить учётную запись?',
+                `Аккаунт "${login}" будет удалён без возможности восстановления.`,
+                async () => {
+                    try {
+                        await supabaseClient.from('cart_items').delete().eq('user_identifier', login);
+                        const { error } = await supabaseClient.from('user').delete().eq('логин', login);
+                        if (error) throw error;
+
+                        if (state.editingAccountLogin === login) state.editingAccountLogin = null;
+                        await fetchAccounts();
+                        await fetchRegisteredAccountsCount();
+                        render();
+                        showToast('Учётная запись удалена');
+                    } catch (e) {
+                        console.error('Ошибка удаления учётной записи:', e);
+                        showToast('Не удалось удалить учётную запись', 'error');
+                    }
+                }
+            );
+        }
+
+        async function saveManager() {
+            const nameField = document.getElementById('new-manager-name');
+            const usernameField = document.getElementById('new-manager-username');
+            if (!nameField || !usernameField) return;
+
+            const name = nameField.value.trim();
+            let username = usernameField.value.trim();
+
+            if (!name || !username) {
+                showToast('Заполните имя и юз менеджера!', 'error');
+                return;
+            }
+
+            if (username.startsWith('@')) username = username.substring(1);
+
+            try {
+                if (state.editingManagerId) {
+                    const { error } = await supabaseClient.from('managers').update({ name, username }).eq('id', state.editingManagerId);
+                    if (error) {
+                        showToast('Ошибка при сохранении менеджера', 'error');
+                        return;
+                    }
+                    state.editingManagerId = null;
+                    await fetchManagers();
+                    render();
+                    showToast('Данные менеджера обновлены!');
+                } else {
+                    const { error } = await supabaseClient.from('managers').insert({ name, username });
+                    if (error) {
+                        showToast('Ошибка при добавлении менеджера', 'error');
+                        return;
+                    }
+                    await fetchManagers();
+                    render();
+                    showToast('Менеджер успешно добавлен!');
+                }
+            } catch (e) {
+                showToast('Ошибка подключения к базе данных', 'error');
+            }
+        }
 
         function startEditManager(id) {
             state.editingManagerId = id;
