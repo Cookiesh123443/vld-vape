@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VLD VAPE</title>
+    <meta name="telegram-auth-version" content="2026-08-21-v6">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -316,6 +317,21 @@
                 <button onclick="saveDiscount(true)" class="flex-1 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl text-xs font-medium transition text-red-400">Убрать акцию</button>
                 <button onclick="saveDiscount(false)" class="flex-1 bg-accent hover:bg-accentHover py-2.5 rounded-xl text-xs font-medium transition text-white">Сохранить</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно: панель работника -->
+    <div id="modal-worker-access" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold">Панель работника</h3>
+                <button onclick="closeModal('modal-worker-access')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="bg-zinc-900/70 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-300">
+                Доступ определяется ролью Telegram-профиля в Supabase. Пароль от старой системы больше не используется.
+            </div>
+            <div id="worker-access-status" class="text-xs text-zinc-400"></div>
+            <button onclick="checkWorkerAccess()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium text-white">Проверить доступ</button>
         </div>
     </div>
 
@@ -1461,6 +1477,55 @@
             if (dropdown) dropdown.classList.toggle('hidden');
         }
 
+        async function openAdminPanel() {
+            const status = document.getElementById('worker-access-status');
+
+            if (!state.userId) {
+                switchTab('profile');
+                showToast('Сначала войдите через Telegram', 'error');
+                return;
+            }
+
+            if (state.role === 'admin') {
+                switchTab('admin_home');
+                return;
+            }
+
+            if (status) status.textContent = 'Проверяем права текущего Telegram-профиля…';
+            openModal('modal-worker-access');
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .select('role, telegram_id, telegram_username')
+                    .eq('id', state.userId)
+                    .single();
+
+                if (error) throw error;
+
+                if (data.role === 'admin') {
+                    state.role = 'admin';
+                    if (status) status.textContent = 'Доступ подтверждён.';
+                    closeModal('modal-worker-access');
+                    render();
+                    switchTab('admin_home');
+                    return;
+                }
+
+                const tg = data.telegram_username ? '@' + data.telegram_username : `ID ${data.telegram_id}`;
+                if (status) status.innerHTML = `Для ${escapeHtml(tg)} роль пока <b class="text-zinc-200">Пользователь</b>. Добавьте Telegram ID сотрудника в таблицу <code class="text-accent">telegram_admins</code> или назначьте <code class="text-accent">profiles.role = 'admin'</code>.`;
+            } catch (e) {
+                console.error('Worker access check error:', e);
+                if (status) status.textContent = e?.message || 'Не удалось проверить права';
+                showToast('Не удалось проверить доступ работника', 'error');
+            }
+        }
+
+        async function checkWorkerAccess() {
+            closeModal('modal-worker-access');
+            await openAdminPanel();
+        }
+
         // --- Восстановленная система управления товарами в админке ---
         function openProductModal(productId = null) {
             document.getElementById('edit-product-id').value = productId || '';
@@ -2399,7 +2464,7 @@
         }
 
         function isTelegramMiniApp() {
-            return !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData);
+            return !!(window.Telegram && window.Telegram.WebApp);
         }
 
         function setupTelegramMiniApp() {
@@ -3042,6 +3107,24 @@
                 }
             }
         });
+
+        // Дополнительная проверка после возврата из Telegram OIDC.
+        // Нужна, чтобы браузерный callback не зависел только от события onAuthStateChange.
+        (async () => {
+            try {
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                if (session?.user) {
+                    state.userId = session.user.id;
+                    await waitForAuthProfile(10);
+                    await mergeGuestCartIntoDb();
+                    await loadCartFromDb();
+                    await fetchOrders();
+                    render();
+                }
+            } catch (e) {
+                console.error('Browser OAuth session bootstrap error:', e);
+            }
+        })();
 
     </script>
 </body>
