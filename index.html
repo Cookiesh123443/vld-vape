@@ -390,6 +390,7 @@
             adminSettingsSubTab: 'general',
             editingAccountLogin: null,
             isOwner: false,
+            adminPanelOpen: false,
             adminUserSearch: '',
             selectedAccountId: null,
             adminStatsFilter: 'all',
@@ -677,15 +678,16 @@
                 const headerUserDisplay = document.getElementById('header-user-display');
 
                 if (state.role !== 'admin') {
+                    state.adminPanelOpen = false;
                     if (state.activeTab.startsWith('admin_')) state.activeTab = 'home';
                 }
 
                 if (state.role === 'admin') {
-                    roleBadge.textContent = 'Админ';
+                    roleBadge.textContent = state.dbRole === 'owner' ? 'Владелец' : 'Админ';
                     roleBadge.className = 'text-xs px-2 py-0.5 rounded-full bg-accent text-white font-medium';
-                    if (adminLogoutBtn) adminLogoutBtn.classList.remove('hidden');
-                    if (adminLoginMenuItem) adminLoginMenuItem.classList.add('hidden');
-                    if (!state.activeTab.startsWith('admin_')) state.activeTab = 'admin_home';
+                    if (adminLogoutBtn) adminLogoutBtn.classList.toggle('hidden', !state.adminPanelOpen);
+                    if (adminLoginMenuItem) adminLoginMenuItem.classList.toggle('hidden', state.adminPanelOpen);
+                    if (state.adminPanelOpen && !state.activeTab.startsWith('admin_')) state.activeTab = 'admin_settings';
                 } else {
                     roleBadge.textContent = 'Пользователь';
                     roleBadge.className = 'text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400';
@@ -714,7 +716,7 @@
 
         function renderNav() {
             const nav = document.getElementById('bottom-nav');
-            if (state.role === 'user') {
+            if (state.role !== 'admin' || !state.adminPanelOpen) {
                 nav.innerHTML = `
                     <button onclick="switchTab('home')" class="flex flex-col items-center py-1 px-3 ${state.activeTab === 'home' ? 'text-accent' : 'text-zinc-400'}">
                         <i data-lucide="home" class="w-5 h-5"></i><span class="text-[10px] mt-1">Главная</span>
@@ -757,11 +759,17 @@
         }
 
         function switchTab(tab) {
-            if (tab.startsWith('admin_') && state.role !== 'admin') {
-                showToast('Доступ запрещен', 'error');
-                state.activeTab = 'home';
-                render();
-                return;
+            if (tab.startsWith('admin_')) {
+                if (state.role !== 'admin') {
+                    showToast('Доступ запрещен', 'error');
+                    state.activeTab = 'home';
+                    state.adminPanelOpen = false;
+                    render();
+                    return;
+                }
+                state.adminPanelOpen = true;
+            } else if (state.role === 'admin') {
+                state.adminPanelOpen = false;
             }
             state.activeTab = tab;
             render();
@@ -879,7 +887,7 @@
                         ${p.is_pinned ? '<span class="bg-amber-500/90 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow flex items-center"><i data-lucide="pin" class="w-3 h-3"></i></span>' : ''}
                     </div>
                     <div>
-                        <img src="${p.image_url || 'https://via.placeholder.com/150'}" alt="${p.name}" onclick="openImagePreview(${p.id})" class="w-full h-36 object-cover rounded-xl mb-3 cursor-pointer">
+                        <img src="${p.image_url || 'https://via.placeholder.com/150'}" alt="${p.name}" onclick="openImagePreview(${JSON.stringify(p.id)})" class="w-full h-36 object-cover rounded-xl mb-3 cursor-pointer">
                         <h4 class="font-semibold text-sm line-clamp-1">${p.name}</h4>
                         <p class="text-xs text-zinc-400 truncate">${p.subcategory || ''}</p>
                         ${state.role === 'admin' ? `<p class="text-[11px] text-zinc-500 mt-0.5">Остаток: <span class="${stock > 0 ? 'text-zinc-300' : 'text-red-400'} font-medium">${stock} шт.</span></p>` : ''}
@@ -889,7 +897,7 @@
                             <span class="text-[11px] text-zinc-500 line-through h-[14px] leading-[14px]">${hasDiscount ? p.old_price + ' ₽' : ''}</span>
                             <span class="font-bold text-sm text-accent leading-none">${p.retail_price} ₽</span>
                         </div>
-                        <button onclick="openVariantModal(${p.id})" title="${inCartQty > 0 ? 'В корзине: ' + inCartQty : 'Добавить в корзину'}" class="w-8 h-8 rounded-full flex items-center justify-center text-white transition ${inCartQty > 0 ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-accent hover:bg-accentHover'}">
+                        <button onclick="openVariantModal(${JSON.stringify(p.id)})" title="${inCartQty > 0 ? 'В корзине: ' + inCartQty : 'Добавить в корзину'}" class="w-8 h-8 rounded-full flex items-center justify-center text-white transition ${inCartQty > 0 ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-accent hover:bg-accentHover'}">
                             ${inCartQty > 0 ? `<span class="text-[11px] font-bold">${inCartQty}</span>` : '<i data-lucide="plus" class="w-4 h-4"></i>'}
                         </button>
                     </div>
@@ -947,7 +955,7 @@
                             ${hasDiscount ? '<span class="bg-red-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">АКЦИЯ</span>' : ''}
                         </div>
                         <div>
-                            <img src="${p.image_url || 'https://via.placeholder.com/150'}" alt="${p.name}" onclick="openImagePreview(${p.id})" class="w-full h-36 object-cover rounded-xl mb-3 cursor-pointer">
+                            <img src="${p.image_url || 'https://via.placeholder.com/150'}" alt="${p.name}" onclick="openImagePreview(${JSON.stringify(p.id)})" class="w-full h-36 object-cover rounded-xl mb-3 cursor-pointer">
                             <h4 class="font-semibold text-sm line-clamp-1">${p.name}</h4>
                             <p class="text-xs text-zinc-400 truncate">${p.subcategory || ''}</p>
                             <p class="text-xs font-medium text-purple-300 mt-1">${v.type === 'flavor' ? 'Вкус' : 'Цвет'}: ${v.value}</p>
@@ -960,12 +968,12 @@
                             </div>
                             ${inCartQty > 0 ? `
                             <div class="flex items-center bg-zinc-900 border border-accent rounded-full overflow-hidden">
-                                <button onclick="changeCatalogCartQty(${p.id}, ${v.id}, -1)" class="w-7 h-8 flex items-center justify-center text-accent hover:bg-accent/10 transition"><i data-lucide="minus" class="w-3.5 h-3.5"></i></button>
+                                <button onclick="changeCatalogCartQty(${JSON.stringify(p.id)}, ${JSON.stringify(v.id)}, -1)" class="w-7 h-8 flex items-center justify-center text-accent hover:bg-accent/10 transition"><i data-lucide="minus" class="w-3.5 h-3.5"></i></button>
                                 <span class="text-xs font-bold w-5 text-center text-zinc-100">${inCartQty}</span>
-                                <button onclick="changeCatalogCartQty(${p.id}, ${v.id}, 1)" class="w-7 h-8 flex items-center justify-center text-accent hover:bg-accent/10 transition"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>
+                                <button onclick="changeCatalogCartQty(${JSON.stringify(p.id)}, ${JSON.stringify(v.id)}, 1)" class="w-7 h-8 flex items-center justify-center text-accent hover:bg-accent/10 transition"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>
                             </div>
                             ` : `
-                            <button onclick="addToCart(${p.id}, ${v.id})" title="Добавить в корзину" class="w-8 h-8 rounded-full flex items-center justify-center text-white bg-accent hover:bg-accentHover transition">
+                            <button onclick="addToCart(${JSON.stringify(p.id)}, ${JSON.stringify(v.id)})" title="Добавить в корзину" class="w-8 h-8 rounded-full flex items-center justify-center text-white bg-accent hover:bg-accentHover transition">
                                 <i data-lucide="plus" class="w-4 h-4"></i>
                             </button>
                             `}
@@ -1134,7 +1142,7 @@
                 container.innerHTML = availableVariants.map(v => {
                     const inCart = state.cart.find(i => i.productId === p.id && i.variantId === v.id);
                     return `
-                    <div onclick="addToCart(${p.id}, ${v.id})" class="bg-zinc-900 border ${inCart ? 'border-emerald-600' : 'border-zinc-800'} hover:border-accent p-3 rounded-xl flex items-center justify-between cursor-pointer transition">
+                    <div onclick="addToCart(${JSON.stringify(p.id)}, ${JSON.stringify(v.id)})" class="bg-zinc-900 border ${inCart ? 'border-emerald-600' : 'border-zinc-800'} hover:border-accent p-3 rounded-xl flex items-center justify-between cursor-pointer transition">
                         <div>
                             <span class="text-xs text-zinc-400 block">${v.type === 'flavor' ? 'Вкус' : 'Цвет'}${state.role === 'admin' ? ' • Остаток: ' + v.quantity + ' шт.' : ''}</span>
                             <h4 class="text-sm font-semibold text-zinc-200">${v.value} ${inCart ? `<span class="text-emerald-400 text-xs">(в корзине: ${inCart.qty})</span>` : ''}</h4>
@@ -1476,6 +1484,8 @@
         }
 
         async function openAdminPanel() {
+            const dropdown = document.getElementById('admin-dropdown');
+            if (dropdown) dropdown.classList.add('hidden');
             if (!state.userId) {
                 switchTab('profile');
                 showToast('Сначала войдите через Telegram', 'error');
@@ -1491,6 +1501,7 @@
                 state.role = data?.is_admin ? 'admin' : 'user';
 
                 if (state.role === 'admin') {
+                    state.adminPanelOpen = true;
                     closeModal('modal-worker-access');
                     await fetchAccounts(state.adminUserSearch || '');
                     switchTab('admin_settings');
@@ -2047,21 +2058,21 @@
                                 </div>
                                 <div class="flex flex-col space-y-1.5 items-center shrink-0">
                                     <div class="flex space-x-1">
-                                        <button onclick="toggleProductPin(${p.id})" title="${p.is_pinned ? 'Открепить' : 'Закрепить'}" class="w-8 h-8 ${p.is_pinned ? 'bg-amber-500/30 text-amber-400' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} rounded-xl flex items-center justify-center transition">
+                                        <button onclick="toggleProductPin(${JSON.stringify(p.id)})" title="${p.is_pinned ? 'Открепить' : 'Закрепить'}" class="w-8 h-8 ${p.is_pinned ? 'bg-amber-500/30 text-amber-400' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} rounded-xl flex items-center justify-center transition">
                                             <i data-lucide="pin" class="w-4 h-4"></i>
                                         </button>
-                                        <button onclick="toggleProductArchive(${p.id})" title="В архив" class="w-8 h-8 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 rounded-xl flex items-center justify-center transition">
+                                        <button onclick="toggleProductArchive(${JSON.stringify(p.id)})" title="В архив" class="w-8 h-8 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 rounded-xl flex items-center justify-center transition">
                                             <i data-lucide="archive" class="w-4 h-4"></i>
                                         </button>
                                     </div>
                                     <div class="flex space-x-1">
-                                        <button onclick="openDiscountModal(${p.id})" title="Акция" class="w-8 h-8 ${isDiscount ? 'bg-red-500/20 text-red-400' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} rounded-xl flex items-center justify-center transition">
+                                        <button onclick="openDiscountModal(${JSON.stringify(p.id)})" title="Акция" class="w-8 h-8 ${isDiscount ? 'bg-red-500/20 text-red-400' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} rounded-xl flex items-center justify-center transition">
                                             <i data-lucide="tag" class="w-4 h-4"></i>
                                         </button>
-                                        <button onclick="editProduct(${p.id})" title="Редактировать" class="w-8 h-8 bg-zinc-800 hover:bg-zinc-700 rounded-xl flex items-center justify-center text-zinc-300 transition">
+                                        <button onclick="editProduct(${JSON.stringify(p.id)})" title="Редактировать" class="w-8 h-8 bg-zinc-800 hover:bg-zinc-700 rounded-xl flex items-center justify-center text-zinc-300 transition">
                                             <i data-lucide="edit-2" class="w-4 h-4"></i>
                                         </button>
-                                        <button onclick="deleteProduct(${p.id})" title="Удалить" class="w-8 h-8 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl flex items-center justify-center transition">
+                                        <button onclick="deleteProduct(${JSON.stringify(p.id)})" title="Удалить" class="w-8 h-8 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl flex items-center justify-center transition">
                                             <i data-lucide="trash-2" class="w-4 h-4"></i>
                                         </button>
                                     </div>
@@ -2093,10 +2104,10 @@
                                             </div>
                                         </div>
                                         <div class="flex flex-col space-y-1 items-center shrink-0">
-                                            <button onclick="toggleProductArchive(${p.id})" title="Восстановить" class="px-3 py-2 bg-accent/20 hover:bg-accent/30 text-accent rounded-xl text-xs font-medium flex items-center space-x-1 transition">
+                                            <button onclick="toggleProductArchive(${JSON.stringify(p.id)})" title="Восстановить" class="px-3 py-2 bg-accent/20 hover:bg-accent/30 text-accent rounded-xl text-xs font-medium flex items-center space-x-1 transition">
                                                 <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i><span>Вернуть</span>
                                             </button>
-                                            <button onclick="deleteProduct(${p.id})" title="Удалить навсегда" class="w-full px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs flex items-center justify-center space-x-1 transition">
+                                            <button onclick="deleteProduct(${JSON.stringify(p.id)})" title="Удалить навсегда" class="w-full px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs flex items-center justify-center space-x-1 transition">
                                                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i><span>Удалить</span>
                                             </button>
                                         </div>
@@ -2307,6 +2318,7 @@
             state.dbRole = 'user';
             state.role = 'user';
             state.isOwner = false;
+            state.adminPanelOpen = false;
             state.userId = null;
             state.telegramUser = null;
             state.login = '';
@@ -2633,11 +2645,14 @@
         }
 
         async function logoutAdmin() {
-            // Это НЕ выход из Telegram/Supabase.
-            // Админ-панель использует ту же пользовательскую сессию.
+            // Закрываем только административный интерфейс.
+            // Telegram/Supabase сессия пользователя НЕ завершается.
+            state.adminPanelOpen = false;
             state.activeTab = 'home';
             state.adminUserSearch = '';
             closeModal('modal-worker-access');
+            const dropdown = document.getElementById('admin-dropdown');
+            if (dropdown) dropdown.classList.add('hidden');
             render();
         }
 
