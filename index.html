@@ -28,6 +28,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Telegram Login 2.0 (OIDC) -->
+    <script async src="https://oauth.telegram.org/js/telegram-login.js?3"></script>
     <style>
         body { background-color: #0f0f11; color: #f4f4f5; font-family: system-ui, -apple-system, sans-serif; }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -51,9 +53,9 @@
             <!-- Выпадающее меню (смещено под кнопку, не перекрывает её) -->
             <div id="admin-dropdown" class="hidden absolute top-full right-0 mt-2 w-52 bg-cardBg border border-zinc-700 rounded-xl shadow-xl overflow-hidden z-50">
                 <div id="admin-login-menu-item">
-                    <button onclick="openAdminLoginModal()" class="w-full text-left px-4 py-3 text-sm hover:bg-zinc-700/50 flex items-center space-x-2">
+                    <button onclick="openAdminPanel()" class="w-full text-left px-4 py-3 text-sm hover:bg-zinc-700/50 flex items-center space-x-2">
                         <i data-lucide="shield" class="w-4 h-4 text-accent"></i>
-                        <span>Для работников</span>
+                        <span>Панель работника</span>
                     </button>
                 </div>
                 <div id="admin-logout-btn" class="hidden">
@@ -116,29 +118,6 @@
         </div>
     </div>
 
-    <!-- Модальное окно входа в админку -->
-    <div id="modal-admin-login" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
-            <div class="flex justify-between items-center">
-                <h3 class="text-lg font-bold">Вход для работников</h3>
-                <button onclick="closeModal('modal-admin-login')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            <p class="text-xs text-zinc-400">Для входа вы должны быть зарегистрированы и войти в свой аккаунт, а также ввести пароль администратора:</p>
-            <div class="space-y-3">
-                <div>
-                    <label class="text-xs text-zinc-400 mb-1 block">Пароль администратора</label>
-                    <div class="relative">
-                        <input type="password" id="admin-password-input" placeholder="Введите пароль админа" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 pr-10 text-sm focus:outline-none focus:border-accent">
-                        <button type="button" onclick="togglePasswordVisibility('admin-password-input', 'eye-icon')" class="absolute right-3 top-3 text-zinc-400 hover:text-white transition">
-                            <i id="eye-icon" data-lucide="eye" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <button onclick="submitAdminLogin()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Войти в админку</button>
-        </div>
-    </div>
-
     <!-- Модальное окно фильтров каталога -->
     <div id="modal-catalog-filters" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl max-h-[88vh] overflow-y-auto">
@@ -174,50 +153,6 @@
                 <button onclick="resetCatalogFilters()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl text-xs">Сбросить</button>
                 <button onclick="saveCatalogFilters()" class="flex-1 bg-accent hover:bg-accentHover py-2.5 rounded-xl text-xs font-medium text-white">Сохранить</button>
             </div>
-        </div>
-    </div>
-
-    <!-- Модальное окно смены пароля -->
-    <div id="modal-change-password" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
-            <div class="flex justify-between items-center">
-                <h3 class="text-lg font-bold">Смена пароля аккаунта</h3>
-                <button onclick="closeModal('modal-change-password')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            <p class="text-xs text-zinc-400">Введите старый и новый пароль для вашего аккаунта:</p>
-            <div class="space-y-3">
-                <div>
-                    <label class="text-xs text-zinc-400 mb-1 block">Старый пароль</label>
-                    <input type="password" id="old-acc-password" placeholder="Старый пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
-                </div>
-                <div>
-                    <label class="text-xs text-zinc-400 mb-1 block">Новый пароль</label>
-                    <input type="password" id="new-acc-password" placeholder="Новый пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
-                </div>
-            </div>
-            <button onclick="submitChangePassword()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Сменить пароль</button>
-        </div>
-    </div>
-
-    <!-- Модальное окно смены пароля администратора -->
-    <div id="modal-change-admin-password" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
-            <div class="flex justify-between items-center">
-                <h3 class="text-lg font-bold">Смена пароля администратора</h3>
-                <button onclick="closeModal('modal-change-admin-password')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            <p class="text-xs text-amber-400">После смены пароля все текущие администраторы (включая вас) будут понижены до пользователей и должны будут войти заново с новым паролем.</p>
-            <div class="space-y-3">
-                <div>
-                    <label class="text-xs text-zinc-400 mb-1 block">Текущий пароль администратора</label>
-                    <input type="password" id="old-admin-password" placeholder="Текущий пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
-                </div>
-                <div>
-                    <label class="text-xs text-zinc-400 mb-1 block">Новый пароль администратора</label>
-                    <input type="password" id="new-admin-password" placeholder="Новый пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
-                </div>
-            </div>
-            <button onclick="submitChangeAdminPassword()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Сменить пароль администратора</button>
         </div>
     </div>
 
@@ -400,14 +335,16 @@
         }
 
         let state = {
-            role: localStorage.getItem('reflex_role') || 'user', 
-            activeTab: 'home', 
-            login: localStorage.getItem('reflex_login') || '',
-            contactUser: localStorage.getItem('reflex_contact_user') || '',
-            phone: localStorage.getItem('reflex_phone') || '',
+            role: 'user',
+            activeTab: 'home',
+            login: '',
+            userId: null,
+            telegramUser: null,
+            contactUser: '',
+            phone: '',
             clientId: getOrCreateClientId(),
-            isProfileEditing: false, 
-            authMode: 'login',
+            isProfileEditing: false,
+            authMode: 'telegram',
             isPlacingOrder: false,
             cart: [],
             products: [],
@@ -415,8 +352,8 @@
             managers: [],
             accounts: [],
             adminSettingsSubTab: 'general',
-            editingAccountLogin: null, 
-            adminStatsFilter: 'all', 
+            editingAccountLogin: null,
+            adminStatsFilter: 'all',
             adminHomeSubTab: 'stats',
             catalogCategory: 'жидкость',
             catalogSubcategory: 'all',
@@ -585,87 +522,7 @@
             }
         }
 
-        async function resetSystemToZero() {
-            showConfirm('Полный сброс сайта в 0', 'Вы уверены? Все товары, варианты, заказы, корзины, менеджеры и пользователи будут полностью удалены.', async () => {
-                try {
-                    await supabaseClient.from('order_items').delete().not('id', 'is', null);
-                    await supabaseClient.from('orders').delete().not('id', 'is', null);
-                    await supabaseClient.from('product_variants').delete().not('id', 'is', null);
-                    await supabaseClient.from('products').delete().not('id', 'is', null);
-                    await supabaseClient.from('managers').delete().not('id', 'is', null);
-                    await supabaseClient.from('user').delete().not('логин', 'is', null);
-                    await supabaseClient.from('cart_items').delete().not('id', 'is', null);
-
-                    state.cart = [];
-                    state.searchQuery = '';
-                    state.login = '';
-                    state.contactUser = '';
-                    state.phone = '';
-                    localStorage.removeItem('reflex_login');
-                    localStorage.removeItem('reflex_contact_user');
-                    localStorage.removeItem('reflex_phone');
-
-                    logoutAdmin();
-
-                    await fetchProducts();
-                    await fetchOrders();
-                    await fetchManagers();
-                    render();
-                    showToast('Сайт полностью сброшен в начальное состояние!');
-                } catch (e) {
-                    console.error(e);
-                    showToast('Ошибка при сбросе системы: ' + e.message, 'error');
-                }
-            });
-        }
-
         // --- Управление корзиной ---
-        async function loadCartFromDb() {
-            if (!state.login) {
-                state.cart = JSON.parse(localStorage.getItem('reflex_cart') || '[]');
-                return;
-            }
-            try {
-                const { data, error } = await supabaseClient.from('cart_items').select('*').eq('user_identifier', state.login);
-                if (!error && data) {
-                    state.cart = data.map(i => ({
-                        productId: i.product_id,
-                        variantId: i.variant_id,
-                        name: i.name,
-                        variantName: i.variant_name,
-                        price: Number(i.price),
-                        qty: i.qty,
-                        image: i.image,
-                        maxQty: i.max_qty
-                    }));
-                }
-            } catch (e) { console.error(e); }
-        }
-
-        async function saveCartToDb() {
-            if (!state.login) {
-                localStorage.setItem('reflex_cart', JSON.stringify(state.cart));
-                return;
-            }
-            try {
-                await supabaseClient.from('cart_items').delete().eq('user_identifier', state.login);
-                if (state.cart.length > 0) {
-                    const rows = state.cart.map(i => ({
-                        user_identifier: state.login,
-                        product_id: i.productId,
-                        variant_id: i.variantId,
-                        name: i.name,
-                        variant_name: i.variantName,
-                        price: i.price,
-                        qty: i.qty,
-                        image: i.image,
-                        max_qty: i.maxQty
-                    }));
-                    await supabaseClient.from('cart_items').insert(rows);
-                }
-            } catch (e) { console.error(e); }
-        }
-
         async function validateCartStock() {
             if (!state.cart || state.cart.length === 0) return;
             let removedFlavors = false;
@@ -686,55 +543,6 @@
             if (removedFlavors) showToast('Некоторые вкусы или товары из вашей корзины закончились и были удалены', 'error');
             state.cart = updatedCart;
             await saveCartToDb();
-        }
-
-        async function checkUserRoleOnStartup() {
-            try {
-                // При запуске удаляем сохранённый автологин, если пароль уже сменили.
-                const savedAdminPassword = localStorage.getItem('reflex_admin_password');
-                const savedAdminVersion = localStorage.getItem('reflex_admin_password_version');
-
-                if (savedAdminPassword) {
-                    try {
-                        const adminState = await getAdminPasswordState();
-                        if (savedAdminVersion && adminState.version !== 'legacy' &&
-                            savedAdminVersion !== adminState.version) {
-                            localStorage.removeItem('reflex_admin_password');
-                            localStorage.removeItem('reflex_admin_password_version');
-                            if (localStorage.getItem('reflex_role') === 'admin') {
-                                localStorage.setItem('reflex_role', 'user');
-                            }
-                        }
-                    } catch (e) {
-                        console.error('Не удалось проверить версию пароля админки:', e);
-                    }
-                }
-
-                if (state.login) {
-                    const { data: dbUser } = await supabaseClient.from('user').select('*').eq('логин', state.login).maybeSingle();
-                    if (dbUser) {
-                        state.contactUser = dbUser.contact_username || '';
-                        state.phone = dbUser.номер || '';
-                        localStorage.setItem('reflex_contact_user', state.contactUser);
-                        localStorage.setItem('reflex_phone', state.phone);
-
-                        if (dbUser.роль === 'админ') {
-                            state.role = 'admin';
-                            localStorage.setItem('reflex_role', 'admin');
-                        } else {
-                            state.role = 'user';
-                            localStorage.setItem('reflex_role', 'user');
-                        }
-                    } else {
-                        logoutUser();
-                    }
-                } else {
-                    state.role = 'user';
-                    localStorage.setItem('reflex_role', 'user');
-                }
-            } catch (e) {
-                console.error(e);
-            }
         }
 
         window.addEventListener('DOMContentLoaded', async () => {
@@ -774,8 +582,8 @@
         async function fetchRegisteredAccountsCount() {
             try {
                 const { count, error } = await supabaseClient
-                    .from('user')
-                    .select('логин', { count: 'exact', head: true });
+                    .from('profiles')
+                    .select('id', { count: 'exact', head: true });
                 if (!error) state.registeredAccountsCount = Number(count || 0);
             } catch (e) {
                 console.error(e);
@@ -819,15 +627,15 @@
         async function fetchAccounts() {
             try {
                 const { data, error } = await supabaseClient
-                    .from('user')
-                    .select('логин, номер, contact_username, роль')
-                    .order('логин', { ascending: true });
+                    .from('profiles')
+                    .select('id, telegram_id, telegram_username, first_name, last_name, photo_url, phone, contact_username, role, created_at')
+                    .order('created_at', { ascending: false });
 
                 if (error) throw error;
                 state.accounts = data || [];
             } catch (e) {
-                console.error('Ошибка загрузки учётных записей:', e);
-                showToast('Не удалось загрузить учётные записи', 'error');
+                console.error('Ошибка загрузки профилей:', e);
+                showToast('Не удалось загрузить профили', 'error');
             }
         }
 
@@ -1538,203 +1346,6 @@
             closeModal('modal-missing-contacts');
         }
 
-        async function executeCheckout() {
-            // Берём снимок выбранных товаров ДО любых запросов/изменений корзины.
-            // В заказ должны попасть только они, а остальные позиции остаются в корзине.
-            const selectedItems = getSelectedCartItems().map(item => ({ ...item }));
-
-            if (selectedItems.length === 0) {
-                showToast('Выберите товары для оформления', 'error');
-                return;
-            }
-
-            if (getMyActiveOrder()) {
-                showToast('У вас уже есть заказ в работе', 'error');
-                return;
-            }
-
-            if (state.isPlacingOrder) return;
-            state.isPlacingOrder = true;
-
-            const checkoutBtn = document.getElementById('checkout-order-btn');
-            if (checkoutBtn) {
-                checkoutBtn.disabled = true;
-                checkoutBtn.textContent = 'Оформляем заказ...';
-                checkoutBtn.classList.add('opacity-60', 'cursor-not-allowed');
-            }
-
-            let totalRetail = 0;
-            let totalWholesale = 0;
-            const itemsToInsert = [];
-            const processedKeys = new Set();
-
-            try {
-                // Обрабатываем ТОЛЬКО выбранные позиции.
-                for (const item of selectedItems) {
-                    const product = (state.products || []).find(
-                        p => String(p.id) === String(item.productId)
-                    );
-                    if (!product) continue;
-
-                    const qty = Number(item.qty) || 0;
-                    const price = Number(item.price) || 0;
-                    if (qty <= 0) continue;
-
-                    // Не допускаем повторную обработку одной позиции.
-                    const key = `${item.productId}:${item.variantId}`;
-                    if (processedKeys.has(key)) continue;
-                    processedKeys.add(key);
-
-                    totalRetail += price * qty;
-                    totalWholesale += Number(product.wholesale_price || 0) * qty;
-
-                    itemsToInsert.push({
-                        product_name: item.name,
-                        variant_name: item.variantName,
-                        quantity: qty,
-                        price: price
-                    });
-
-                    // Списываем со склада только выбранное количество.
-                    const { data: varData, error: varError } = await supabaseClient
-                        .from('product_variants')
-                        .select('quantity')
-                        .eq('id', item.variantId)
-                        .single();
-
-                    if (varError) throw varError;
-
-                    const availableQty = Number(varData?.quantity || 0);
-                    if (availableQty < qty) {
-                        throw new Error(
-                            `Недостаточно товара "${item.name}" (${item.variantName}). Доступно: ${availableQty} шт.`
-                        );
-                    }
-
-                    const { error: stockError } = await supabaseClient
-                        .from('product_variants')
-                        .update({ quantity: availableQty - qty })
-                        .eq('id', item.variantId);
-
-                    if (stockError) throw stockError;
-                }
-
-                if (itemsToInsert.length === 0) {
-                    throw new Error('Не удалось подготовить выбранные товары');
-                }
-
-                const { data: orderData, error: orderErr } = await supabaseClient
-                    .from('orders')
-                    .insert({
-                        username: state.contactUser || 'не указано',
-                        phone: state.phone || 'не указан',
-                        total_retail: totalRetail,
-                        total_wholesale: totalWholesale,
-                        status: 'in_progress',
-                        user_login: state.login || null,
-                        client_id: state.clientId
-                    })
-                    .select()
-                    .single();
-
-                if (orderErr || !orderData) {
-                    throw orderErr || new Error('Не удалось создать заказ');
-                }
-
-                for (const item of itemsToInsert) {
-                    const { error: itemError } = await supabaseClient
-                        .from('order_items')
-                        .insert({
-                            order_id: orderData.id,
-                            product_name: item.product_name,
-                            variant_name: item.variant_name,
-                            quantity: item.quantity,
-                            price: item.price
-                        });
-
-                    if (itemError) throw itemError;
-                }
-
-                // Удаляем из корзины ТОЛЬКО те позиции, которые были оформлены.
-                const selectedKeys = new Set(
-                    selectedItems.map(i => `${i.productId}:${i.variantId}`)
-                );
-
-                state.cart = state.cart.filter(
-                    item => !selectedKeys.has(`${item.productId}:${item.variantId}`)
-                );
-
-                // После оформления снимаем выделение.
-                state.selectedCartItems.clear();
-
-                await saveCartToDb();
-                await fetchProducts();
-                await fetchOrders();
-
-                switchTab('orders');
-                showToast('Заказ успешно оформлен!');
-            } catch (e) {
-                console.error('Ошибка оформления заказа:', e);
-                showToast(
-                    e?.message || 'Ошибка при оформлении заказа',
-                    'error'
-                );
-
-                // Если создание заказа не удалось после списания склада,
-                // пытаемся вернуть уже списанные выбранные позиции.
-                // Это не затрагивает остальные товары корзины.
-                if (!itemsToInsert.length) {
-                    // Ничего со склада ещё не списывали.
-                }
-
-                if (state.activeTab === 'cart') render();
-            } finally {
-                state.isPlacingOrder = false;
-            }
-        }
-
-        async function cancelOrder(orderId) {
-            showConfirm('Отмена заказа', 'Вы уверены, что хотите отменить этот заказ?', async () => {
-                try {
-                    const order = (state.orders || []).find(o => o.id == orderId);
-                    if (order && order.order_items) {
-                        for (const item of order.order_items) {
-                            // Ищем товар в БД по имени
-                            const { data: prodData } = await supabaseClient
-                                .from('products')
-                                .select('id')
-                                .ilike('name', item.product_name)
-                                .limit(1);
-
-                            if (prodData && prodData.length > 0) {
-                                const productId = prodData[0].id;
-                                // Ищем вариант в БД по product_id и value
-                                const { data: varData } = await supabaseClient
-                                    .from('product_variants')
-                                    .select('id, quantity')
-                                    .eq('product_id', productId)
-                                    .ilike('value', item.variant_name)
-                                    .limit(1);
-
-                                if (varData && varData.length > 0) {
-                                    const newQty = Number(varData[0].quantity || 0) + Number(item.quantity);
-                                    await supabaseClient.from('product_variants').update({ quantity: newQty }).eq('id', varData[0].id);
-                                }
-                            }
-                        }
-                    }
-                    await supabaseClient.from('orders').delete().eq('id', orderId);
-                    await fetchProducts();
-                    await fetchOrders();
-                    render();
-                    showToast('Заказ отменен, товар возвращен на склад');
-                } catch (e) {
-                    console.error(e);
-                    showToast('Ошибка отмены заказа', 'error');
-                }
-            });
-        }
-
         function renderUserOrders(container) {
             const myOrders = (state.orders || []).filter(o => {
                 if (o.status === 'archived') return false;
@@ -1836,432 +1447,6 @@
             
             closeModal('modal-select-manager');
             window.open(tgUrl, '_blank');
-        }
-
-        // --- Профиль / Авторизация ---
-        function setAuthMode(mode) {
-            state.authMode = mode;
-            render();
-        }
-
-        function renderUserProfile(container) {
-            const tg = JSON.parse(localStorage.getItem('telegram_user') || 'null');
-            const logged = !!tg;
-
-            container.innerHTML = `
-            <div class="space-y-4 max-w-sm mx-auto pt-4">
-              <h2 class="text-lg font-bold">Профиль аккаунта</h2>
-
-              ${!logged ? `
-              <div class="bg-cardBg border border-zinc-800 rounded-2xl p-5 space-y-4">
-                <h3 class="text-accent font-bold">Вход через Telegram</h3>
-                <p class="text-sm text-zinc-400">Аккаунт создастся автоматически после входа.</p>
-                <button onclick="telegramLogin()" class="w-full bg-accent py-3 rounded-xl text-white font-medium">
-                    Войти через Telegram
-                </button>
-              </div>` : `
-              <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
-                <div class="flex items-center gap-3">
-                  ${tg.photo_url ? `<img src="${tg.photo_url}" class="w-12 h-12 rounded-full">` : ''}
-                  <div>
-                    <div class="font-bold">${tg.first_name || ''} ${tg.last_name || ''}</div>
-                    <div class="text-accent text-sm">${tg.username ? '@'+tg.username : 'Без username'}</div>
-                  </div>
-                </div>
-                <div class="text-sm text-zinc-400">Telegram ID: ${tg.id}</div>
-                <button onclick="logoutTelegram()" class="w-full bg-zinc-800 py-3 rounded-xl text-red-400">Выйти</button>
-              </div>`}
-            </div>`;
-            lucide.createIcons();
-        }
-
-        function telegramLogin(){
-            window.location.href='https://oauth.telegram.org/auth?bot_id=8749767581&origin='+encodeURIComponent(location.origin+location.pathname)+'&request_access=write';
-        }
-
-        async function handleTelegramAuth(){
-            const params=new URLSearchParams(location.search);
-            const result=params.get('tgAuthResult');
-            if(!result) return;
-            try{
-                const user=JSON.parse(atob(result));
-                const r=await fetch('https://ehrzjvuuvodudlelazhe.supabase.co/functions/v1/telegram-auth',{
-                    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(user)
-                });
-                const data=await r.json();
-                if(data.user){
-                    localStorage.setItem('telegram_user',JSON.stringify(data.user));
-                    history.replaceState({},'',location.pathname);
-                    render();
-                }
-            }catch(e){console.error(e);showToast('Ошибка Telegram авторизации','error')}
-        }
-
-        function logoutTelegram(){
-            localStorage.removeItem('telegram_user');
-            render();
-        }
-
-        function startEditContacts() {
-            state.isProfileEditing = true;
-            render();
-        }
-
-        function cancelEditContacts() {
-            state.isProfileEditing = false;
-            render();
-        }
-
-        async function saveEditContacts() {
-            let contact = document.getElementById('edit-contact-user').value.trim();
-            const phone = document.getElementById('edit-contact-phone').value.trim();
-            if (contact && !contact.startsWith('@')) contact = '@' + contact;
-
-            try {
-                await supabaseClient.from('user').update({
-                    contact_username: contact,
-                    номер: phone
-                }).eq('логин', state.login);
-
-                state.contactUser = contact;
-                state.phone = phone;
-                localStorage.setItem('reflex_contact_user', state.contactUser);
-                localStorage.setItem('reflex_phone', state.phone);
-                state.isProfileEditing = false;
-                render();
-                showToast('Контакты обновлены!');
-            } catch (e) {
-                showToast('Ошибка обновления контактов', 'error');
-            }
-        }
-
-        async function submitLogin() {
-            const login = document.getElementById('login-login').value.trim();
-            const password = document.getElementById('login-password').value.trim();
-
-            if (!login || !password) {
-                showToast('Введите логин и пароль!', 'error');
-                return;
-            }
-
-            try {
-                const { data: existingUser } = await supabaseClient.from('user').select('*').eq('логин', login).maybeSingle();
-
-                if (!existingUser) {
-                    showToast('Аккаунт с таким логином не найден. Зарегистрируйтесь!', 'error');
-                    return;
-                }
-                if (existingUser.пароль !== password) {
-                    showToast('Неверный пароль!', 'error');
-                    return;
-                }
-
-                state.login = login;
-                state.contactUser = existingUser.contact_username || '';
-                state.phone = existingUser.номер || '';
-                state.role = existingUser.роль === 'админ' ? 'admin' : 'user';
-
-                localStorage.setItem('reflex_login', state.login);
-                localStorage.setItem('reflex_contact_user', state.contactUser);
-                localStorage.setItem('reflex_phone', state.phone);
-                localStorage.setItem('reflex_role', state.role);
-
-                showToast('Успешный вход в аккаунт!');
-                await loadCartFromDb();
-                await fetchOrders();
-                render();
-            } catch (e) {
-                console.error(e);
-                showToast('Ошибка входа', 'error');
-            }
-        }
-
-        async function submitRegister() {
-            const login = document.getElementById('reg-login').value.trim();
-            const password = document.getElementById('reg-password').value.trim();
-            let contact = document.getElementById('reg-contact').value.trim();
-            const phone = document.getElementById('reg-phone').value.trim();
-
-            if (!login || !password) {
-                showToast('Введите логин и пароль!', 'error');
-                return;
-            }
-
-            if (contact && !contact.startsWith('@')) contact = '@' + contact;
-
-            try {
-                const { data: existingUser } = await supabaseClient.from('user').select('логин').eq('логин', login).maybeSingle();
-                if (existingUser) {
-                    showToast('Такой логин уже занят, выберите другой', 'error');
-                    return;
-                }
-
-                const { error } = await supabaseClient.from('user').insert({
-                    логин: login,
-                    пароль: password,
-                    contact_username: contact,
-                    номер: phone,
-                    роль: 'пользователь'
-                });
-
-                if (error) {
-                    showToast('Ошибка регистрации (возможно, логин уже занят)', 'error');
-                    return;
-                }
-
-                state.login = login;
-                state.contactUser = contact;
-                state.phone = phone;
-                state.role = 'user';
-
-                localStorage.setItem('reflex_login', state.login);
-                localStorage.setItem('reflex_contact_user', state.contactUser);
-                localStorage.setItem('reflex_phone', state.phone);
-                localStorage.setItem('reflex_role', state.role);
-
-                state.registeredAccountsCount++;
-                showToast('Успешная регистрация и вход!');
-                await loadCartFromDb();
-                await fetchOrders();
-                render();
-            } catch (e) {
-                console.error(e);
-                showToast('Ошибка регистрации', 'error');
-            }
-        }
-
-        function logoutUser() {
-            state.login = '';
-            state.contactUser = '';
-            state.phone = '';
-            state.role = 'user';
-            state.isProfileEditing = false;
-            state.authMode = 'login';
-            localStorage.removeItem('reflex_login');
-            localStorage.removeItem('reflex_contact_user');
-            localStorage.removeItem('reflex_phone');
-            localStorage.setItem('reflex_role', 'user');
-
-            state.cart = [];
-            render();
-            showToast('Вы вышли из аккаунта');
-        }
-
-        function deleteAccount() {
-            showConfirm('Удаление аккаунта', 'Вы уверены, что хотите удалить свой аккаунт? Это действие необратимо.', async () => {
-                try {
-                    await supabaseClient.from('user').delete().eq('логин', state.login);
-                } catch (e) {}
-
-                logoutUser();
-                showToast('Аккаунт успешно удален');
-            });
-        }
-
-        function openChangePasswordModal() {
-            if (!state.login) {
-                showToast('Смена пароля доступна только при вошедшем аккаунте', 'error');
-                return;
-            }
-            document.getElementById('old-acc-password').value = '';
-            document.getElementById('new-acc-password').value = '';
-            openModal('modal-change-password');
-        }
-
-        async function submitChangePassword() {
-            const oldPass = document.getElementById('old-acc-password').value.trim();
-            const newPass = document.getElementById('new-acc-password').value.trim();
-
-            if (!oldPass || !newPass) {
-                showToast('Заполните оба поля', 'error');
-                return;
-            }
-
-            try {
-                const { data: dbUser } = await supabaseClient.from('user').select('пароль').eq('логин', state.login).maybeSingle();
-                if (!dbUser || dbUser.пароль !== oldPass) {
-                    showToast('Неверный старый пароль!', 'error');
-                    return;
-                }
-
-                await supabaseClient.from('user').update({ пароль: newPass }).eq('логин', state.login);
-                closeModal('modal-change-password');
-                showToast('Пароль успешно изменен!');
-            } catch (e) {
-                showToast('Ошибка смены пароля', 'error');
-            }
-        }
-
-        // --- Вход в админку ---
-        // Версия пароля позволяет глобально инвалидировать старые автологины.
-        async function getAdminPasswordState() {
-            const { data: passwordRow, error: passwordError } = await supabaseClient
-                .from('setting').select('value').eq('key', 'admin_password').maybeSingle();
-            if (passwordError) throw passwordError;
-
-            const { data: versionRow, error: versionError } = await supabaseClient
-                .from('setting').select('value').eq('key', 'admin_password_version').maybeSingle();
-            if (versionError) throw versionError;
-
-            return {
-                password: passwordRow ? passwordRow.value : 'admin',
-                version: versionRow ? String(versionRow.value) : 'legacy'
-            };
-        }
-
-        async function openAdminLoginModal() {
-            if (!state.login) {
-                showToast('Сначала зарегистрируйтесь и войдите в аккаунт!', 'error');
-                switchTab('profile');
-                return;
-            }
-
-            const savedPassword = localStorage.getItem('reflex_admin_password');
-            const savedVersion = localStorage.getItem('reflex_admin_password_version');
-
-            if (savedPassword) {
-                try {
-                    const adminState = await getAdminPasswordState();
-
-                    if (savedVersion && adminState.version !== 'legacy' &&
-                        savedVersion !== adminState.version) {
-                        localStorage.removeItem('reflex_admin_password');
-                        localStorage.removeItem('reflex_admin_password_version');
-                        localStorage.setItem('reflex_role', 'user');
-                        state.role = 'user';
-                        document.getElementById('admin-password-input').value = '';
-                        openModal('modal-admin-login');
-                        showToast('Пароль админки был изменён. Введите новый пароль.', 'error');
-                        return;
-                    }
-
-                    await submitAdminLogin(savedPassword, true, adminState);
-                    return;
-                } catch (e) {
-                    console.error('Ошибка проверки автологина:', e);
-                    localStorage.removeItem('reflex_admin_password');
-                    localStorage.removeItem('reflex_admin_password_version');
-                }
-            }
-
-            document.getElementById('admin-password-input').value = '';
-            openModal('modal-admin-login');
-        }
-
-        async function submitAdminLogin(passwordOverride = null, silent = false, knownAdminState = null) {
-            const adminPassInput = passwordOverride || document.getElementById('admin-password-input').value.trim();
-            if (!adminPassInput) {
-                if (!silent) showToast('Введите пароль администратора', 'error');
-                return;
-            }
-
-            try {
-                const adminState = knownAdminState || await getAdminPasswordState();
-
-                if (adminPassInput !== adminState.password) {
-                    localStorage.removeItem('reflex_admin_password');
-                    localStorage.removeItem('reflex_admin_password_version');
-                    localStorage.setItem('reflex_role', 'user');
-                    state.role = 'user';
-
-                    if (!silent) {
-                        showToast('Неверный пароль администратора!', 'error');
-                    } else {
-                        showToast('Пароль админки изменился — введите новый', 'error');
-                        document.getElementById('admin-password-input').value = '';
-                        openModal('modal-admin-login');
-                    }
-                    return;
-                }
-
-                const { error: roleError } = await supabaseClient
-                    .from('user').update({ роль: 'админ' }).eq('логин', state.login);
-                if (roleError) throw roleError;
-
-                state.role = 'admin';
-                localStorage.setItem('reflex_role', 'admin');
-                localStorage.setItem('reflex_admin_password', adminPassInput);
-
-                if (adminState.version !== 'legacy') {
-                    localStorage.setItem('reflex_admin_password_version', adminState.version);
-                }
-
-                closeModal('modal-admin-login');
-                switchTab('admin_home');
-                showToast(silent ? 'Автовход в админку выполнен' : 'Вы успешно вошли как администратор!');
-            } catch (e) {
-                console.error(e);
-                if (!silent) showToast('Ошибка входа в админку', 'error');
-            }
-        }
-
-        function openChangeAdminPasswordModal() {
-            document.getElementById('old-admin-password').value = '';
-            document.getElementById('new-admin-password').value = '';
-            openModal('modal-change-admin-password');
-        }
-
-        async function submitChangeAdminPassword() {
-            const oldPass = document.getElementById('old-admin-password').value.trim();
-            const newPass = document.getElementById('new-admin-password').value.trim();
-
-            if (!oldPass || !newPass) {
-                showToast('Заполните оба поля', 'error');
-                return;
-            }
-            if (oldPass === newPass) {
-                showToast('Новый пароль должен отличаться от старого', 'error');
-                return;
-            }
-
-            try {
-                const adminState = await getAdminPasswordState();
-
-                if (oldPass !== adminState.password) {
-                    showToast('Неверный текущий пароль администратора!', 'error');
-                    return;
-                }
-
-                const { error: passwordError } = await supabaseClient
-                    .from('setting')
-                    .upsert({ key: 'admin_password', value: newPass }, { onConflict: 'key' });
-                if (passwordError) throw passwordError;
-
-                // Новая версия делает все старые сохранённые автологины недействительными.
-                const newVersion = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-                const { error: versionError } = await supabaseClient
-                    .from('setting')
-                    .upsert({ key: 'admin_password_version', value: newVersion }, { onConflict: 'key' });
-                if (versionError) throw versionError;
-
-                // Сбрасываем всех текущих администраторов.
-                const { error: roleError } = await supabaseClient
-                    .from('user').update({ роль: 'пользователь' }).eq('роль', 'админ');
-                if (roleError) throw roleError;
-
-                // На текущем устройстве тоже удаляем автологин.
-                state.role = 'user';
-                localStorage.setItem('reflex_role', 'user');
-                localStorage.removeItem('reflex_admin_password');
-                localStorage.removeItem('reflex_admin_password_version');
-
-                closeModal('modal-change-admin-password');
-                switchTab('home');
-                showToast('Пароль изменён. Все админские сессии и автологины сброшены.');
-            } catch (e) {
-                console.error('Ошибка смены пароля администратора:', e);
-                showToast('Ошибка смены пароля администратора', 'error');
-            }
-        }
-
-        function logoutAdmin() {
-            if (state.login) {
-                supabaseClient.from('user').update({ роль: 'пользователь' }).eq('логин', state.login).then(() => {});
-            }
-            state.role = 'user';
-            localStorage.setItem('reflex_role', 'user');
-            switchTab('home');
-            showToast('Вы вышли из админки');
         }
 
         function toggleAdminMenu() {
@@ -2937,279 +2122,6 @@
             }
         }
 
-        function renderAdminSettings(container) {
-            const editingAccount = state.accounts.find(a => a.логин === state.editingAccountLogin);
-
-            container.innerHTML = `
-                <div class="space-y-4 max-w-md mx-auto pt-4">
-                    <h2 class="text-lg font-bold">Настройки администратора</h2>
-
-                    <div class="grid grid-cols-3 gap-1 bg-cardBg p-1 rounded-2xl border border-zinc-800">
-                        <button onclick="state.adminSettingsSubTab='general'; state.editingAccountLogin=null; render();"
-                            class="py-2 rounded-xl text-[11px] font-medium transition ${state.adminSettingsSubTab === 'general' ? 'bg-accent text-white' : 'text-zinc-400'}">
-                            Основные
-                        </button>
-                        <button onclick="state.adminSettingsSubTab='accounts'; state.editingAccountLogin=null; fetchAccounts().then(render);"
-                            class="py-2 rounded-xl text-[11px] font-medium transition ${state.adminSettingsSubTab === 'accounts' ? 'bg-accent text-white' : 'text-zinc-400'}">
-                            Аккаунты (${state.accounts.length})
-                        </button>
-                        <button onclick="state.adminSettingsSubTab='managers'; state.editingAccountLogin=null; render();"
-                            class="py-2 rounded-xl text-[11px] font-medium transition ${state.adminSettingsSubTab === 'managers' ? 'bg-accent text-white' : 'text-zinc-400'}">
-                            Менеджеры (${state.managers.length})
-                        </button>
-                    </div>
-
-                    ${state.adminSettingsSubTab === 'general' ? `
-                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
-                            <button onclick="openChangeAdminPasswordModal()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
-                                <i data-lucide="key" class="w-4 h-4 text-accent"></i><span>Сменить пароль администратора</span>
-                            </button>
-                            <button onclick="resetSystemToZero()" class="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2 border border-red-500/30">
-                                <i data-lucide="trash-2" class="w-4 h-4"></i><span>Сбросить сайт (Очистить всё)</span>
-                            </button>
-                            <button onclick="logoutAdmin()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
-                                <i data-lucide="log-out" class="w-4 h-4"></i><span>Выйти из админки</span>
-                            </button>
-                        </div>
-                    ` : state.adminSettingsSubTab === 'accounts' ? `
-                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <h3 class="text-sm font-bold">Учётные записи</h3>
-                                    <p class="text-[10px] text-zinc-500 mt-0.5">Логин, номер телефона и Telegram. Пароли в списке не показываются.</p>
-                                </div>
-                                <button onclick="fetchAccounts().then(render)" class="p-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300" title="Обновить">
-                                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-                                </button>
-                            </div>
-
-                            ${editingAccount ? `
-                                <div class="border border-accent/50 bg-accent/5 rounded-2xl p-3 space-y-3">
-                                    <div class="flex items-center justify-between">
-                                        <h3 class="text-sm font-bold">Редактирование аккаунта</h3>
-                                        <button onclick="cancelEditAccount()" class="text-zinc-400 hover:text-white p-1">
-                                            <i data-lucide="x" class="w-4 h-4"></i>
-                                        </button>
-                                    </div>
-
-                                    <input id="account-edit-login" type="text"
-                                        value="${escapeHtml(editingAccount.логин)}"
-                                        placeholder="Логин"
-                                        class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-accent">
-
-                                    <input id="account-edit-phone" type="text"
-                                        value="${escapeHtml(editingAccount.номер || '')}"
-                                        placeholder="Номер телефона"
-                                        class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-accent">
-
-                                    <input id="account-edit-username" type="text"
-                                        value="${escapeHtml(editingAccount.contact_username || '')}"
-                                        placeholder="Telegram / US (@username)"
-                                        class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-accent">
-
-                                    <select id="account-edit-role"
-                                        class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-accent">
-                                        <option value="пользователь" ${editingAccount.роль === 'пользователь' ? 'selected' : ''}>Пользователь</option>
-                                        <option value="админ" ${editingAccount.роль === 'админ' ? 'selected' : ''}>Администратор</option>
-                                    </select>
-
-                                    <input id="account-edit-password" type="password"
-                                        placeholder="Новый пароль (не менять — оставить пустым)"
-                                        class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-accent">
-
-                                    <div class="flex space-x-2">
-                                        <button onclick="saveAccountChanges()" class="flex-1 bg-accent hover:bg-accentHover py-2.5 rounded-xl text-xs font-medium text-white">
-                                            Сохранить
-                                        </button>
-                                        <button onclick="cancelEditAccount()" class="px-4 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl text-xs text-zinc-300">
-                                            Отмена
-                                        </button>
-                                    </div>
-                                </div>
-                            ` : ''}
-
-                            <div class="space-y-2 max-h-[55vh] overflow-y-auto pr-0.5">
-                                ${state.accounts.length === 0 ? `
-                                    <p class="text-xs text-zinc-500 text-center py-8">Учётных записей пока нет</p>
-                                ` : state.accounts.map(account => `
-                                    <div class="bg-zinc-900 border ${account.логин === state.login ? 'border-accent/50' : 'border-zinc-800'} rounded-2xl p-3">
-                                        <div class="flex items-start justify-between gap-2">
-                                            <div class="min-w-0">
-                                                <div class="flex items-center gap-2">
-                                                    <span class="font-semibold text-sm text-zinc-100 truncate">${escapeHtml(account.логин)}</span>
-                                                    <span class="text-[9px] px-1.5 py-0.5 rounded-full ${account.роль === 'админ' ? 'bg-accent/20 text-accent' : 'bg-zinc-800 text-zinc-400'}">
-                                                        ${account.роль === 'админ' ? 'Админ' : 'Пользователь'}
-                                                    </span>
-                                                </div>
-                                                <p class="text-xs text-zinc-400 mt-1">
-                                                    <span class="text-zinc-500">Номер:</span> ${escapeHtml(account.номер || 'не указан')}
-                                                </p>
-                                                <p class="text-xs text-zinc-400 mt-0.5">
-                                                    <span class="text-zinc-500">US:</span> ${escapeHtml(account.contact_username || 'не указан')}
-                                                </p>
-                                            </div>
-                                            <div class="flex items-center gap-1 shrink-0">
-                                                <button onclick="startEditAccount('${escapeHtml(account.логин)}')" class="p-2 rounded-lg text-zinc-400 hover:text-accent hover:bg-zinc-800" title="Изменить">
-                                                    <i data-lucide="edit-2" class="w-4 h-4"></i>
-                                                </button>
-                                                ${account.логин !== state.login ? `
-                                                    <button onclick="deleteAccount('${escapeHtml(account.логин)}')" class="p-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-950/30" title="Удалить">
-                                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                                    </button>
-                                                ` : `
-                                                    <span class="text-[9px] text-zinc-600 px-1">Вы</span>
-                                                `}
-                                            </div>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    ` : `
-                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
-                            <h3 class="text-sm font-bold">${state.editingManagerId ? 'Редактировать менеджера' : 'Добавить менеджера'}</h3>
-                            <div class="space-y-2">
-                                <input type="text" id="new-manager-name" placeholder="Имя менеджера" value="${(() => { const m = state.managers.find(x => x.id == state.editingManagerId); return m ? escapeHtml(m.name) : ''; })()}" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
-                                <input type="text" id="new-manager-username" placeholder="Юз телеграм (@username)" value="${(() => { const m = state.managers.find(x => x.id == state.editingManagerId); return m ? escapeHtml(m.username) : ''; })()}" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
-                                <div class="flex space-x-2">
-                                    <button onclick="saveManager()" class="flex-1 bg-accent hover:bg-accentHover py-2.5 rounded-xl font-medium transition text-xs text-white">${state.editingManagerId ? 'Сохранить изменения' : 'Добавить менеджера'}</button>
-                                    ${state.editingManagerId ? `<button onclick="cancelEditManager()" class="px-4 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl font-medium transition text-xs text-zinc-300">Отмена</button>` : ''}
-                                </div>
-                            </div>
-                            <h3 class="text-sm font-bold pt-3 border-t border-zinc-800">Список менеджеров</h3>
-                            <div class="space-y-2 max-h-48 overflow-y-auto">
-                                ${state.managers.length === 0 ? '<p class="text-xs text-zinc-500 text-center py-2">Менеджеры не добавлены</p>' : state.managers.map(m => `
-                                    <div class="bg-zinc-900 border ${state.editingManagerId == m.id ? 'border-accent' : 'border-zinc-800'} p-2.5 rounded-xl flex items-center justify-between">
-                                        <div>
-                                            <h4 class="text-xs font-semibold text-zinc-200">${escapeHtml(m.name)}</h4>
-                                            <p class="text-[10px] text-accent">@${escapeHtml(m.username).replace('@', '')}</p>
-                                        </div>
-                                        <div class="flex items-center space-x-1">
-                                            <button onclick="startEditManager('${escapeHtml(m.id)}')" class="text-zinc-400 hover:text-accent p-1"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
-                                            <button onclick="deleteManager('${escapeHtml(m.id)}')" class="text-red-400 hover:text-red-300 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `}
-                </div>
-            `;
-            lucide.createIcons();
-        }
-
-        function startEditAccount(login) {
-            state.editingAccountLogin = login;
-            render();
-        }
-
-        function cancelEditAccount() {
-            state.editingAccountLogin = null;
-            render();
-        }
-
-        async function saveAccountChanges() {
-            const originalLogin = state.editingAccountLogin;
-            if (!originalLogin) return;
-
-            const loginField = document.getElementById('account-edit-login');
-            const phoneField = document.getElementById('account-edit-phone');
-            const usernameField = document.getElementById('account-edit-username');
-            const roleField = document.getElementById('account-edit-role');
-            const passwordField = document.getElementById('account-edit-password');
-
-            if (!loginField || !phoneField || !usernameField || !roleField || !passwordField) return;
-
-            const newLogin = loginField.value.trim();
-            const phone = phoneField.value.trim();
-            let username = usernameField.value.trim();
-            const role = roleField.value;
-            const newPassword = passwordField.value.trim();
-
-            if (!newLogin) {
-                showToast('Логин не может быть пустым', 'error');
-                return;
-            }
-
-            if (username && !username.startsWith('@')) username = '@' + username;
-
-            try {
-                if (newLogin !== originalLogin) {
-                    const { data: existing } = await supabaseClient
-                        .from('user').select('логин').eq('логин', newLogin).maybeSingle();
-
-                    if (existing) {
-                        showToast('Такой логин уже занят', 'error');
-                        return;
-                    }
-
-                    // Переносим корзину на новый логин, чтобы при переименовании
-                    // аккаунта пользователь не потерял сохранённую корзину.
-                    await supabaseClient.from('cart_items')
-                        .update({ user_identifier: newLogin })
-                        .eq('user_identifier', originalLogin);
-                }
-
-                const updateData = {
-                    логин: newLogin,
-                    номер: phone,
-                    contact_username: username,
-                    роль: role
-                };
-                if (newPassword) updateData.пароль = newPassword;
-
-                const { error } = await supabaseClient
-                    .from('user').update(updateData).eq('логин', originalLogin);
-
-                if (error) throw error;
-
-                if (originalLogin === state.login) {
-                    state.login = newLogin;
-                    state.role = role === 'админ' ? 'admin' : 'user';
-                    localStorage.setItem('reflex_login', newLogin);
-                    localStorage.setItem('reflex_role', state.role);
-                    localStorage.setItem('reflex_contact_user', username);
-                    localStorage.setItem('reflex_phone', phone);
-                }
-
-                state.editingAccountLogin = null;
-                await fetchAccounts();
-                render();
-                showToast('Учётная запись обновлена');
-            } catch (e) {
-                console.error('Ошибка изменения учётной записи:', e);
-                showToast('Не удалось изменить учётную запись', 'error');
-            }
-        }
-
-        async function deleteAccount(login) {
-            if (!login || login === state.login) {
-                showToast('Нельзя удалить текущую учётную запись', 'error');
-                return;
-            }
-
-            showConfirm(
-                'Удалить учётную запись?',
-                `Аккаунт "${login}" будет удалён без возможности восстановления.`,
-                async () => {
-                    try {
-                        await supabaseClient.from('cart_items').delete().eq('user_identifier', login);
-                        const { error } = await supabaseClient.from('user').delete().eq('логин', login);
-                        if (error) throw error;
-
-                        if (state.editingAccountLogin === login) state.editingAccountLogin = null;
-                        await fetchAccounts();
-                        await fetchRegisteredAccountsCount();
-                        render();
-                        showToast('Учётная запись удалена');
-                    } catch (e) {
-                        console.error('Ошибка удаления учётной записи:', e);
-                        showToast('Не удалось удалить учётную запись', 'error');
-                    }
-                }
-            );
-        }
-
         async function saveManager() {
             const nameField = document.getElementById('new-manager-name');
             const usernameField = document.getElementById('new-manager-username');
@@ -3268,6 +2180,873 @@
             render();
             showToast('Менеджер удален');
         }
+
+        /* =========================================================
+           VLD VAPE — NEW AUTH LAYER
+           Telegram Login 2.0 (OIDC) + Supabase Auth + profiles
+           ========================================================= */
+
+        const TELEGRAM_CLIENT_ID = 8749767581;
+
+        // Нормализуем состояние. Старые localStorage-ключи больше не используются.
+        state.role = 'user';
+        state.login = '';
+        state.userId = null;
+        state.telegramUser = null;
+        state.contactUser = '';
+        state.phone = '';
+        state.authMode = 'telegram';
+        state.isProfileEditing = false;
+
+        function applyProfileToState(profile) {
+            if (!profile) return;
+
+            state.userId = profile.id;
+            state.role = profile.role === 'admin' ? 'admin' : 'user';
+            state.contactUser = profile.contact_username || '';
+            state.phone = profile.phone || '';
+            state.telegramUser = {
+                id: Number(profile.telegram_id),
+                username: profile.telegram_username || '',
+                first_name: profile.first_name || '',
+                last_name: profile.last_name || '',
+                photo_url: profile.photo_url || ''
+            };
+
+            state.login = profile.telegram_username
+                ? '@' + profile.telegram_username
+                : (profile.first_name || `Telegram ${profile.telegram_id}`);
+
+            if (state.role !== 'admin' && state.activeTab.startsWith('admin_')) {
+                state.activeTab = 'home';
+            }
+        }
+
+        async function checkUserRoleOnStartup() {
+            try {
+                const { data: { session } } = await supabaseClient.auth.getSession();
+
+                if (!session?.user) {
+                    state.role = 'user';
+                    state.userId = null;
+                    state.telegramUser = null;
+                    state.login = '';
+                    state.contactUser = '';
+                    state.phone = '';
+                    return;
+                }
+
+                state.userId = session.user.id;
+
+                const { data: profile, error } = await supabaseClient
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', session.user.id)
+                    .single();
+
+                if (error || !profile) {
+                    await supabaseClient.auth.signOut();
+                    throw error || new Error('Профиль Telegram не найден');
+                }
+
+                applyProfileToState(profile);
+            } catch (e) {
+                console.error('Ошибка восстановления сессии:', e);
+                state.role = 'user';
+                state.userId = null;
+                state.telegramUser = null;
+                state.login = '';
+            }
+        }
+
+        async function refreshCurrentProfile() {
+            if (!state.userId) return null;
+
+            const { data, error } = await supabaseClient
+                .from('profiles')
+                .select('*')
+                .eq('id', state.userId)
+                .single();
+
+            if (error) throw error;
+            applyProfileToState(data);
+            return data;
+        }
+
+        function renderUserProfile(container) {
+            const logged = !!state.userId;
+            const tg = state.telegramUser || {};
+
+            container.innerHTML = `
+                <div class="space-y-4 max-w-sm mx-auto pt-4">
+                    <h2 class="text-lg font-bold">Профиль аккаунта</h2>
+
+                    ${!logged ? `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-5 space-y-4">
+                            <h3 class="text-accent font-bold">Вход через Telegram</h3>
+                            <p class="text-sm text-zinc-400">
+                                Новый Telegram Login 2.0 (OpenID Connect). Логин и пароль больше не нужны.
+                            </p>
+                            <button onclick="telegramLogin()"
+                                class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl text-white font-medium">
+                                Войти через Telegram
+                            </button>
+                            <div class="text-[10px] text-zinc-600 text-center">
+                                При первом входе профиль создаётся автоматически.
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-4">
+                            <div class="flex items-center gap-3">
+                                ${tg.photo_url
+                                    ? `<img src="${escapeHtml(tg.photo_url)}" class="w-12 h-12 rounded-full object-cover border border-zinc-700">`
+                                    : `<div class="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center"><i data-lucide="user" class="w-5 h-5 text-zinc-500"></i></div>`}
+                                <div class="min-w-0">
+                                    <div class="font-bold truncate">
+                                        ${escapeHtml(((tg.first_name || '') + ' ' + (tg.last_name || '')).trim() || 'Пользователь Telegram')}
+                                    </div>
+                                    <div class="text-accent text-sm truncate">
+                                        ${tg.username ? '@' + escapeHtml(tg.username) : 'Без username'}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="text-xs text-zinc-500">
+                                Telegram ID: <span class="text-zinc-300">${escapeHtml(tg.id || '')}</span>
+                            </div>
+
+                            ${state.isProfileEditing ? `
+                                <div class="space-y-3 pt-2 border-t border-zinc-800">
+                                    <div>
+                                        <label class="text-xs text-zinc-400 mb-1 block">Telegram для связи</label>
+                                        <input id="edit-contact-user"
+                                            value="${escapeHtml(state.contactUser || '')}"
+                                            placeholder="@username"
+                                            class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                                    </div>
+                                    <div>
+                                        <label class="text-xs text-zinc-400 mb-1 block">Номер телефона</label>
+                                        <input id="edit-contact-phone"
+                                            value="${escapeHtml(state.phone || '')}"
+                                            placeholder="+7..."
+                                            class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button onclick="saveEditContacts()" class="bg-accent hover:bg-accentHover py-2.5 rounded-xl text-xs font-medium text-white">Сохранить</button>
+                                        <button onclick="cancelEditContacts()" class="bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl text-xs text-zinc-300">Отмена</button>
+                                    </div>
+                                </div>
+                            ` : `
+                                <div class="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 space-y-1.5">
+                                    <div class="text-xs"><span class="text-zinc-500">Контакт:</span> <span class="text-zinc-300">${escapeHtml(state.contactUser || 'не указан')}</span></div>
+                                    <div class="text-xs"><span class="text-zinc-500">Телефон:</span> <span class="text-zinc-300">${escapeHtml(state.phone || 'не указан')}</span></div>
+                                </div>
+                                <button onclick="startEditContacts()" class="w-full bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl text-xs text-zinc-200">
+                                    Изменить контакты
+                                </button>
+                            `}
+
+                            <div class="space-y-2 pt-2 border-t border-zinc-800">
+                                <button onclick="logoutTelegram()" class="w-full bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl text-red-400 text-sm">Выйти</button>
+                                <button onclick="deleteAccount()" class="w-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 py-2.5 rounded-xl text-red-400 text-xs">Удалить аккаунт</button>
+                            </div>
+                        </div>
+                    `}
+                </div>
+            `;
+
+            lucide.createIcons();
+        }
+
+        function telegramLogin() {
+            if (!window.Telegram?.Login) {
+                showToast('Telegram Login ещё загружается. Попробуйте через секунду.', 'error');
+                return;
+            }
+
+            try {
+                window.Telegram.Login.auth({
+                    client_id: TELEGRAM_CLIENT_ID,
+                    lang: 'ru'
+                }, onTelegramAuth);
+            } catch (e) {
+                console.error(e);
+                showToast('Не удалось открыть Telegram', 'error');
+            }
+        }
+
+        async function onTelegramAuth(data) {
+            if (!data || data.error || !data.id_token) {
+                console.error('Telegram auth error:', data);
+                showToast('Telegram не подтвердил авторизацию', 'error');
+                return;
+            }
+
+            try {
+                showToast('Проверяем аккаунт Telegram…');
+
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/telegram-auth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id_token: data.id_token })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok || !result.email || !result.password) {
+                    throw new Error(result?.error || 'Не удалось подтвердить Telegram');
+                }
+
+                const { error: signInError } = await supabaseClient.auth.signInWithPassword({
+                    email: result.email,
+                    password: result.password
+                });
+
+                if (signInError) throw signInError;
+
+                await checkUserRoleOnStartup();
+                await mergeGuestCartIntoDb();
+                await loadCartFromDb();
+                await fetchOrders();
+                await fetchRegisteredAccountsCount();
+
+                showToast('Вход через Telegram выполнен');
+                render();
+            } catch (e) {
+                console.error('Telegram OIDC login error:', e);
+                showToast(e?.message || 'Ошибка Telegram авторизации', 'error');
+            }
+        }
+
+        async function logoutTelegram() {
+            try {
+                await supabaseClient.auth.signOut();
+            } catch (e) {
+                console.error(e);
+            }
+
+            state.role = 'user';
+            state.userId = null;
+            state.telegramUser = null;
+            state.login = '';
+            state.contactUser = '';
+            state.phone = '';
+            state.isProfileEditing = false;
+            state.activeTab = 'home';
+
+            await loadCartFromDb();
+            render();
+            showToast('Вы вышли из аккаунта');
+        }
+
+        function startEditContacts() {
+            state.isProfileEditing = true;
+            render();
+        }
+
+        function cancelEditContacts() {
+            state.isProfileEditing = false;
+            render();
+        }
+
+        async function saveEditContacts() {
+            if (!state.userId) {
+                showToast('Сначала войдите через Telegram', 'error');
+                return;
+            }
+
+            let contact = document.getElementById('edit-contact-user')?.value.trim() || '';
+            const phone = document.getElementById('edit-contact-phone')?.value.trim() || '';
+
+            if (contact && !contact.startsWith('@')) contact = '@' + contact;
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .update({
+                        contact_username: contact || null,
+                        phone: phone || null
+                    })
+                    .eq('id', state.userId)
+                    .select('*')
+                    .single();
+
+                if (error) throw error;
+
+                applyProfileToState(data);
+                state.isProfileEditing = false;
+                render();
+                showToast('Контакты обновлены!');
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка обновления контактов', 'error');
+            }
+        }
+
+        async function deleteAccount() {
+            if (!state.userId) return;
+
+            showConfirm(
+                'Удаление аккаунта',
+                'Профиль и связанные с ним данные будут удалены. Действие необратимо.',
+                async () => {
+                    try {
+                        const { error } = await supabaseClient.rpc('delete_my_account');
+                        if (error) throw error;
+
+                        await supabaseClient.auth.signOut();
+
+                        state.role = 'user';
+                        state.userId = null;
+                        state.telegramUser = null;
+                        state.login = '';
+                        state.contactUser = '';
+                        state.phone = '';
+                        state.cart = [];
+                        state.activeTab = 'home';
+
+                        render();
+                        showToast('Аккаунт удалён');
+                    } catch (e) {
+                        console.error(e);
+                        showToast('Не удалось удалить аккаунт', 'error');
+                    }
+                }
+            );
+        }
+
+        function openAdminPanel() {
+            if (!state.userId) {
+                showToast('Сначала войдите через Telegram', 'error');
+                switchTab('profile');
+                return;
+            }
+
+            if (state.role !== 'admin') {
+                showToast('У вашего Telegram-аккаунта нет прав администратора', 'error');
+                return;
+            }
+
+            switchTab('admin_home');
+        }
+
+        async function logoutAdmin() {
+            if (state.role !== 'admin') return;
+            await refreshCurrentProfile().catch(() => null);
+            state.activeTab = 'home';
+            render();
+            showToast('Вы вышли из панели работника');
+        }
+
+        async function mergeGuestCartIntoDb() {
+            if (!state.userId) return;
+
+            const guestCart = JSON.parse(localStorage.getItem('reflex_cart') || '[]');
+            if (!guestCart.length) return;
+
+            const { data: dbRows, error } = await supabaseClient
+                .from('cart_items')
+                .select('*')
+                .eq('user_id', state.userId);
+
+            if (error) throw error;
+
+            const merged = [...(dbRows || []).map(i => ({
+                productId: i.product_id,
+                variantId: i.variant_id,
+                name: i.name,
+                variantName: i.variant_name,
+                price: Number(i.price),
+                qty: Number(i.qty),
+                image: i.image,
+                maxQty: Number(i.max_qty || 0)
+            }))];
+
+            for (const item of guestCart) {
+                const existing = merged.find(x =>
+                    String(x.productId) === String(item.productId) &&
+                    String(x.variantId) === String(item.variantId)
+                );
+
+                if (existing) existing.qty += Number(item.qty || 0);
+                else merged.push({ ...item });
+            }
+
+            state.cart = merged;
+            localStorage.removeItem('reflex_cart');
+            await saveCartToDb();
+        }
+
+        async function loadCartFromDb() {
+            if (!state.userId) {
+                state.cart = JSON.parse(localStorage.getItem('reflex_cart') || '[]');
+                return;
+            }
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('cart_items')
+                    .select('*')
+                    .eq('user_id', state.userId);
+
+                if (error) throw error;
+
+                state.cart = (data || []).map(i => ({
+                    productId: i.product_id,
+                    variantId: i.variant_id,
+                    name: i.name,
+                    variantName: i.variant_name,
+                    price: Number(i.price),
+                    qty: Number(i.qty),
+                    image: i.image,
+                    maxQty: Number(i.max_qty || 0)
+                }));
+            } catch (e) {
+                console.error('Ошибка загрузки корзины:', e);
+            }
+        }
+
+        async function saveCartToDb() {
+            if (!state.userId) {
+                localStorage.setItem('reflex_cart', JSON.stringify(state.cart));
+                return;
+            }
+
+            try {
+                const { error: deleteError } = await supabaseClient
+                    .from('cart_items')
+                    .delete()
+                    .eq('user_id', state.userId);
+
+                if (deleteError) throw deleteError;
+
+                if (state.cart.length > 0) {
+                    const rows = state.cart.map(i => ({
+                        user_id: state.userId,
+                        product_id: i.productId,
+                        variant_id: i.variantId,
+                        name: i.name,
+                        variant_name: i.variantName,
+                        price: Number(i.price),
+                        qty: Number(i.qty),
+                        image: i.image || null,
+                        max_qty: Number(i.maxQty || 0)
+                    }));
+
+                    const { error: insertError } = await supabaseClient
+                        .from('cart_items')
+                        .insert(rows);
+
+                    if (insertError) throw insertError;
+                }
+            } catch (e) {
+                console.error('Ошибка сохранения корзины:', e);
+            }
+        }
+
+        function getMyActiveOrder() {
+            return (state.orders || []).find(o =>
+                o.status === 'in_progress' &&
+                state.userId &&
+                o.user_id === state.userId
+            ) || null;
+        }
+
+        function renderUserOrders(container) {
+            const myOrders = (state.orders || []).filter(o =>
+                o.status !== 'archived' && state.userId && o.user_id === state.userId
+            );
+
+            const inProgress = myOrders.filter(o => o.status === 'in_progress');
+            const completed = myOrders.filter(o => o.status === 'completed');
+
+            container.innerHTML = `
+                <div class="space-y-4">
+                    <h2 class="text-lg font-bold">Мои заказы</h2>
+                    ${!state.userId ? `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-5 text-center">
+                            <p class="text-sm text-zinc-400 mb-3">Войдите через Telegram, чтобы видеть историю заказов.</p>
+                            <button onclick="switchTab('profile')" class="bg-accent hover:bg-accentHover px-4 py-2.5 rounded-xl text-sm text-white">Войти</button>
+                        </div>
+                    ` : `
+                        <div class="space-y-3">
+                            <h3 class="text-sm font-semibold text-amber-400">В работе (${inProgress.length})</h3>
+                            ${inProgress.length === 0 ? '<p class="text-xs text-zinc-600">Нет заказов в работе</p>' : inProgress.map(o => `
+                                <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-2">
+                                    <div class="flex justify-between text-xs text-zinc-400">
+                                        <span>Заказ #${String(o.id).slice(0,6)}</span>
+                                        <span>${new Date(o.created_at).toLocaleString()}</span>
+                                    </div>
+                                    <div class="space-y-1">
+                                        ${(o.order_items || []).map(i => `<div class="text-sm flex justify-between"><span>${escapeHtml(i.product_name)} (${escapeHtml(i.variant_name)})</span><span>${i.quantity} шт.</span></div>`).join('')}
+                                    </div>
+                                    <div class="pt-2 border-t border-zinc-800 flex items-center justify-between">
+                                        <span class="font-bold text-accent">${o.total_retail} ₽</span>
+                                        <button onclick="askAboutOrder('${o.id}')" class="px-3 py-2 bg-zinc-800 rounded-xl text-xs">Вопрос</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <div class="space-y-3 pt-3">
+                            <h3 class="text-sm font-semibold text-emerald-400">Выполненные (${completed.length})</h3>
+                            ${completed.length === 0 ? '<p class="text-xs text-zinc-600">Нет выполненных заказов</p>' : completed.map(o => `
+                                <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-2 opacity-75">
+                                    <div class="flex justify-between text-xs text-zinc-400">
+                                        <span>Заказ #${String(o.id).slice(0,6)}</span>
+                                        <span>${new Date(o.created_at).toLocaleDateString()}</span>
+                                    </div>
+                                    <div class="space-y-1">
+                                        ${(o.order_items || []).map(i => `<div class="text-sm flex justify-between"><span>${escapeHtml(i.product_name)} (${escapeHtml(i.variant_name)})</span><span>${i.quantity} шт.</span></div>`).join('')}
+                                    </div>
+                                    <div class="pt-2 border-t border-zinc-800">
+                                        <span class="font-bold text-sm text-zinc-300">${o.total_retail} ₽</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `}
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        async function executeCheckout() {
+            const selectedItems = getSelectedCartItems().map(item => ({ ...item }));
+
+            if (!state.userId) {
+                showToast('Для оформления заказа войдите через Telegram', 'error');
+                switchTab('profile');
+                return;
+            }
+
+            if (!selectedItems.length) {
+                showToast('Выберите товары для оформления', 'error');
+                return;
+            }
+
+            if (getMyActiveOrder()) {
+                showToast('У вас уже есть заказ в работе', 'error');
+                return;
+            }
+
+            if (state.isPlacingOrder) return;
+            state.isPlacingOrder = true;
+
+            try {
+                const items = selectedItems.map(item => ({
+                    product_id: item.productId,
+                    variant_id: item.variantId,
+                    quantity: Number(item.qty) || 0
+                })).filter(x => x.quantity > 0);
+
+                const { data: orderId, error } = await supabaseClient.rpc('place_order', {
+                    p_items: items,
+                    p_contact_username: state.contactUser || null,
+                    p_phone: state.phone || null,
+                    p_client_id: state.clientId
+                });
+
+                if (error) throw error;
+
+                const selectedKeys = new Set(selectedItems.map(i => `${i.productId}:${i.variantId}`));
+                state.cart = state.cart.filter(item => !selectedKeys.has(`${item.productId}:${item.variantId}`));
+                state.selectedCartItems.clear();
+
+                await saveCartToDb();
+                await fetchProducts();
+                await fetchOrders();
+
+                switchTab('orders');
+                showToast(`Заказ #${String(orderId).slice(0,6)} успешно оформлен!`);
+            } catch (e) {
+                console.error(e);
+                showToast(e?.message || 'Ошибка при оформлении заказа', 'error');
+            } finally {
+                state.isPlacingOrder = false;
+            }
+        }
+
+        async function cancelOrder(orderId) {
+            showConfirm('Отмена заказа', 'Вы уверены, что хотите отменить этот заказ?', async () => {
+                try {
+                    const { error } = await supabaseClient.rpc('cancel_order', { p_order_id: orderId });
+                    if (error) throw error;
+
+                    await fetchProducts();
+                    await fetchOrders();
+                    render();
+                    showToast('Заказ отменен, товар возвращен на склад');
+                } catch (e) {
+                    console.error(e);
+                    showToast(e?.message || 'Ошибка отмены заказа', 'error');
+                }
+            });
+        }
+
+        function checkoutOrder() {
+            if (!state.userId) {
+                showToast('Для оформления заказа войдите через Telegram', 'error');
+                switchTab('profile');
+                return;
+            }
+
+            if (state.isPlacingOrder) return;
+            if (getMyActiveOrder()) {
+                showToast('Нельзя оформить новый заказ, пока текущий не выполнен или не отменен', 'error');
+                return;
+            }
+            if (!getSelectedCartItems().length) {
+                showToast('Выберите товары для оформления', 'error');
+                return;
+            }
+            if (!state.contactUser && !state.phone) {
+                openModal('modal-missing-contacts');
+                return;
+            }
+            executeCheckout();
+        }
+
+        async function fetchRegisteredAccountsCount() {
+            try {
+                const { count, error } = await supabaseClient
+                    .from('profiles')
+                    .select('id', { count: 'exact', head: true });
+
+                if (!error) state.registeredAccountsCount = Number(count || 0);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function fetchAccounts() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .select('id, telegram_id, telegram_username, first_name, last_name, photo_url, phone, contact_username, role, created_at')
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+                state.accounts = data || [];
+            } catch (e) {
+                console.error(e);
+                showToast('Не удалось загрузить профили', 'error');
+            }
+        }
+
+        function renderAdminSettings(container) {
+            const editingAccount = state.accounts.find(a => a.id === state.editingAccountLogin);
+
+            container.innerHTML = `
+                <div class="space-y-4 max-w-md mx-auto pt-4">
+                    <h2 class="text-lg font-bold">Настройки администратора</h2>
+
+                    <div class="grid grid-cols-3 gap-1 bg-cardBg p-1 rounded-2xl border border-zinc-800">
+                        <button onclick="state.adminSettingsSubTab='general'; state.editingAccountLogin=null; render();" class="py-2 rounded-xl text-[11px] font-medium transition ${state.adminSettingsSubTab === 'general' ? 'bg-accent text-white' : 'text-zinc-400'}">Основные</button>
+                        <button onclick="state.adminSettingsSubTab='accounts'; state.editingAccountLogin=null; fetchAccounts().then(render);" class="py-2 rounded-xl text-[11px] font-medium transition ${state.adminSettingsSubTab === 'accounts' ? 'bg-accent text-white' : 'text-zinc-400'}">Профили (${state.accounts.length})</button>
+                        <button onclick="state.adminSettingsSubTab='managers'; state.editingAccountLogin=null; render();" class="py-2 rounded-xl text-[11px] font-medium transition ${state.adminSettingsSubTab === 'managers' ? 'bg-accent text-white' : 'text-zinc-400'}">Менеджеры (${state.managers.length})</button>
+                    </div>
+
+                    ${state.adminSettingsSubTab === 'general' ? `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <div class="bg-zinc-900/70 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-400">
+                                <div class="font-semibold text-zinc-200 mb-1">Telegram Login 2.0</div>
+                                Администраторы определяются полем <code class="text-accent">profiles.role</code>. Отдельного пароля админки больше нет.
+                            </div>
+                            <button onclick="resetSystemToZero()" class="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2 border border-red-500/30">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i><span>Очистить данные магазина</span>
+                            </button>
+                            <button onclick="logoutAdmin()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
+                                <i data-lucide="log-out" class="w-4 h-4"></i><span>Выйти из панели</span>
+                            </button>
+                        </div>
+                    ` : state.adminSettingsSubTab === 'accounts' ? `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-sm font-bold">Telegram-профили</h3>
+                                    <p class="text-[10px] text-zinc-500 mt-0.5">Telegram ID, имя, телефон, контакт и роль.</p>
+                                </div>
+                                <button onclick="fetchAccounts().then(render)" class="p-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
+                            </div>
+
+                            ${editingAccount ? `
+                                <div class="border border-accent/50 bg-accent/5 rounded-2xl p-3 space-y-3">
+                                    <h3 class="text-sm font-bold">Редактирование профиля</h3>
+                                    <div class="text-xs text-zinc-400">Telegram ID: <span class="text-zinc-200">${escapeHtml(editingAccount.telegram_id)}</span></div>
+                                    <input id="account-edit-phone" type="text" value="${escapeHtml(editingAccount.phone || '')}" placeholder="Номер телефона" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-accent">
+                                    <input id="account-edit-username" type="text" value="${escapeHtml(editingAccount.contact_username || '')}" placeholder="Контактный Telegram (@username)" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-accent">
+                                    <select id="account-edit-role" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-accent">
+                                        <option value="user" ${editingAccount.role === 'user' ? 'selected' : ''}>Пользователь</option>
+                                        <option value="admin" ${editingAccount.role === 'admin' ? 'selected' : ''}>Администратор</option>
+                                    </select>
+                                    <div class="flex space-x-2">
+                                        <button onclick="saveAccountChanges()" class="flex-1 bg-accent py-2.5 rounded-xl text-xs font-medium text-white">Сохранить</button>
+                                        <button onclick="cancelEditAccount()" class="px-4 bg-zinc-800 py-2.5 rounded-xl text-xs text-zinc-300">Отмена</button>
+                                    </div>
+                                </div>
+                            ` : ''}
+
+                            <div class="space-y-2 max-h-[55vh] overflow-y-auto">
+                                ${state.accounts.length === 0 ? '<p class="text-xs text-zinc-500 text-center py-8">Профили пока не созданы</p>' : state.accounts.map(account => `
+                                    <div class="bg-zinc-900 border ${account.id === state.userId ? 'border-accent/50' : 'border-zinc-800'} rounded-2xl p-3">
+                                        <div class="flex items-start justify-between gap-2">
+                                            <div class="min-w-0 flex items-center gap-3">
+                                                ${account.photo_url ? `<img src="${escapeHtml(account.photo_url)}" class="w-9 h-9 rounded-full object-cover">` : `<div class="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center"><i data-lucide="user" class="w-4 h-4 text-zinc-500"></i></div>`}
+                                                <div class="min-w-0">
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="font-semibold text-sm text-zinc-100 truncate">${escapeHtml(((account.first_name || '') + ' ' + (account.last_name || '')).trim() || 'Telegram пользователь')}</span>
+                                                        <span class="text-[9px] px-1.5 py-0.5 rounded-full ${account.role === 'admin' ? 'bg-accent/20 text-accent' : 'bg-zinc-800 text-zinc-400'}">${account.role === 'admin' ? 'Админ' : 'Пользователь'}</span>
+                                                    </div>
+                                                    <p class="text-xs text-accent">${account.telegram_username ? '@' + escapeHtml(account.telegram_username) : 'Без username'}</p>
+                                                    <p class="text-[10px] text-zinc-500">ID: ${escapeHtml(account.telegram_id)}</p>
+                                                    <p class="text-[10px] text-zinc-500">${escapeHtml(account.phone || 'Телефон не указан')}</p>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center gap-1">
+                                                <button onclick="startEditAccount('${escapeHtml(account.id)}')" class="p-2 text-zinc-400 hover:text-accent"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
+                                                ${account.id !== state.userId ? `<button onclick="deleteAccount('${escapeHtml(account.id)}')" class="p-2 text-red-400"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <h3 class="text-sm font-bold">${state.editingManagerId ? 'Редактировать менеджера' : 'Добавить менеджера'}</h3>
+                            <div class="space-y-2">
+                                <input type="text" id="new-manager-name" placeholder="Имя менеджера" value="${(() => { const m = state.managers.find(x => x.id == state.editingManagerId); return m ? escapeHtml(m.name) : ''; })()}" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
+                                <input type="text" id="new-manager-username" placeholder="Юз телеграм (@username)" value="${(() => { const m = state.managers.find(x => x.id == state.editingManagerId); return m ? escapeHtml(m.username) : ''; })()}" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
+                                <button onclick="saveManager()" class="w-full bg-accent py-2.5 rounded-xl text-xs text-white">${state.editingManagerId ? 'Сохранить изменения' : 'Добавить менеджера'}</button>
+                            </div>
+                            <div class="space-y-2 max-h-48 overflow-y-auto">
+                                ${state.managers.map(m => `<div class="bg-zinc-900 border border-zinc-800 p-2.5 rounded-xl flex items-center justify-between"><div><h4 class="text-xs font-semibold">${escapeHtml(m.name)}</h4><p class="text-[10px] text-accent">@${escapeHtml(m.username).replace('@','')}</p></div><div class="flex gap-1"><button onclick="startEditManager('${escapeHtml(m.id)}')" class="p-1 text-zinc-400"><i data-lucide="edit-2" class="w-4 h-4"></i></button><button onclick="deleteManager('${escapeHtml(m.id)}')" class="p-1 text-red-400"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div></div>`).join('')}
+                            </div>
+                        </div>
+                    `}
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        function startEditAccount(id) {
+            state.editingAccountLogin = id;
+            render();
+        }
+
+        function cancelEditAccount() {
+            state.editingAccountLogin = null;
+            render();
+        }
+
+        async function saveAccountChanges() {
+            const profileId = state.editingAccountLogin;
+            if (!profileId) return;
+
+            let username = document.getElementById('account-edit-username')?.value.trim() || '';
+            const phone = document.getElementById('account-edit-phone')?.value.trim() || '';
+            const role = document.getElementById('account-edit-role')?.value;
+
+            if (username && !username.startsWith('@')) username = '@' + username;
+
+            try {
+                const { error } = await supabaseClient
+                    .from('profiles')
+                    .update({ phone: phone || null, contact_username: username || null, role })
+                    .eq('id', profileId);
+
+                if (error) throw error;
+
+                state.editingAccountLogin = null;
+                if (profileId === state.userId) await refreshCurrentProfile();
+                await fetchAccounts();
+                render();
+                showToast('Профиль обновлён');
+            } catch (e) {
+                console.error(e);
+                showToast('Не удалось изменить профиль', 'error');
+            }
+        }
+
+        async function deleteAccount(profileId) {
+            if (!profileId || profileId === state.userId) {
+                showToast('Нельзя удалить текущий профиль', 'error');
+                return;
+            }
+
+            showConfirm('Удалить профиль?', 'Профиль будет удалён. При следующем входе через Telegram он создастся заново.', async () => {
+                try {
+                    const { error } = await supabaseClient.rpc('admin_delete_profile', { p_profile_id: profileId });
+                    if (error) throw error;
+
+                    state.editingAccountLogin = null;
+                    await fetchAccounts();
+                    await fetchRegisteredAccountsCount();
+                    render();
+                    showToast('Профиль удалён');
+                } catch (e) {
+                    console.error(e);
+                    showToast('Не удалось удалить профиль', 'error');
+                }
+            });
+        }
+
+        async function resetSystemToZero() {
+            showConfirm(
+                'Очистить сайт',
+                'Удалятся товары, варианты, заказы, корзины и менеджеры. Telegram-профили останутся.',
+                async () => {
+                    try {
+                        for (const table of ['order_items','orders','cart_items','product_variants','products','managers']) {
+                            const { error } = await supabaseClient.from(table).delete().not('id', 'is', null);
+                            if (error) throw error;
+                        }
+                        state.cart = [];
+                        state.orders = [];
+                        state.products = [];
+                        state.managers = [];
+                        await fetchProducts();
+                        await fetchOrders();
+                        await fetchManagers();
+                        render();
+                        showToast('Данные магазина очищены');
+                    } catch (e) {
+                        console.error(e);
+                        showToast(e?.message || 'Ошибка очистки', 'error');
+                    }
+                }
+            );
+        }
+
+        // Одна auth-сессия Supabase = одна сессия Telegram-профиля.
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_OUT') {
+                state.role = 'user';
+                state.userId = null;
+                state.telegramUser = null;
+                state.login = '';
+                state.contactUser = '';
+                state.phone = '';
+                state.activeTab = 'home';
+                render();
+                return;
+            }
+
+            if (event === 'SIGNED_IN' && session?.user) {
+                try {
+                    state.userId = session.user.id;
+                    await refreshCurrentProfile();
+                    await mergeGuestCartIntoDb();
+                    await loadCartFromDb();
+                    await fetchOrders();
+                    render();
+                } catch (e) {
+                    console.error('Ошибка загрузки Telegram-профиля:', e);
+                }
+            }
+        });
+
     </script>
 </body>
 </html>
