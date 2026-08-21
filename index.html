@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VLD VAPE</title>
-    <meta name="telegram-auth-version" content="2026-08-21-miniapp-only-v1">
+    <meta name="telegram-auth-version" content="2026-08-21-v8">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -571,15 +571,6 @@
 
         window.addEventListener('DOMContentLoaded', async () => {
             try {
-                if (!(window.Telegram && Telegram.WebApp && Telegram.WebApp.initData)) {
-                    document.getElementById('main-content').innerHTML = `
-                    <div class="text-center space-y-4 py-10">
-                        <h2 class="text-xl font-bold">Откройте приложение через Telegram</h2>
-                        <p class="text-zinc-400 text-sm">Вход доступен только через Telegram Mini App.</p>
-                        <a class="inline-block bg-accent px-5 py-3 rounded-xl text-white" href="${TELEGRAM_BOT_LINK}">Перейти в Telegram</a>
-                    </div>`;
-                    return;
-                }
                 if (window.Notification && Notification.permission !== 'granted') {
                     Notification.requestPermission();
                 }
@@ -695,7 +686,7 @@
                     roleBadge.className = 'text-xs px-2 py-0.5 rounded-full bg-accent text-white font-medium';
                     if (adminLogoutBtn) adminLogoutBtn.classList.toggle('hidden', !state.adminPanelOpen);
                     if (adminLoginMenuItem) adminLoginMenuItem.classList.toggle('hidden', state.adminPanelOpen);
-                    if (state.adminPanelOpen && !state.activeTab.startsWith('admin_')) state.activeTab = 'admin_home';
+                    if (state.adminPanelOpen && !state.activeTab.startsWith('admin_')) state.activeTab = 'admin_settings';
                 } else {
                     roleBadge.textContent = 'Пользователь';
                     roleBadge.className = 'text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400';
@@ -1504,7 +1495,7 @@
                 const { data, error } = await supabaseClient.rpc('get_my_admin_status');
                 if (error) throw error;
 
-                state.dbRole = data?.db_role || (data?.is_owner ? 'owner' : (data?.is_admin ? 'admin' : 'user'));
+                state.role = data?.db_role || (data?.is_owner ? 'owner' : (data?.is_admin ? 'admin' : 'user'));
                 state.isOwner = !!data?.is_owner;
                 state.role = data?.is_admin ? 'admin' : 'user';
 
@@ -2262,9 +2253,7 @@
            provider. The browser never sees the Telegram client secret.
            ========================================================= */
 
-        const TELEGRAM_PROVIDER = null;
-        const OWNER_TELEGRAM_ID = 2112161128;
-        const TELEGRAM_BOT_LINK = 'https://t.me/vldvape_bot';
+        const TELEGRAM_PROVIDER = 'custom:telegram';
 
         state.role = 'user';
         state.login = '';
@@ -2279,8 +2268,12 @@
             if (!profile) return;
 
             state.userId = profile.id;
-            state.role = profile.role || (Number(profile.telegram_id) === OWNER_TELEGRAM_ID ? 'owner' : 'user');
+            state.role = profile.role || 'user';
             state.isOwner = state.role === 'owner';
+
+            // Права определяются одной ролью,
+            // а не site_role. Telegram-синхронизация больше не может сбросить admin.
+            state.role = ['admin', 'owner'].includes(state.role) ? 'admin' : 'user';
 
             state.contactUser = profile.contact_username || '';
             state.phone = profile.phone || '';
@@ -2366,7 +2359,7 @@
                     await supabaseClient.rpc('get_my_admin_status');
 
                 if (!adminError && adminStatus) {
-                    state.dbRole =
+                    state.role =
                         adminStatus.db_role ||
                         (adminStatus.is_owner ? 'owner' :
                          adminStatus.is_admin ? 'admin' : 'user');
@@ -2448,11 +2441,11 @@
                             <div class="grid grid-cols-2 gap-2 text-[11px]">
                                 <div class="bg-zinc-900/60 border border-zinc-800 rounded-xl p-2">
                                     <span class="text-zinc-500 block">Роль сайта</span>
-                                    <span class="text-zinc-200">${escapeHtml(state.siteRole || 'user')}</span>
+                                    <span class="text-zinc-200">${escapeHtml(state.role || 'user')}</span>
                                 </div>
                                 <div class="bg-zinc-900/60 border border-zinc-800 rounded-xl p-2">
                                     <span class="text-zinc-500 block">Права БД</span>
-                                    <span class="text-zinc-200">${escapeHtml(state.dbRole || 'user')}</span>
+                                    <span class="text-zinc-200">${escapeHtml(state.role || 'user')}</span>
                                 </div>
                             </div>
 
@@ -2529,21 +2522,19 @@
                 await telegramMiniAppLogin(false);
                 return;
             }
-            try {
-                showToast('Открываем Telegram…');
-                const redirectTo = window.location.origin + window.location.pathname;
-                const { error } = await supabaseClient.auth.signInWithOAuth({
-                    provider: TELEGRAM_PROVIDER,
-                    options: { redirectTo }
-                });
-                if (error) throw error;
-            } catch (e) {
-                console.error('Telegram OIDC start error:', e);
-                showToast(e?.message || 'Не удалось открыть Telegram', 'error');
-            }
+            showToast('Откройте приложение через Telegram', 'error');
+            window.open('https://t.me/vldvape_bot', '_blank');
         }
 
-        async function telegramMiniAppLogin(manualRetry = false) {
+        function isTelegramMiniAppOnly(){
+    return !!(window.Telegram?.WebApp?.initData);
+}
+
+function openTelegramOnly(){
+    window.open('https://t.me/vldvape_bot','_blank');
+}
+
+async function telegramMiniAppLogin(manualRetry = false) {
             const tg = window.Telegram?.WebApp;
             const initData = tg?.initData;
 
@@ -3089,8 +3080,8 @@
                 userId: session?.user?.id || null,
                 profile,
                 profileError,
-                siteRole: state.siteRole,
-                dbRole: state.dbRole,
+                siteRole: state.role,
+                dbRole: state.role,
                 uiRole: state.role,
                 isOwner: state.isOwner
             };
