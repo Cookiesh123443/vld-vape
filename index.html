@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VLD VAPE</title>
-    <meta name="telegram-auth-version" content="2026-08-21-v8">
+    <meta name="telegram-auth-version" content="2026-08-21-miniapp-only-v1">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -352,7 +352,7 @@
             auth: {
                 persistSession: true,
                 autoRefreshToken: true,
-                detectSessionInUrl: true,
+                detectSessionInUrl: false,
                 flowType: 'pkce'
             }
         });
@@ -370,9 +370,8 @@
             // siteRole = роль/режим пользователя на сайте.
             // dbRole   = реальные права в БД: user/admin/owner.
             // role     = только производный UI-флаг для старого кода: admin/user.
-            siteRole: 'user',
-            dbRole: 'user',
             role: 'user',
+            isOwner: false,
             activeTab: 'home',
             login: '',
             userId: null,
@@ -572,6 +571,15 @@
 
         window.addEventListener('DOMContentLoaded', async () => {
             try {
+                if (!(window.Telegram && Telegram.WebApp && Telegram.WebApp.initData)) {
+                    document.getElementById('main-content').innerHTML = `
+                    <div class="text-center space-y-4 py-10">
+                        <h2 class="text-xl font-bold">Откройте приложение через Telegram</h2>
+                        <p class="text-zinc-400 text-sm">Вход доступен только через Telegram Mini App.</p>
+                        <a class="inline-block bg-accent px-5 py-3 rounded-xl text-white" href="${TELEGRAM_BOT_LINK}">Перейти в Telegram</a>
+                    </div>`;
+                    return;
+                }
                 if (window.Notification && Notification.permission !== 'granted') {
                     Notification.requestPermission();
                 }
@@ -683,11 +691,11 @@
                 }
 
                 if (state.role === 'admin') {
-                    roleBadge.textContent = state.dbRole === 'owner' ? 'Владелец' : 'Админ';
+                    roleBadge.textContent = state.role === 'owner' ? 'Владелец' : 'Админ';
                     roleBadge.className = 'text-xs px-2 py-0.5 rounded-full bg-accent text-white font-medium';
                     if (adminLogoutBtn) adminLogoutBtn.classList.toggle('hidden', !state.adminPanelOpen);
                     if (adminLoginMenuItem) adminLoginMenuItem.classList.toggle('hidden', state.adminPanelOpen);
-                    if (state.adminPanelOpen && !state.activeTab.startsWith('admin_')) state.activeTab = 'admin_settings';
+                    if (state.adminPanelOpen && !state.activeTab.startsWith('admin_')) state.activeTab = 'admin_home';
                 } else {
                     roleBadge.textContent = 'Пользователь';
                     roleBadge.className = 'text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400';
@@ -2254,7 +2262,9 @@
            provider. The browser never sees the Telegram client secret.
            ========================================================= */
 
-        const TELEGRAM_PROVIDER = 'custom:telegram';
+        const TELEGRAM_PROVIDER = null;
+        const OWNER_TELEGRAM_ID = 2112161128;
+        const TELEGRAM_BOT_LINK = 'https://t.me/vldvape_bot';
 
         state.role = 'user';
         state.login = '';
@@ -2269,12 +2279,8 @@
             if (!profile) return;
 
             state.userId = profile.id;
-            state.siteRole = profile.site_role || 'user';
-            state.dbRole = profile.db_role || 'user';
-
-            // Админский интерфейс определяется ТОЛЬКО db_role / owner-status,
-            // а не site_role. Telegram-синхронизация больше не может сбросить admin.
-            state.role = ['admin', 'owner'].includes(state.dbRole) ? 'admin' : 'user';
+            state.role = profile.role || (Number(profile.telegram_id) === OWNER_TELEGRAM_ID ? 'owner' : 'user');
+            state.isOwner = state.role === 'owner';
 
             state.contactUser = profile.contact_username || '';
             state.phone = profile.phone || '';
@@ -2314,9 +2320,8 @@
         }
 
         function resetAuthState() {
-            state.siteRole = 'user';
-            state.dbRole = 'user';
             state.role = 'user';
+            state.isOwner = false;
             state.isOwner = false;
             state.adminPanelOpen = false;
             state.userId = null;
