@@ -1,0 +1,3320 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VLD VAPE</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#0f0f11',
+                        cardBg: '#18181b',
+                        cardHover: '#27272a',
+                        accent: '#7c3aed',
+                        accentHover: '#6d28d9',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { background-color: #0f0f11; color: #f4f4f5; font-family: system-ui, -apple-system, sans-serif; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #0f0f11; }
+        ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-accent selection:text-white">
+
+    <!-- Верхняя шапка -->
+    <header class="sticky top-0 z-40 bg-darkBg/85 backdrop-blur-md border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+            <h1 id="shop-title" class="text-lg font-bold tracking-wide">VLD VAPE</h1>
+            <span id="role-badge" class="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">Пользователь</span>
+        </div>
+        <div class="relative flex items-center space-x-2">
+            <div id="header-user-display" class="text-xs text-zinc-400 hidden sm:block"></div>
+            <button onclick="toggleAdminMenu()" class="w-9 h-9 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 transition">
+                <i data-lucide="more-vertical" class="w-5 h-5"></i>
+            </button>
+            <!-- Выпадающее меню (смещено под кнопку, не перекрывает её) -->
+            <div id="admin-dropdown" class="hidden absolute top-full right-0 mt-2 w-52 bg-cardBg border border-zinc-700 rounded-xl shadow-xl overflow-hidden z-50">
+                <div id="admin-login-menu-item">
+                    <button onclick="openAdminLoginModal()" class="w-full text-left px-4 py-3 text-sm hover:bg-zinc-700/50 flex items-center space-x-2">
+                        <i data-lucide="shield" class="w-4 h-4 text-accent"></i>
+                        <span>Для работников</span>
+                    </button>
+                </div>
+                <div id="admin-logout-btn" class="hidden">
+                    <button onclick="logoutAdmin()" class="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-zinc-700/50 flex items-center space-x-2">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                        <span>Выйти из админки</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Основной контент -->
+    <main id="main-content" class="flex-1 max-w-md w-full mx-auto p-4 pb-28">
+        <!-- Динамический контент рендерится через JS -->
+    </main>
+
+    <!-- Нижняя навигация -->
+    <nav id="bottom-nav" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-darkBg/90 backdrop-blur-md border-t border-zinc-800 px-2 py-2 flex justify-around items-center z-30">
+        <!-- Навигация рендерится через JS -->
+    </nav>
+
+    <!-- Уведомления (тосты) -->
+    <div id="toast-container" class="fixed top-16 left-1/2 -translate-x-1/2 z-[100] flex flex-col space-y-2 w-11/12 max-w-sm pointer-events-none"></div>
+
+    <!-- Модальное окно подтверждения -->
+    <div id="modal-confirm" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+            <h3 id="confirm-title" class="text-lg font-bold">Подтверждение</h3>
+            <p id="confirm-text" class="text-sm text-zinc-400">Вы уверены?</p>
+            <div class="flex space-x-2 pt-2">
+                <button id="confirm-cancel-btn" class="flex-1 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl text-sm font-medium transition">Отмена</button>
+                <button id="confirm-ok-btn" class="flex-1 bg-accent hover:bg-accentHover py-2.5 rounded-xl text-sm font-medium transition text-white">Да</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно: предупреждение о незаполненных данных при заказе -->
+    <div id="modal-missing-contacts" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+            <h3 class="text-lg font-bold">Контакты для связи не указаны</h3>
+            <p class="text-sm text-zinc-400">У вас не указан юз или номер телефона в профиле. Без них вы САМИ должны написать менеджеру.</p>
+            <div class="flex flex-col space-y-2 pt-2">
+                <button onclick="closeModal('modal-missing-contacts'); switchTab('profile');" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl text-sm font-medium transition text-white">Указать в профиле</button>
+                <button onclick="proceedCheckoutWithoutContacts()" class="w-full bg-zinc-800 hover:bg-zinc-700 py-3 rounded-xl text-sm font-medium transition text-zinc-300">Продолжить без указания</button>
+                <button onclick="cancelCheckout()" class="w-full bg-red-500/20 hover:bg-red-500/30 py-3 rounded-xl text-sm font-medium transition text-red-400 border border-red-500/30">Отменить заказ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно: выбор менеджера для вопроса о заказе -->
+    <div id="modal-select-manager" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold">Выберите менеджера</h3>
+                <button onclick="closeModal('modal-select-manager')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <p class="text-xs text-zinc-400">Выберите менеджера, с которым хотите обсудить заказ <span id="ask-order-id-label" class="text-white font-bold"></span>:</p>
+            <div id="managers-list-container" class="space-y-2 max-h-60 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <!-- Модальное окно входа в админку -->
+    <div id="modal-admin-login" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold">Вход для работников</h3>
+                <button onclick="closeModal('modal-admin-login')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <p class="text-xs text-zinc-400">Для входа вы должны быть зарегистрированы и войти в свой аккаунт, а также ввести пароль администратора:</p>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Пароль администратора</label>
+                    <div class="relative">
+                        <input type="password" id="admin-password-input" placeholder="Введите пароль админа" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 pr-10 text-sm focus:outline-none focus:border-accent">
+                        <button type="button" onclick="togglePasswordVisibility('admin-password-input', 'eye-icon')" class="absolute right-3 top-3 text-zinc-400 hover:text-white transition">
+                            <i id="eye-icon" data-lucide="eye" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <button onclick="submitAdminLogin()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Войти в админку</button>
+        </div>
+    </div>
+
+    <!-- Модальное окно фильтров каталога -->
+    <div id="modal-catalog-filters" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl max-h-[88vh] overflow-y-auto">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold">Фильтры</h3>
+                <button onclick="closeModal('modal-catalog-filters')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div>
+                <div class="text-xs text-zinc-400 mb-2">Бренд</div>
+                <div id="filter-brand-list" class="flex flex-wrap gap-2 max-h-28 overflow-y-auto"></div>
+            </div>
+            <div>
+                <div class="text-xs text-zinc-400 mb-2">Сортировка по цене</div>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="filter-price-asc" onclick="setCatalogPriceSort('asc')" class="py-2 rounded-xl text-xs border">Дешевле → дороже</button>
+                    <button id="filter-price-desc" onclick="setCatalogPriceSort('desc')" class="py-2 rounded-xl text-xs border">Дороже → дешевле</button>
+                </div>
+            </div>
+            <div>
+                <div class="flex justify-between text-xs text-zinc-400 mb-2">
+                    <span>Цена</span><span id="filter-price-label">0 ₽ — 0 ₽</span>
+                </div>
+                <div class="space-y-2">
+                    <input id="filter-min-range" type="range" class="w-full accent-accent" oninput="updateCatalogPriceRange('min', this.value)">
+                    <input id="filter-max-range" type="range" class="w-full accent-accent" oninput="updateCatalogPriceRange('max', this.value)">
+                </div>
+            </div>
+            <div class="flex space-x-2 pt-1">
+                <button onclick="resetCatalogFilters()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl text-xs">Сбросить</button>
+                <button onclick="saveCatalogFilters()" class="flex-1 bg-accent hover:bg-accentHover py-2.5 rounded-xl text-xs font-medium text-white">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно смены пароля -->
+    <div id="modal-change-password" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold">Смена пароля аккаунта</h3>
+                <button onclick="closeModal('modal-change-password')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <p class="text-xs text-zinc-400">Введите старый и новый пароль для вашего аккаунта:</p>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Старый пароль</label>
+                    <input type="password" id="old-acc-password" placeholder="Старый пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                </div>
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Новый пароль</label>
+                    <input type="password" id="new-acc-password" placeholder="Новый пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                </div>
+            </div>
+            <button onclick="submitChangePassword()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Сменить пароль</button>
+        </div>
+    </div>
+
+    <!-- Модальное окно смены пароля администратора -->
+    <div id="modal-change-admin-password" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold">Смена пароля администратора</h3>
+                <button onclick="closeModal('modal-change-admin-password')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <p class="text-xs text-amber-400">После смены пароля все текущие администраторы (включая вас) будут понижены до пользователей и должны будут войти заново с новым паролем.</p>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Текущий пароль администратора</label>
+                    <input type="password" id="old-admin-password" placeholder="Текущий пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                </div>
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Новый пароль администратора</label>
+                    <input type="password" id="new-admin-password" placeholder="Новый пароль" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                </div>
+            </div>
+            <button onclick="submitChangeAdminPassword()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Сменить пароль администратора</button>
+        </div>
+    </div>
+
+    <!-- Модальное окно выбора варианта товара -->
+    <div id="modal-variant-select" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <h3 id="variant-modal-title" class="text-lg font-bold">Выберите вариант</h3>
+                <button onclick="closeModal('modal-variant-select')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div id="variant-list-container" class="space-y-2 max-h-60 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <!-- Модальное окно добавления/редактирования товара + ИИ кнопка -->
+    <div id="modal-product-form" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-md rounded-2xl p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center">
+                <h3 id="product-form-title" class="text-lg font-bold">Добавить товар</h3>
+                <div class="flex items-center space-x-2">
+                    <button type="button" onclick="openAiModal()" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 shadow-lg shadow-purple-900/30 transition">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                        <span>ИИ Загрузка</span>
+                    </button>
+                    <button onclick="closeModal('modal-product-form')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+                </div>
+            </div>
+            <input type="hidden" id="edit-product-id">
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Название</label>
+                    <input type="text" id="p-name" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="text-xs text-zinc-400 mb-1 block">Категория</label>
+                        <select id="p-category" onchange="updateVariantLabel()" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-accent">
+                            <option value="жидкость">Жидкость</option>
+                            <option value="железо">Железо</option>
+                            <option value="одноразки">Одноразки</option>
+                            <option value="снюс/пластинки">Снюс/пластинки</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-zinc-400 mb-1 block">Подкатегория (Бренд)</label>
+                        <input type="text" id="p-subcategory" placeholder="например, Мутанты" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-accent">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="text-xs text-zinc-400 mb-1 block">Цена розница (₽)</label>
+                        <input type="number" id="p-retail" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-accent">
+                    </div>
+                    <div>
+                        <label class="text-xs text-zinc-400 mb-1 block">Цена опт (₽)</label>
+                        <input type="number" id="p-wholesale" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-accent">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Фото с устройства</label>
+                    <input type="file" id="p-image-file" accept="image/*" onchange="handleImageUpload(event)" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-accent file:text-white hover:file:bg-accentHover">
+                    <input type="hidden" id="p-image">
+                    <div id="image-preview-container" class="mt-2 hidden">
+                        <img id="image-preview" class="w-20 h-20 object-cover rounded-xl border border-zinc-700">
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" id="p-featured" class="w-4 h-4 accent-accent" checked>
+                    <label class="text-sm text-zinc-300">Показывать на Главной</label>
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label id="variants-label" class="text-xs text-zinc-400">Вкусы и количество</label>
+                        <button type="button" onclick="addVariantRow()" class="text-xs text-accent hover:underline flex items-center space-x-1"><i data-lucide="plus" class="w-3 h-3"></i><span>Добавить</span></button>
+                    </div>
+                    <div id="variants-rows" class="space-y-2"></div>
+                </div>
+            </div>
+            <button onclick="saveProduct()" class="w-full bg-accent hover:bg-accentHover py-3 rounded-xl font-medium transition text-white">Сохранить товар</button>
+        </div>
+    </div>
+
+    <!-- Модальное окно ИИ Загрузки товаров -->
+    <div id="modal-ai-import" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-lg rounded-2xl p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold flex items-center space-x-2 text-purple-400">
+                    <i data-lucide="sparkles" class="w-5 h-5"></i>
+                    <span>ИИ Загрузка товаров (JSON)</span>
+                </h3>
+                <button onclick="closeModal('modal-ai-import')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="space-y-1.5">
+                <div class="flex justify-between items-center">
+                    <label class="text-xs font-semibold text-zinc-300">1. Промпт для ИИ</label>
+                    <button type="button" onclick="copyAiPrompt()" class="text-xs text-accent hover:underline flex items-center space-x-1">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Копировать промпт</span>
+                    </button>
+                </div>
+                <textarea id="ai-prompt-text" readonly rows="7" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-3 text-xs text-zinc-300 font-mono focus:outline-none select-all">Распознай данные о товарах из прикрепленной накладной, фото или текста. Выдай ответ СТРОГО в виде чистого JSON-массива без лишних слов, комментариев и символов markdown (without ```json ... ```).
+Формат JSON:
+[
+  {
+    "name": "Название товара",
+    "category": "жидкость", 
+    "subcategory": "Бренд",
+    "retail_price": 500,
+    "wholesale_price": 350,
+    "variants": [
+      {"value": "Вкус или цвет 1", "quantity": 10},
+      {"value": "Вкус или цвет 2", "quantity": 5}
+    ]
+  }
+]</textarea>
+            </div>
+            <div class="space-y-1.5">
+                <label class="text-xs font-semibold text-zinc-300">2. Вставьте готовый JSON от ИИ сюда:</label>
+                <textarea id="ai-json-input" placeholder="[ { 'name': '...', ... } ]" rows="6" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl p-3 text-xs text-zinc-200 font-mono focus:outline-none focus:border-accent"></textarea>
+            </div>
+            <button onclick="processAiJsonImport()" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 py-3 rounded-xl font-medium transition text-white text-sm shadow-lg shadow-purple-900/40">
+                Добавить товары автоматически
+            </button>
+        </div>
+    </div>
+
+    <!-- Модальное окно просмотра фото товара -->
+    <div id="modal-image-preview" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl relative">
+            <button onclick="closeModal('modal-image-preview')" class="absolute top-3 right-3 w-8 h-8 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white z-10 transition">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <img id="preview-image-img" src="" alt="" class="w-full h-72 object-cover">
+            <div class="p-4 space-y-2 max-h-52 overflow-y-auto">
+                <h3 id="preview-image-title" class="text-base font-bold"></h3>
+                <div id="preview-image-price" class="text-sm font-bold text-accent"></div>
+                <div id="preview-image-variants" class="space-y-1.5 pt-1"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно управления скидкой/акцией -->
+    <div id="modal-discount-form" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-zinc-700 w-full max-w-sm rounded-2xl p-5 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold">Управление скидкой</h3>
+                <button onclick="closeModal('modal-discount-form')" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <input type="hidden" id="discount-product-id">
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Текущая (старая) розничная цена</label>
+                    <div id="discount-old-price-text" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-400 select-none">0 ₽</div>
+                </div>
+                <div>
+                    <label class="text-xs text-zinc-400 mb-1 block">Новая акционная цена (₽)</label>
+                    <input type="number" id="discount-new-price" placeholder="Оставьте пустым для отмены акции" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                </div>
+            </div>
+            <div class="flex space-x-2 pt-2">
+                <button onclick="saveDiscount(true)" class="flex-1 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl text-xs font-medium transition text-red-400">Убрать акцию</button>
+                <button onclick="saveDiscount(false)" class="flex-1 bg-accent hover:bg-accentHover py-2.5 rounded-xl text-xs font-medium transition text-white">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Основной скрипт приложения -->
+    <script>
+        const SUPABASE_URL = 'https://ehrzjvuuvodudlelazhe.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_5Lj-BMZYANimr2UG2ZcQ_MEi6tOHp';
+        const TELEGRAM_CLIENT_ID = '8749767581';
+        const TELEGRAM_REDIRECT = 'https://cookiesh123443.github.io/vld-vape/';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        function getOrCreateClientId() {
+            let id = localStorage.getItem('reflex_client_id');
+            if (!id) {
+                id = 'guest-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+                localStorage.setItem('reflex_client_id', id);
+            }
+            return id;
+        }
+
+        let state = {
+            role: localStorage.getItem('reflex_role') || 'user', 
+            activeTab: 'home', 
+            user: JSON.parse(localStorage.getItem('reflex_user') || 'null'),
+            login: localStorage.getItem('reflex_login') || '',
+            contactUser: localStorage.getItem('reflex_contact_user') || '',
+            phone: localStorage.getItem('reflex_phone') || '',
+            telegramId: localStorage.getItem('reflex_telegram_id') || '',
+            telegramUsername: localStorage.getItem('reflex_telegram_username') || '',
+            telegramName: localStorage.getItem('reflex_telegram_name') || '',
+            clientId: getOrCreateClientId(),
+            isProfileEditing: false, 
+            authMode: 'login',
+            isPlacingOrder: false,
+            cart: [],
+            products: [],
+            orders: [],
+            managers: [],
+            accounts: [],
+            adminSettingsSubTab: 'general',
+            editingAccountLogin: null, 
+            adminStatsFilter: 'all', 
+            adminHomeSubTab: 'stats',
+            catalogCategory: 'all',
+            catalogSubcategory: 'all',
+            searchQuery: '',
+            chartInstance: null,
+            selectedOrderForAsk: null,
+            showArchive: false,
+            editingManagerId: null,
+            adminProductSearch: '',
+            registeredAccountsCount: 0,
+            selectedCartItems: new Set(),
+            catalogFilters: {
+                categories: [],
+                brands: [],
+                priceSort: '',
+                minPrice: null,
+                maxPrice: null
+            }
+        };
+
+        function togglePasswordVisibility(inputId, iconId) {
+            const passwordInput = document.getElementById(inputId);
+            const eyeIcon = document.getElementById(iconId);
+            if (!passwordInput || !eyeIcon) return;
+
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIcon.setAttribute('data-lucide', 'eye-off');
+            } else {
+                passwordInput.type = 'password';
+                eyeIcon.setAttribute('data-lucide', 'eye');
+            }
+            lucide.createIcons();
+        }
+
+        function showToast(message, type = 'success') {
+            try {
+                const container = document.getElementById('toast-container');
+                if (!container) return;
+                const toast = document.createElement('div');
+                toast.className = `pointer-events-auto px-4 py-3 rounded-2xl text-sm font-medium shadow-xl border flex items-center justify-between transition-all duration-300 transform translate-y-2 opacity-0 ${
+                    type === 'error' ? 'bg-red-950/90 border-red-800 text-red-200' : 'bg-cardBg border-zinc-700 text-zinc-100'
+                }`;
+                toast.innerHTML = `<span>${message}</span>`;
+                container.appendChild(toast);
+                
+                setTimeout(() => { toast.classList.remove('translate-y-2', 'opacity-0'); }, 10);
+                setTimeout(() => {
+                    toast.classList.add('translate-y-2', 'opacity-0');
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
+            } catch (e) { console.error(e); }
+        }
+
+        function showConfirm(title, text, onConfirm) {
+            const modal = document.getElementById('modal-confirm');
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-text').textContent = text;
+            
+            const okBtn = document.getElementById('confirm-ok-btn');
+            const cancelBtn = document.getElementById('confirm-cancel-btn');
+            
+            modal.classList.remove('hidden');
+            lucide.createIcons();
+
+            const handleOk = () => { modal.classList.add('hidden'); cleanup(); onConfirm(); };
+            const handleCancel = () => { modal.classList.add('hidden'); cleanup(); };
+            const cleanup = () => {
+                okBtn.removeEventListener('click', handleOk);
+                cancelBtn.removeEventListener('click', handleCancel);
+            };
+
+            okBtn.addEventListener('click', handleOk);
+            cancelBtn.addEventListener('click', handleCancel);
+        }
+
+        function closeModal(modalId) {
+            const m = document.getElementById(modalId);
+            if (m) m.classList.add('hidden');
+        }
+
+        function openModal(modalId) {
+            const m = document.getElementById(modalId);
+            if (m) m.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function openAiModal() {
+            document.getElementById('ai-json-input').value = '';
+            openModal('modal-ai-import');
+        }
+
+        function copyAiPrompt() {
+            const promptText = document.getElementById('ai-prompt-text');
+            promptText.select();
+            promptText.setSelectionRange(0, 99999);
+            copyTextReliable(promptText.value).then(ok => {
+                showToast(ok ? 'Промпт скопирован в буфер обмена!' : 'Не удалось скопировать промпт', ok ? 'success' : 'error');
+            });
+        }
+
+        async function processAiJsonImport() {
+            const rawJson = document.getElementById('ai-json-input').value.trim();
+            if (!rawJson) {
+                showToast('Вставьте JSON из ИИ!', 'error');
+                return;
+            }
+
+            try {
+                let cleanedJson = rawJson.replace(/```json/g, '').replace(/```/g, '').trim();
+                const items = JSON.parse(cleanedJson);
+
+                if (!Array.isArray(items)) throw new Error('JSON должен быть массивом товаров [...]');
+
+                let addedCount = 0;
+                for (const item of items) {
+                    const name = item.name || 'Товар без названия';
+                    const category = ['жидкость', 'железо', 'одноразки', 'снюс/пластинки'].includes(item.category) ? item.category : 'жидкость';
+                    const subcategory = item.subcategory || '';
+                    const retailPrice = Number(item.retail_price) || 0;
+                    const wholesalePrice = Number(item.wholesale_price) || 0;
+                    const variants = Array.isArray(item.variants) ? item.variants : [];
+
+                    const existingProduct = (state.products || []).find(p => p.name.trim().toLowerCase() === name.trim().toLowerCase());
+                    let productId;
+
+                    if (existingProduct) {
+                        productId = existingProduct.id;
+                        await supabaseClient.from('products').update({
+                            category, subcategory, retail_price: retailPrice, wholesale_price: wholesalePrice
+                        }).eq('id', productId);
+                    } else {
+                        const { data: newProd, error: prodErr } = await supabaseClient.from('products').insert({
+                            name, category, subcategory, retail_price: retailPrice, wholesale_price: wholesalePrice, is_featured: true
+                        }).select().single();
+
+                        if (prodErr || !newProd) continue;
+                        productId = newProd.id;
+                    }
+
+                    for (const v of variants) {
+                        const vValue = v.value || 'Стандарт';
+                        const vQty = Number(v.quantity) > 0 ? Number(v.quantity) : 1;
+                        const vType = category === 'железо' ? 'color' : 'flavor';
+
+                        const { data: existingVars } = await supabaseClient.from('product_variants').select('*').eq('product_id', productId);
+                        const matchVar = (existingVars || []).find(ev => ev.value.trim().toLowerCase() === vValue.trim().toLowerCase());
+
+                        if (matchVar) {
+                            await supabaseClient.from('product_variants').update({ quantity: matchVar.quantity + vQty }).eq('id', matchVar.id);
+                        } else {
+                            await supabaseClient.from('product_variants').insert({ product_id: productId, type: vType, value: vValue, quantity: vQty });
+                        }
+                    }
+                    addedCount++;
+                }
+
+                closeModal('modal-ai-import');
+                closeModal('modal-product-form');
+                await fetchProducts();
+                render();
+                showToast(`Успешно добавлено/обновлено товаров: ${addedCount}`);
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка разбора JSON: проверьте правильность формата', 'error');
+            }
+        }
+
+        checkTelegramCallback();
+
+        async function resetSystemToZero() {
+            showConfirm('Полный сброс сайта в 0', 'Вы уверены? Все товары, варианты, заказы, корзины, менеджеры и пользователи будут полностью удалены.', async () => {
+                try {
+                    await supabaseClient.from('order_items').delete().not('id', 'is', null);
+                    await supabaseClient.from('orders').delete().not('id', 'is', null);
+                    await supabaseClient.from('product_variants').delete().not('id', 'is', null);
+                    await supabaseClient.from('products').delete().not('id', 'is', null);
+                    await supabaseClient.from('managers').delete().not('id', 'is', null);
+                    await supabaseClient.from('users').delete().not('id', 'is', null);
+                    await supabaseClient.from('cart_items').delete().not('id', 'is', null);
+
+                    state.cart = [];
+                    state.searchQuery = '';
+                    state.login = '';
+                    state.contactUser = '';
+                    state.phone = '';
+                    localStorage.removeItem('reflex_login');
+                    localStorage.removeItem('reflex_contact_user');
+                    localStorage.removeItem('reflex_phone');
+
+                    logoutAdmin();
+
+                    await fetchProducts();
+                    await fetchOrders();
+                    await fetchManagers();
+                    render();
+                    showToast('Сайт полностью сброшен в начальное состояние!');
+                } catch (e) {
+                    console.error(e);
+                    showToast('Ошибка при сбросе системы: ' + e.message, 'error');
+                }
+            });
+        }
+
+        // --- Управление корзиной ---
+        async function loadCartFromDb() {
+            if (!state.login) {
+                state.cart = JSON.parse(localStorage.getItem('reflex_cart') || '[]');
+                return;
+            }
+            try {
+                const { data, error } = await supabaseClient.from('cart_items').select('*').eq('user_identifier', state.login);
+                if (!error && data) {
+                    state.cart = data.map(i => ({
+                        productId: i.product_id,
+                        variantId: i.variant_id,
+                        name: i.name,
+                        variantName: i.variant_name,
+                        price: Number(i.price),
+                        qty: i.qty,
+                        image: i.image,
+                        maxQty: i.max_qty
+                    }));
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function saveCartToDb() {
+            if (!state.login) {
+                localStorage.setItem('reflex_cart', JSON.stringify(state.cart));
+                return;
+            }
+            try {
+                await supabaseClient.from('cart_items').delete().eq('user_identifier', state.login);
+                if (state.cart.length > 0) {
+                    const rows = state.cart.map(i => ({
+                        user_identifier: state.login,
+                        product_id: i.productId,
+                        variant_id: i.variantId,
+                        name: i.name,
+                        variant_name: i.variantName,
+                        price: i.price,
+                        qty: i.qty,
+                        image: i.image,
+                        max_qty: i.maxQty
+                    }));
+                    await supabaseClient.from('cart_items').insert(rows);
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function validateCartStock() {
+            if (!state.cart || state.cart.length === 0) return;
+            let removedFlavors = false;
+            const updatedCart = [];
+
+            for (const item of state.cart) {
+                const product = (state.products || []).find(p => p.id === item.productId);
+                if (!product) { removedFlavors = true; continue; }
+
+                const variant = (product.product_variants || []).find(v => v.id === item.variantId);
+                if (!variant || variant.quantity <= 0) { removedFlavors = true; continue; }
+
+                if (item.qty > variant.quantity) item.qty = variant.quantity;
+                item.maxQty = variant.quantity;
+                updatedCart.push(item);
+            }
+
+            if (removedFlavors) showToast('Некоторые вкусы или товары из вашей корзины закончились и были удалены', 'error');
+            state.cart = updatedCart;
+            await saveCartToDb();
+        }
+
+        async function checkUserRoleOnStartup() {
+            try {
+                // При запуске удаляем сохранённый автологин, если пароль уже сменили.
+                const savedAdminPassword = localStorage.getItem('reflex_admin_password');
+                const savedAdminVersion = localStorage.getItem('reflex_admin_password_version');
+
+                if (savedAdminPassword) {
+                    try {
+                        const adminState = await getAdminPasswordState();
+                        if (savedAdminVersion && adminState.version !== 'legacy' &&
+                            savedAdminVersion !== adminState.version) {
+                            localStorage.removeItem('reflex_admin_password');
+                            localStorage.removeItem('reflex_admin_password_version');
+                            if (localStorage.getItem('reflex_role') === 'admin') {
+                                localStorage.setItem('reflex_role', 'user');
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Не удалось проверить версию пароля админки:', e);
+                    }
+                }
+
+                if (state.login) {
+                    const { data: dbUser } = await supabaseClient.from('user').select('*').eq('логин', state.login).maybeSingle();
+                    if (dbUser) {
+                        state.contactUser = dbUser.contact_username || '';
+                        state.phone = dbUser.номер || '';
+                        localStorage.setItem('reflex_contact_user', state.contactUser);
+                        localStorage.setItem('reflex_phone', state.phone);
+
+                        if (dbUser.роль === 'админ') {
+                            state.role = 'admin';
+                            localStorage.setItem('reflex_role', 'admin');
+                        } else {
+                            state.role = 'user';
+                            localStorage.setItem('reflex_role', 'user');
+                        }
+                    } else {
+                        logoutUser();
+                    }
+                } else {
+                    state.role = 'user';
+                    localStorage.setItem('reflex_role', 'user');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                if (window.Notification && Notification.permission !== 'granted') {
+                    Notification.requestPermission();
+                }
+
+                await checkUserRoleOnStartup();
+                await fetchProducts();
+                await loadCartFromDb();
+                await fetchOrders();
+                await fetchManagers();
+                await fetchRegisteredAccountsCount();
+                await validateCartStock();
+                render();
+
+                setInterval(async () => {
+                    const prevInProgress = (state.orders || []).filter(o => o.status === 'in_progress').length;
+                    await fetchOrders();
+                    const newInProgress = (state.orders || []).filter(o => o.status === 'in_progress').length;
+                    
+                    if (newInProgress > prevInProgress && state.role === 'admin') {
+                        showToast('🔔 Поступил новый заказ!', 'success');
+                        if (window.Notification && Notification.permission === 'granted') {
+                            new Notification('VLD VAPE', { body: 'Поступил новый заказ в обработку!' });
+                        }
+                        if (state.activeTab === 'admin_orders' || state.activeTab === 'admin_home') render();
+                    }
+                }, 10000);
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка инициализации приложения', 'error');
+            }
+        });
+
+        async function fetchRegisteredAccountsCount() {
+            try {
+                const { count, error } = await supabaseClient
+                    .from('user')
+                    .select('логин', { count: 'exact', head: true });
+                if (!error) state.registeredAccountsCount = Number(count || 0);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function fetchProducts() {
+            try {
+                const { data, error } = await supabaseClient.from('products').select('*, product_variants(*)');
+                if (!error && data) {
+                    // Просто загружаем все товары как есть, без автоудаления.
+                    // Дубли вариантов (одинаковый value в одном товаре) объединяем только в памяти.
+                    state.products = data.map(p => {
+                        const variants = p.product_variants || [];
+                        const varMap = {};
+                        for (const v of variants) {
+                            const vKey = v.value.trim().toLowerCase();
+                            if (!varMap[vKey]) varMap[vKey] = { ...v };
+                            else varMap[vKey].quantity += Number(v.quantity || 0);
+                        }
+                        return { ...p, product_variants: Object.values(varMap) };
+                    });
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function fetchOrders() {
+            try {
+                const { data, error } = await supabaseClient.from('orders').select('*, order_items(*)');
+                if (!error && data) state.orders = data;
+            } catch (e) { console.error(e); }
+        }
+
+        async function fetchManagers() {
+            try {
+                const { data, error } = await supabaseClient.from('managers').select('*');
+                if (!error && data) state.managers = data;
+            } catch (e) { console.error(e); }
+        }
+
+        async function fetchAccounts() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('user')
+                    .select('логин, номер, contact_username, роль')
+                    .order('логин', { ascending: true });
+
+                if (error) throw error;
+                state.accounts = data || [];
+            } catch (e) {
+                console.error('Ошибка загрузки учётных записей:', e);
+                showToast('Не удалось загрузить учётные записи', 'error');
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function render() {
+            try {
+                const roleBadge = document.getElementById('role-badge');
+                const adminLogoutBtn = document.getElementById('admin-logout-btn');
+                const adminLoginMenuItem = document.getElementById('admin-login-menu-item');
+                const headerUserDisplay = document.getElementById('header-user-display');
+
+                if (state.role !== 'admin') {
+                    if (state.activeTab.startsWith('admin_')) state.activeTab = 'home';
+                }
+
+                if (state.role === 'admin') {
+                    roleBadge.textContent = 'Админ';
+                    roleBadge.className = 'text-xs px-2 py-0.5 rounded-full bg-accent text-white font-medium';
+                    if (adminLogoutBtn) adminLogoutBtn.classList.remove('hidden');
+                    if (adminLoginMenuItem) adminLoginMenuItem.classList.add('hidden');
+                    if (!state.activeTab.startsWith('admin_')) state.activeTab = 'admin_home';
+                } else {
+                    roleBadge.textContent = 'Пользователь';
+                    roleBadge.className = 'text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400';
+                    if (adminLogoutBtn) adminLogoutBtn.classList.add('hidden');
+                    if (adminLoginMenuItem) adminLoginMenuItem.classList.remove('hidden');
+                    if (state.activeTab.startsWith('admin_')) state.activeTab = 'home';
+                }
+
+                if (state.login) {
+                    if (headerUserDisplay) {
+                        headerUserDisplay.textContent = state.login;
+                        headerUserDisplay.classList.remove('hidden');
+                    }
+                } else {
+                    if (headerUserDisplay) headerUserDisplay.classList.add('hidden');
+                }
+
+                renderNav();
+                renderMainContent();
+                lucide.createIcons();
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка отображения интерфейса', 'error');
+            }
+        }
+
+        function renderNav() {
+            const nav = document.getElementById('bottom-nav');
+            if (state.role === 'user') {
+                nav.innerHTML = `
+                    <button onclick="switchTab('home')" class="flex flex-col items-center py-1 px-3 ${state.activeTab === 'home' ? 'text-accent' : 'text-zinc-400'}">
+                        <i data-lucide="home" class="w-5 h-5"></i><span class="text-[10px] mt-1">Главная</span>
+                    </button>
+                    <button onclick="switchTab('catalog')" class="flex flex-col items-center py-1 px-3 ${state.activeTab === 'catalog' ? 'text-accent' : 'text-zinc-400'}">
+                        <i data-lucide="grid" class="w-5 h-5"></i><span class="text-[10px] mt-1">Каталог</span>
+                    </button>
+                    <button onclick="switchTab('cart')" class="flex flex-col items-center py-1 px-3 relative ${state.activeTab === 'cart' ? 'text-accent' : 'text-zinc-400'}">
+                        <i data-lucide="shopping-cart" class="w-5 h-5"></i><span class="text-[10px] mt-1">Корзина</span>
+                        ${state.cart.length > 0 ? `<span class="absolute top-0 right-3 bg-accent text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">${state.cart.reduce((a,c)=>a+c.qty,0)}</span>` : ''}
+                    </button>
+                    <button onclick="switchTab('orders')" class="flex flex-col items-center py-1 px-3 ${state.activeTab === 'orders' ? 'text-accent' : 'text-zinc-400'}">
+                        <i data-lucide="package" class="w-5 h-5"></i><span class="text-[10px] mt-1">Заказы</span>
+                    </button>
+                    <button onclick="switchTab('profile')" class="flex flex-col items-center py-1 px-3 ${state.activeTab === 'profile' ? 'text-accent' : 'text-zinc-400'}">
+                        <i data-lucide="user" class="w-5 h-5"></i><span class="text-[10px] mt-1">Профиль</span>
+                    </button>
+                `;
+            } else {
+                const inProgressCount = (state.orders || []).filter(o => o.status === 'in_progress').length;
+                nav.innerHTML = `
+                    <button onclick="switchTab('admin_home')" class="flex flex-col items-center py-1 px-2 ${state.activeTab === 'admin_home' ? 'text-accent' : 'text-zinc-400'}">
+                        <i data-lucide="layout-dashboard" class="w-5 h-5"></i><span class="text-[10px] mt-1">Главная</span>
+                    </button>
+                    <button onclick="switchTab('admin_catalog')" class="flex flex-col items-center py-1 px-2 ${state.activeTab === 'admin_catalog' ? 'text-accent' : 'text-zinc-400'}">
+                        <i data-lucide="grid" class="w-5 h-5"></i><span class="text-[10px] mt-1">Каталог</span>
+                    </button>
+                    <button onclick="switchTab('admin_orders')" class="flex flex-col items-center py-1 px-2 relative ${state.activeTab === 'admin_orders' ? 'text-accent' : 'text-zinc-400'}">
+                        <i data-lucide="clipboard-list" class="w-5 h-5"></i><span class="text-[10px] mt-1">Заказы</span>
+                        ${inProgressCount > 0 ? `<span class="absolute top-0 right-2 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">${inProgressCount}</span>` : ''}
+                    </button>
+                    <button onclick="switchTab('admin_products')" class="flex flex-col items-center py-1 px-2 ${state.activeTab === 'admin_products' ? 'text-accent' : 'text-zinc-400'}">
+                        <i data-lucide="shopping-bag" class="w-5 h-5"></i><span class="text-[10px] mt-1">Товары</span>
+                    </button>
+                    <button onclick="switchTab('admin_settings')" class="flex flex-col items-center py-1 px-2 ${state.activeTab === 'admin_settings' ? 'text-accent' : 'text-zinc-400'}">
+                        <i data-lucide="settings" class="w-5 h-5"></i><span class="text-[10px] mt-1">Ещё</span>
+                    </button>
+                `;
+            }
+        }
+
+        function switchTab(tab) {
+            if (tab.startsWith('admin_') && state.role !== 'admin') {
+                showToast('Доступ запрещен', 'error');
+                state.activeTab = 'home';
+                render();
+                return;
+            }
+            state.activeTab = tab;
+            render();
+            window.scrollTo(0, 0);
+
+            if (tab === 'orders' || tab === 'admin_orders') {
+                fetchOrders().then(() => { if (state.activeTab === tab) render(); });
+            }
+
+            if (tab === 'admin_settings' && state.adminSettingsSubTab === 'accounts') {
+                fetchAccounts().then(() => {
+                    if (state.activeTab === 'admin_settings' && state.adminSettingsSubTab === 'accounts') render();
+                });
+            }
+        }
+
+        function renderMainContent() {
+            const main = document.getElementById('main-content');
+            if (!main) return;
+            main.innerHTML = '';
+
+            switch(state.activeTab) {
+                case 'home': renderUserHome(main); break;
+                case 'catalog': renderUserCatalog(main); break;
+                case 'cart': renderUserCart(main); break;
+                case 'orders': renderUserOrders(main); break;
+                case 'profile': renderUserProfile(main); break;
+                case 'admin_home': renderAdminHome(main); break;
+                case 'admin_catalog': renderUserCatalog(main); break;
+                case 'admin_orders': renderAdminOrders(main); break;
+                case 'admin_products': renderAdminProducts(main); break;
+                case 'admin_settings': renderAdminSettings(main); break;
+            }
+            lucide.createIcons();
+        }
+
+        function hasActiveDiscount(p) {
+            return !!(p.old_price && p.old_price > p.retail_price);
+        }
+
+        function sortPinnedFirst(list) {
+            // Порядок: сначала закрепленные, затем акционные товары, затем остальные.
+            return [...list].sort((a, b) => {
+                const pinDiff = (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0);
+                if (pinDiff !== 0) return pinDiff;
+                return (hasActiveDiscount(b) ? 1 : 0) - (hasActiveDiscount(a) ? 1 : 0);
+            });
+        }
+
+        function renderUserHome(container) {
+            let featured = (state.products || []).filter(p => {
+                if (!p.is_featured || p.is_archived) return false;
+                return p.product_variants && p.product_variants.some(v => v.quantity > 0);
+            });
+            featured = sortPinnedFirst(featured);
+            const totalStock = featured.reduce((sum, p) => sum + getProductStock(p), 0);
+
+            container.innerHTML = `
+                <div class="space-y-4">
+                    <div class="bg-gradient-to-r from-accent/30 via-cardBg to-accent/20 border border-zinc-700/60 rounded-2xl p-4 shadow-xl flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-xl bg-accent flex items-center justify-center text-white shrink-0 shadow-lg shadow-accent/40">
+                            <i data-lucide="sparkles" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-bold tracking-wide text-zinc-100">Добро пожаловать в VLD VAPE!</h2>
+                            <p class="text-xs text-zinc-400 mt-0.5">Лучший выбор жидкостей и устройств</p>
+                        </div>
+                    </div>
+                    <div class="relative">
+                        <input type="text" oninput="state.searchQuery=this.value; renderUserHomeSearch(this.value);" placeholder="Поиск товаров..." value="${state.searchQuery}" class="w-full bg-cardBg border border-zinc-700 rounded-2xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-accent">
+                        <i data-lucide="search" class="w-4 h-4 text-zinc-400 absolute left-3.5 top-3.5"></i>
+                    </div>
+                    <div id="home-products-grid" class="grid grid-cols-2 gap-3">
+                        ${featured.length === 0 ? '<p class="col-span-2 text-center text-zinc-500 py-10">Нет товаров на главной</p>' : featured.map(p => renderProductCard(p)).join('')}
+                    </div>
+                    <div id="home-stock-total" class="text-center text-xs text-zinc-500 pt-1">${(state.role === 'admin' && featured.length > 0) ? `Всего в наличии на главной: <span class="text-zinc-300 font-semibold">${totalStock} шт.</span>` : ''}</div>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        function renderUserHomeSearch(query) {
+            const grid = document.getElementById('home-products-grid');
+            if (!grid) return;
+            let filtered = (state.products || []).filter(p => {
+                if (!p.is_featured || p.is_archived) return false;
+                const hasStock = p.product_variants && p.product_variants.some(v => v.quantity > 0);
+                if (!hasStock) return false;
+                return p.name.toLowerCase().includes(query.toLowerCase()) || (p.subcategory && p.subcategory.toLowerCase().includes(query.toLowerCase()));
+            });
+            filtered = sortPinnedFirst(filtered);
+            grid.innerHTML = filtered.length === 0 ? '<p class="col-span-2 text-center text-zinc-500 py-10">Ничего не найдено</p>' : filtered.map(p => renderProductCard(p)).join('');
+            const totalStock = filtered.reduce((sum, p) => sum + getProductStock(p), 0);
+            const totalEl = document.getElementById('home-stock-total');
+            if (totalEl) totalEl.innerHTML = (state.role === 'admin' && filtered.length > 0) ? `Всего в наличии на главной: <span class="text-zinc-300 font-semibold">${totalStock} шт.</span>` : '';
+            lucide.createIcons();
+        }
+
+        function getProductStock(p) {
+            return (p.product_variants || []).reduce((sum, v) => sum + Number(v.quantity || 0), 0);
+        }
+
+        function getCartQtyForProduct(productId) {
+            return state.cart.filter(i => i.productId === productId).reduce((sum, i) => sum + i.qty, 0);
+        }
+
+        function renderProductCard(p) {
+            const hasDiscount = p.old_price && p.old_price > p.retail_price;
+            const stock = getProductStock(p);
+            const inCartQty = getCartQtyForProduct(p.id);
+            return `
+                <div class="bg-cardBg border border-zinc-800 rounded-2xl p-3 flex flex-col justify-between hover:border-zinc-700 transition relative">
+                    <div class="absolute top-2 right-2 flex flex-col items-end space-y-1">
+                        ${hasDiscount ? '<span class="bg-red-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">АКЦИЯ</span>' : ''}
+                        ${p.is_pinned ? '<span class="bg-amber-500/90 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow flex items-center"><i data-lucide="pin" class="w-3 h-3"></i></span>' : ''}
+                    </div>
+                    <div>
+                        <img src="${p.image_url || 'https://via.placeholder.com/150'}" alt="${p.name}" onclick="openImagePreview(${p.id})" class="w-full h-36 object-cover rounded-xl mb-3 cursor-pointer">
+                        <h4 class="font-semibold text-sm line-clamp-1">${p.name}</h4>
+                        <p class="text-xs text-zinc-400 truncate">${p.subcategory || ''}</p>
+                        ${state.role === 'admin' ? `<p class="text-[11px] text-zinc-500 mt-0.5">Остаток: <span class="${stock > 0 ? 'text-zinc-300' : 'text-red-400'} font-medium">${stock} шт.</span></p>` : ''}
+                    </div>
+                    <div class="flex items-center justify-between mt-3 min-h-[2rem]">
+                        <div class="flex flex-col justify-end">
+                            <span class="text-[11px] text-zinc-500 line-through h-[14px] leading-[14px]">${hasDiscount ? p.old_price + ' ₽' : ''}</span>
+                            <span class="font-bold text-sm text-accent leading-none">${p.retail_price} ₽</span>
+                        </div>
+                        <button onclick="openVariantModal(${p.id})" title="${inCartQty > 0 ? 'В корзине: ' + inCartQty : 'Добавить в корзину'}" class="w-8 h-8 rounded-full flex items-center justify-center text-white transition ${inCartQty > 0 ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-accent hover:bg-accentHover'}">
+                            ${inCartQty > 0 ? `<span class="text-[11px] font-bold">${inCartQty}</span>` : '<i data-lucide="plus" class="w-4 h-4"></i>'}
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getCatalogVariantCards() {
+            const f = state.catalogFilters;
+            const allCategories = ['жидкость', 'железо', 'одноразки', 'снюс/пластинки'];
+            const categories = f.categories.length ? f.categories : allCategories;
+            const brands = f.brands;
+            const minPrice = f.minPrice;
+            const maxPrice = f.maxPrice;
+            const query = (state.searchQuery || '').toLowerCase();
+            const variantCards = [];
+
+            (state.products || []).forEach(p => {
+                if (p.is_archived || !categories.includes(p.category)) return;
+                if (brands.length && !brands.includes(p.subcategory)) return;
+                const price = Number(p.retail_price);
+                if (minPrice != null && price < Number(minPrice)) return;
+                if (maxPrice != null && price > Number(maxPrice)) return;
+                (p.product_variants || []).forEach(v => {
+                    if (v.quantity <= 0) return;
+                    const matchesSearch = !query ||
+                        p.name.toLowerCase().includes(query) ||
+                        (p.subcategory && p.subcategory.toLowerCase().includes(query)) ||
+                        v.value.toLowerCase().includes(query);
+                    if (matchesSearch) variantCards.push({product:p, variant:v});
+                });
+            });
+
+            variantCards.sort((a,b) => {
+                if (f.priceSort === 'asc') return Number(a.product.retail_price) - Number(b.product.retail_price);
+                if (f.priceSort === 'desc') return Number(b.product.retail_price) - Number(a.product.retail_price);
+                return (hasActiveDiscount(b.product) ? 1 : 0) - (hasActiveDiscount(a.product) ? 1 : 0);
+            });
+            return variantCards;
+        }
+
+        function getCatalogCardsHTML() {
+            const variantCards = getCatalogVariantCards();
+            if (variantCards.length === 0) return '<p class="col-span-2 text-center text-zinc-500 py-10">Товары не найдены</p>';
+
+            return variantCards.map(item => {
+                const p = item.product;
+                const v = item.variant;
+                const hasDiscount = p.old_price && p.old_price > p.retail_price;
+                const cartIndex = state.cart.findIndex(i => i.productId === p.id && i.variantId === v.id);
+                const inCartQty = cartIndex > -1 ? state.cart[cartIndex].qty : 0;
+                return `
+                    <div class="bg-cardBg border border-zinc-800 rounded-2xl p-3 flex flex-col justify-between hover:border-zinc-700 transition relative">
+                        <div class="absolute top-2 right-2 flex flex-col items-end space-y-1">
+                            ${hasDiscount ? '<span class="bg-red-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">АКЦИЯ</span>' : ''}
+                        </div>
+                        <div>
+                            <img src="${p.image_url || 'https://via.placeholder.com/150'}" alt="${p.name}" onclick="openImagePreview(${p.id})" class="w-full h-36 object-cover rounded-xl mb-3 cursor-pointer">
+                            <h4 class="font-semibold text-sm line-clamp-1">${p.name}</h4>
+                            <p class="text-xs text-zinc-400 truncate">${p.subcategory || ''}</p>
+                            <p class="text-xs font-medium text-purple-300 mt-1">${v.type === 'flavor' ? 'Вкус' : 'Цвет'}: ${v.value}</p>
+                            ${state.role === 'admin' ? `<p class="text-[11px] text-zinc-500 mt-0.5">Остаток: <span class="text-zinc-300 font-medium">${v.quantity} шт.</span></p>` : ''}
+                        </div>
+                        <div class="flex items-center justify-between mt-3 min-h-[2rem]">
+                            <div class="flex flex-col justify-end">
+                                <span class="text-[11px] text-zinc-500 line-through h-[14px] leading-[14px]">${hasDiscount ? p.old_price + ' ₽' : ''}</span>
+                                <span class="font-bold text-sm text-accent leading-none">${p.retail_price} ₽</span>
+                            </div>
+                            ${inCartQty > 0 ? `
+                            <div class="flex items-center bg-zinc-900 border border-accent rounded-full overflow-hidden">
+                                <button onclick="changeCatalogCartQty(${p.id}, ${v.id}, -1)" class="w-7 h-8 flex items-center justify-center text-accent hover:bg-accent/10 transition"><i data-lucide="minus" class="w-3.5 h-3.5"></i></button>
+                                <span class="text-xs font-bold w-5 text-center text-zinc-100">${inCartQty}</span>
+                                <button onclick="changeCatalogCartQty(${p.id}, ${v.id}, 1)" class="w-7 h-8 flex items-center justify-center text-accent hover:bg-accent/10 transition"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>
+                            </div>
+                            ` : `
+                            <button onclick="addToCart(${p.id}, ${v.id})" title="Добавить в корзину" class="w-8 h-8 rounded-full flex items-center justify-center text-white bg-accent hover:bg-accentHover transition">
+                                <i data-lucide="plus" class="w-4 h-4"></i>
+                            </button>
+                            `}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderUserCatalog(container) {
+            const categories = ['жидкость', 'железо', 'одноразки', 'снюс/пластинки'];
+            const activeCategory = state.catalogFilters.categories.length === 1
+                ? state.catalogFilters.categories[0]
+                : 'all';
+
+            // Пустой массив категорий означает "Все категории".
+            // На старте каталог не ограничивается одной категорией.
+            if (!Array.isArray(state.catalogFilters.categories)) {
+                state.catalogFilters.categories = [];
+            }
+
+            container.innerHTML = `
+                <div class="space-y-4">
+                    <div class="relative">
+                        <input type="text" id="catalog-search-input" oninput="state.searchQuery=this.value; updateCatalogGrid();" placeholder="Поиск в каталоге..." value="${escapeHtml(state.searchQuery)}" class="w-full bg-cardBg border border-zinc-700 rounded-2xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-accent">
+                        <i data-lucide="search" class="w-4 h-4 text-zinc-400 absolute left-3.5 top-3.5"></i>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="text-xs text-zinc-400">Категория товара</div>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" onclick="setCatalogCategory('all')" class="px-3 py-2 rounded-xl text-xs border transition ${activeCategory === 'all' ? 'bg-accent border-accent text-white' : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-accent'}">Все товары</button>
+                            ${categories.map(cat => `
+                                <button type="button" onclick="setCatalogCategory('${cat}')" class="px-3 py-2 rounded-xl text-xs border transition ${activeCategory === cat ? 'bg-accent border-accent text-white' : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-accent'}">${cat.charAt(0).toUpperCase()+cat.slice(1)}</button>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <button onclick="openCatalogFilters()" class="w-full bg-cardBg border border-zinc-700 hover:border-accent rounded-2xl px-4 py-3 flex items-center justify-between transition">
+                        <span class="flex items-center space-x-2 text-sm font-medium"><i data-lucide="sliders-horizontal" class="w-4 h-4 text-accent"></i><span>Фильтры</span></span>
+                        <span class="text-xs text-zinc-500">${getCatalogFilterSummary()}</span>
+                    </button>
+
+                    <div id="catalog-products-grid" class="grid grid-cols-2 gap-3">
+                        ${getCatalogCardsHTML()}
+                    </div>
+                    <div id="catalog-stock-total" class="text-center text-xs text-zinc-500 pt-1">${getCatalogStockTotalHTML()}</div>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        function getCatalogFilterSummary() {
+            const f = state.catalogFilters;
+            const count = f.brands.length;
+            if (!count && !f.priceSort && f.minPrice == null && f.maxPrice == null) return 'Все товары';
+            const parts = [];
+            if (f.categories.length) parts.push(`${f.categories.length} кат.`);
+            if (f.brands.length) parts.push(`${f.brands.length} бренд.`);
+            if (f.priceSort) parts.push(f.priceSort === 'asc' ? 'цена ↑' : 'цена ↓');
+            if (f.minPrice != null || f.maxPrice != null) parts.push('цена');
+            return parts.join(' • ');
+        }
+
+        function getCatalogFilterBrands() {
+            const cats = state.catalogFilters.categories.length
+                ? state.catalogFilters.categories
+                : ['жидкость', 'железо', 'одноразки', 'снюс/пластинки'];
+
+            return [...new Set(
+                (state.products || [])
+                    .filter(p => cats.includes(p.category) && !p.is_archived)
+                    .map(p => p.subcategory)
+                    .filter(Boolean)
+            )].sort((a,b) => a.localeCompare(b, 'ru'));
+        }
+
+        function setCatalogCategory(category) {
+            if (category === 'all') {
+                state.catalogFilters.categories = [];
+            } else {
+                state.catalogFilters.categories = [category];
+            }
+
+            // При смене категории оставляем только совместимые бренды.
+            const brands = getCatalogFilterBrands();
+            state.catalogFilters.brands = state.catalogFilters.brands.filter(b => brands.includes(b));
+
+            state.catalogCategory = category;
+            state.catalogSubcategory = 'all';
+            updateCatalogGrid();
+            renderUserCatalog(document.getElementById('main-content'));
+        }
+
+        function openCatalogFilters() {
+            const products = (state.products || []).filter(p => !p.is_archived && p.product_variants?.some(v => v.quantity > 0));
+            const prices = products.map(p => Number(p.retail_price)).filter(Number.isFinite);
+            const min = prices.length ? Math.floor(Math.min(...prices)) : 0;
+            const max = prices.length ? Math.ceil(Math.max(...prices)) : 0;
+
+            if (state.catalogFilters.minPrice == null) state.catalogFilters.minPrice = min;
+            if (state.catalogFilters.maxPrice == null) state.catalogFilters.maxPrice = max;
+
+            // Категория больше не выбирается внутри фильтров.
+            // Если фильтр был пустым, это означает все категории.
+            if (!Array.isArray(state.catalogFilters.categories)) state.catalogFilters.categories = [];
+
+            renderCatalogFilterModal(min, max);
+            openModal('modal-catalog-filters');
+        }
+
+        function renderCatalogFilterModal(min, max) {
+            const f = state.catalogFilters;
+            const brands = getCatalogFilterBrands();
+
+            const brandList = document.getElementById('filter-brand-list');
+            if (!brandList) return;
+
+            brandList.innerHTML = brands.length ? brands.map(brand => {
+                const safeBrand = escapeHtml(brand);
+                const safeJsBrand = String(brand)
+                    .replace(/\\/g, '\\\\')
+                    .replace(/'/g, "\\'")
+                    .replace(/\r/g, '\\r')
+                    .replace(/\n/g, '\\n');
+
+                return `
+                    <button type="button"
+                        onclick="toggleCatalogBrand('${safeJsBrand}')"
+                        class="px-3 py-2 rounded-xl text-xs border transition ${f.brands.includes(brand) ? 'bg-accent border-accent text-white' : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-accent'}">${safeBrand}</button>
+                `;
+            }).join('') : '<span class="text-xs text-zinc-600">Нет брендов для выбранной категории</span>';
+
+            const minEl = document.getElementById('filter-min-range');
+            const maxEl = document.getElementById('filter-max-range');
+            [minEl, maxEl].forEach(el => {
+                if (!el) return;
+                el.min = min;
+                el.max = max;
+                el.step = 1;
+            });
+
+            if (minEl) minEl.value = Math.max(min, Math.min(Number(f.minPrice ?? min), max));
+            if (maxEl) maxEl.value = Math.max(min, Math.min(Number(f.maxPrice ?? max), max));
+
+            const priceLabel = document.getElementById('filter-price-label');
+            if (priceLabel) priceLabel.textContent = `${minEl?.value ?? min} ₽ — ${maxEl?.value ?? max} ₽`;
+
+            const asc = document.getElementById('filter-price-asc');
+            const desc = document.getElementById('filter-price-desc');
+            if (asc) asc.className = `py-2 rounded-xl text-xs border ${f.priceSort === 'asc' ? 'bg-accent border-accent text-white' : 'bg-zinc-900 border-zinc-700 text-zinc-400'}`;
+            if (desc) desc.className = `py-2 rounded-xl text-xs border ${f.priceSort === 'desc' ? 'bg-accent border-accent text-white' : 'bg-zinc-900 border-zinc-700 text-zinc-400'}`;
+
+            lucide.createIcons();
+        }
+
+        function toggleCatalogBrand(brand) {
+            const arr = state.catalogFilters.brands;
+            const i = arr.indexOf(brand);
+
+            if (i >= 0) {
+                arr.splice(i, 1);
+            } else {
+                arr.push(brand);
+            }
+
+            const minEl = document.getElementById('filter-min-range');
+            const maxEl = document.getElementById('filter-max-range');
+            const min = Number(minEl?.min || 0);
+            const max = Number(maxEl?.max || 0);
+            renderCatalogFilterModal(min, max);
+        }
+
+        function setCatalogPriceSort(sort) {
+            state.catalogFilters.priceSort = state.catalogFilters.priceSort === sort ? '' : sort;
+            const minEl = document.getElementById('filter-min-range');
+            const maxEl = document.getElementById('filter-max-range');
+            const min = Number(minEl?.min || 0);
+            const max = Number(maxEl?.max || 0);
+            renderCatalogFilterModal(min, max);
+        }
+
+        function updateCatalogPriceRange(which, value) {
+            const f = state.catalogFilters;
+            if (which === 'min') f.minPrice = Math.min(Number(value), Number(f.maxPrice ?? value));
+            else f.maxPrice = Math.max(Number(value), Number(f.minPrice ?? value));
+
+            const label = document.getElementById('filter-price-label');
+            if (label) label.textContent = `${f.minPrice} ₽ — ${f.maxPrice} ₽`;
+        }
+
+        function resetCatalogFilters() {
+            // Сбрасываем только фильтры. Категории снова показываются все.
+            state.catalogFilters = {
+                categories: [],
+                brands: [],
+                priceSort: '',
+                minPrice: null,
+                maxPrice: null
+            };
+            state.catalogCategory = 'all';
+            state.catalogSubcategory = 'all';
+            closeModal('modal-catalog-filters');
+            render();
+        }
+
+        function saveCatalogFilters() {
+            // Пустой список категорий = все категории.
+            if (!Array.isArray(state.catalogFilters.categories)) state.catalogFilters.categories = [];
+
+            state.catalogCategory = state.catalogFilters.categories.length === 1
+                ? state.catalogFilters.categories[0]
+                : 'all';
+            state.catalogSubcategory = 'all';
+
+            closeModal('modal-catalog-filters');
+            updateCatalogGrid();
+            const summary = document.querySelector('#catalog-products-grid')?.previousElementSibling?.querySelector('span:last-child');
+            if (summary) summary.textContent = getCatalogFilterSummary();
+            renderNav();
+        }
+
+        function getCatalogStockTotalHTML() {
+            if (state.role !== 'admin') return '';
+            const variantCards = getCatalogVariantCards();
+            if (variantCards.length === 0) return '';
+            const total = variantCards.reduce((sum, item) => sum + Number(item.variant.quantity || 0), 0);
+            return `Всего в наличии: <span class="text-zinc-300 font-semibold">${total} шт.</span>`;
+        }
+
+        async function changeCatalogCartQty(productId, variantId, delta) {
+            const index = state.cart.findIndex(i => i.productId === productId && i.variantId === variantId);
+            if (index === -1) {
+                if (delta > 0) await addToCart(productId, variantId);
+                return;
+            }
+            await updateCartQty(index, delta);
+        }
+
+        function updateCatalogGrid() {
+            const grid = document.getElementById('catalog-products-grid');
+            if (grid) {
+                grid.innerHTML = getCatalogCardsHTML();
+                lucide.createIcons();
+            }
+            const totalEl = document.getElementById('catalog-stock-total');
+            if (totalEl) totalEl.innerHTML = getCatalogStockTotalHTML();
+        }
+
+        function openVariantModal(productId) {
+            const p = (state.products || []).find(item => item.id === productId);
+            if (!p || !p.product_variants) return;
+
+            document.getElementById('variant-modal-title').textContent = p.name;
+            const container = document.getElementById('variant-list-container');
+            
+            const availableVariants = p.product_variants.filter(v => v.quantity > 0);
+            if (availableVariants.length === 0) {
+                container.innerHTML = '<p class="text-xs text-zinc-500 text-center py-4">Нет в наличии</p>';
+            } else {
+                container.innerHTML = availableVariants.map(v => {
+                    const inCart = state.cart.find(i => i.productId === p.id && i.variantId === v.id);
+                    return `
+                    <div onclick="addToCart(${p.id}, ${v.id})" class="bg-zinc-900 border ${inCart ? 'border-emerald-600' : 'border-zinc-800'} hover:border-accent p-3 rounded-xl flex items-center justify-between cursor-pointer transition">
+                        <div>
+                            <span class="text-xs text-zinc-400 block">${v.type === 'flavor' ? 'Вкус' : 'Цвет'}${state.role === 'admin' ? ' • Остаток: ' + v.quantity + ' шт.' : ''}</span>
+                            <h4 class="text-sm font-semibold text-zinc-200">${v.value} ${inCart ? `<span class="text-emerald-400 text-xs">(в корзине: ${inCart.qty})</span>` : ''}</h4>
+                        </div>
+                        <span class="text-xs font-bold text-accent">${p.retail_price} ₽</span>
+                    </div>
+                `}).join('');
+            }
+            openModal('modal-variant-select');
+        }
+
+        function openImagePreview(productId) {
+            const p = (state.products || []).find(item => item.id === productId);
+            if (!p) return;
+
+            const hasDiscount = p.old_price && p.old_price > p.retail_price;
+            document.getElementById('preview-image-img').src = p.image_url || 'https://via.placeholder.com/300';
+            document.getElementById('preview-image-img').alt = p.name;
+            document.getElementById('preview-image-title').textContent = p.name;
+            document.getElementById('preview-image-price').innerHTML = hasDiscount
+                ? `<span class="text-zinc-500 line-through font-normal text-xs mr-2">${p.old_price} ₽</span>${p.retail_price} ₽`
+                : `${p.retail_price} ₽`;
+
+            const variantsContainer = document.getElementById('preview-image-variants');
+            const variants = (p.product_variants || []).filter(v => v.quantity > 0);
+            variantsContainer.innerHTML = variants.length === 0
+                ? '<p class="text-xs text-zinc-500">Нет в наличии</p>'
+                : variants.map(v => `
+                    <div class="flex items-center justify-between text-xs bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2">
+                        <span class="text-zinc-300">${v.type === 'flavor' ? 'Вкус' : 'Цвет'}: ${v.value}</span>
+                        <span class="text-accent font-semibold">${p.retail_price} ₽</span>
+                    </div>
+                `).join('');
+
+            openModal('modal-image-preview');
+        }
+
+        async function addToCart(productId, variantId) {
+            const product = (state.products || []).find(p => p.id === productId);
+            if (!product) return;
+
+            const variant = (product.product_variants || []).find(v => v.id === variantId);
+            if (!variant || variant.quantity <= 0) {
+                showToast('Этот вариант закончился', 'error');
+                return;
+            }
+
+            const existingIndex = state.cart.findIndex(i => i.productId === productId && i.variantId === variantId);
+            if (existingIndex > -1) {
+                if (state.cart[existingIndex].qty < variant.quantity) {
+                    state.cart[existingIndex].qty++;
+                } else {
+                    showToast('Достигнут лимит остатка', 'error');
+                    return;
+                }
+            } else {
+                state.cart.push({
+                    productId: product.id,
+                    variantId: variant.id,
+                    name: product.name,
+                    variantName: variant.value,
+                    price: Number(product.retail_price),
+                    qty: 1,
+                    image: product.image_url,
+                    maxQty: variant.quantity
+                });
+            }
+
+            await saveCartToDb();
+            showToast('Товар добавлен в корзину');
+            renderNav();
+            if (state.activeTab === 'cart') render();
+            else if (state.activeTab === 'home') renderUserHomeSearch(state.searchQuery || '');
+            else if (state.activeTab === 'catalog' || state.activeTab === 'admin_catalog') updateCatalogGrid();
+
+            const variantModal = document.getElementById('modal-variant-select');
+            if (variantModal && !variantModal.classList.contains('hidden')) {
+                openVariantModal(productId);
+            }
+        }
+
+        async function updateCartQty(index, delta) {
+            const item = state.cart[index];
+            if (!item) return;
+
+            const newQty = item.qty + delta;
+            if (newQty <= 0) {
+                state.cart.splice(index, 1);
+            } else {
+                const product = (state.products || []).find(p => p.id === item.productId);
+                const variant = product ? (product.product_variants || []).find(v => v.id === item.variantId) : null;
+                const max = variant ? variant.quantity : item.maxQty;
+
+                if (newQty > max) {
+                    showToast('Превышен доступный остаток', 'error');
+                    return;
+                }
+                item.qty = newQty;
+            }
+
+            await saveCartToDb();
+            state.selectedCartItems = new Set([...state.selectedCartItems].filter(i => i < state.cart.length));
+            render();
+        }
+
+        function getSelectedCartItems() {
+            return state.cart.filter((_, idx) => state.selectedCartItems.has(idx));
+        }
+
+        function toggleCartSelection(index, event) {
+            if (event) event.stopPropagation();
+            if (state.selectedCartItems.has(index)) state.selectedCartItems.delete(index);
+            else state.selectedCartItems.add(index);
+            render();
+        }
+
+        function toggleAllCartSelection() {
+            if (state.selectedCartItems.size === state.cart.length) state.selectedCartItems.clear();
+            else state.selectedCartItems = new Set(state.cart.map((_, i) => i));
+            render();
+        }
+
+        async function removeSelectedCartItems() {
+            if (!state.selectedCartItems.size) {
+                showToast('Выберите товары для удаления', 'error');
+                return;
+            }
+            const indexes=[...state.selectedCartItems].sort((a,b)=>b-a);
+            indexes.forEach(i=>state.cart.splice(i,1));
+            state.selectedCartItems.clear();
+            await saveCartToDb();
+            render();
+            showToast('Выбранные товары удалены');
+        }
+
+        function renderUserCart(container) {
+            const selected = getSelectedCartItems();
+            const total = selected.reduce((acc, item) => acc + (item.price * item.qty), 0);
+            const allSelected = state.cart.length > 0 && state.selectedCartItems.size === state.cart.length;
+            const activeOrder = getMyActiveOrder();
+
+            container.innerHTML = `
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-bold">Корзина</h2>
+                        ${state.cart.length ? `<button onclick="toggleAllCartSelection()" class="text-xs text-accent hover:underline">${allSelected ? 'Снять всё' : 'Выбрать всё'}</button>` : ''}
+                    </div>
+                    <div class="space-y-2 max-h-[40vh] overflow-y-auto">
+                        ${state.cart.length === 0 ? '<p class="text-center text-zinc-500 py-6">Корзина пуста</p>' : state.cart.map((item, idx) => {
+                            const checked=state.selectedCartItems.has(idx);
+                            return `
+                            <div class="bg-cardBg border ${checked ? 'border-accent' : 'border-zinc-800'} rounded-2xl p-3 flex items-center justify-between transition">
+                                <div class="flex items-center space-x-3 min-w-0">
+                                    <button onclick="toggleCartSelection(${idx}, event)" class="w-6 h-6 shrink-0 rounded-md border ${checked ? 'bg-accent border-accent' : 'border-zinc-600 bg-zinc-900'} flex items-center justify-center text-white">
+                                        ${checked ? '<i data-lucide="check" class="w-4 h-4"></i>' : ''}
+                                    </button>
+                                    <img src="${item.image || 'https://via.placeholder.com/150'}" onclick="toggleCartSelection(${idx}, event)" class="w-14 h-14 object-cover rounded-xl cursor-pointer" title="Выбрать товар">
+                                    <div class="min-w-0">
+                                        <h4 class="font-semibold text-sm truncate">${item.name}</h4>
+                                        <p class="text-xs text-zinc-400 truncate">${item.variantName} | ${item.price} ₽</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-1 shrink-0 ml-2">
+                                    <button onclick="updateCartQty(${idx}, -1)" class="w-7 h-7 bg-zinc-800 hover:bg-zinc-700 rounded-lg flex items-center justify-center text-sm">-</button>
+                                    <span class="text-sm font-medium w-6 text-center">${item.qty}</span>
+                                    <button onclick="updateCartQty(${idx}, 1)" class="w-7 h-7 bg-zinc-800 hover:bg-zinc-700 rounded-lg flex items-center justify-center text-sm">+</button>
+                                </div>
+                            </div>`;
+                        }).join('')}
+                    </div>
+
+                    ${state.cart.length > 0 ? `
+                        <div class="flex space-x-2">
+                            <button onclick="removeSelectedCartItems()" class="flex-1 bg-red-500/10 border border-red-500/30 text-red-400 py-2.5 rounded-xl text-xs font-medium">Удалить выбранное</button>
+                        </div>
+                        <div class="border-t border-zinc-800 pt-3 space-y-3">
+                            ${activeOrder ? `<div class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-xs text-amber-300">У вас уже есть заказ #${String(activeOrder.id).slice(0,6)} в работе. Новый заказ можно будет оформить после выполнения или отмены текущего.</div>` : ''}
+                            <div class="bg-cardBg border border-zinc-700/60 rounded-2xl p-3.5 space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Контакты для связи</span>
+                                    <button onclick="switchTab('profile')" class="text-xs text-accent hover:underline flex items-center space-x-1">
+                                        <i data-lucide="edit-3" class="w-3.5 h-3.5"></i><span>Изменить</span>
+                                    </button>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2 text-xs pt-1">
+                                    <div class="bg-zinc-900/60 p-2 rounded-xl border border-zinc-800"><span class="text-zinc-500 block text-[10px]">Юз:</span><span class="font-medium text-zinc-200">${state.contactUser || 'Не указано'}</span></div>
+                                    <div class="bg-zinc-900/60 p-2 rounded-xl border border-zinc-800"><span class="text-zinc-500 block text-[10px]">Телефон:</span><span class="font-medium text-zinc-200">${state.phone || 'Не указано'}</span></div>
+                                </div>
+                            </div>
+                            <div class="flex justify-between text-base font-bold"><span>Итого выбранного:</span><span class="text-accent">${total} ₽</span></div>
+                            <button id="checkout-order-btn" onclick="checkoutOrder()" ${(!selected.length || activeOrder) ? 'disabled' : ''} class="w-full bg-accent hover:bg-accentHover disabled:opacity-40 disabled:cursor-not-allowed py-3 rounded-xl font-medium transition text-white">${activeOrder ? 'Есть заказ в работе' : 'Оформить выбранное'}</button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        function getMyActiveOrder() {
+            return (state.orders || []).find(o => {
+                if (o.status !== 'in_progress') return false;
+                if (state.login) return o.user_login === state.login;
+                return o.client_id === state.clientId;
+            }) || null;
+        }
+
+        function checkoutOrder() {
+            if (state.isPlacingOrder) return;
+            if (getMyActiveOrder()) {
+                showToast('Нельзя оформить новый заказ, пока текущий не выполнен или не отменен', 'error');
+                return;
+            }
+            if (!getSelectedCartItems().length) {
+                showToast('Выберите товары для оформления', 'error');
+                return;
+            }
+            if (!state.contactUser && !state.phone) {
+                openModal('modal-missing-contacts');
+                return;
+            }
+            executeCheckout();
+        }
+
+        function proceedCheckoutWithoutContacts() {
+            closeModal('modal-missing-contacts');
+            executeCheckout();
+        }
+
+        function cancelCheckout() {
+            closeModal('modal-missing-contacts');
+        }
+
+        async function executeCheckout() {
+            // Берём снимок выбранных товаров ДО любых запросов/изменений корзины.
+            // В заказ должны попасть только они, а остальные позиции остаются в корзине.
+            const selectedItems = getSelectedCartItems().map(item => ({ ...item }));
+
+            if (selectedItems.length === 0) {
+                showToast('Выберите товары для оформления', 'error');
+                return;
+            }
+
+            if (getMyActiveOrder()) {
+                showToast('У вас уже есть заказ в работе', 'error');
+                return;
+            }
+
+            if (state.isPlacingOrder) return;
+            state.isPlacingOrder = true;
+
+            const checkoutBtn = document.getElementById('checkout-order-btn');
+            if (checkoutBtn) {
+                checkoutBtn.disabled = true;
+                checkoutBtn.textContent = 'Оформляем заказ...';
+                checkoutBtn.classList.add('opacity-60', 'cursor-not-allowed');
+            }
+
+            let totalRetail = 0;
+            let totalWholesale = 0;
+            const itemsToInsert = [];
+            const processedKeys = new Set();
+
+            try {
+                // Обрабатываем ТОЛЬКО выбранные позиции.
+                for (const item of selectedItems) {
+                    const product = (state.products || []).find(
+                        p => String(p.id) === String(item.productId)
+                    );
+                    if (!product) continue;
+
+                    const qty = Number(item.qty) || 0;
+                    const price = Number(item.price) || 0;
+                    if (qty <= 0) continue;
+
+                    // Не допускаем повторную обработку одной позиции.
+                    const key = `${item.productId}:${item.variantId}`;
+                    if (processedKeys.has(key)) continue;
+                    processedKeys.add(key);
+
+                    totalRetail += price * qty;
+                    totalWholesale += Number(product.wholesale_price || 0) * qty;
+
+                    itemsToInsert.push({
+                        product_name: item.name,
+                        variant_name: item.variantName,
+                        quantity: qty,
+                        price: price
+                    });
+
+                    // Списываем со склада только выбранное количество.
+                    const { data: varData, error: varError } = await supabaseClient
+                        .from('product_variants')
+                        .select('quantity')
+                        .eq('id', item.variantId)
+                        .single();
+
+                    if (varError) throw varError;
+
+                    const availableQty = Number(varData?.quantity || 0);
+                    if (availableQty < qty) {
+                        throw new Error(
+                            `Недостаточно товара "${item.name}" (${item.variantName}). Доступно: ${availableQty} шт.`
+                        );
+                    }
+
+                    const { error: stockError } = await supabaseClient
+                        .from('product_variants')
+                        .update({ quantity: availableQty - qty })
+                        .eq('id', item.variantId);
+
+                    if (stockError) throw stockError;
+                }
+
+                if (itemsToInsert.length === 0) {
+                    throw new Error('Не удалось подготовить выбранные товары');
+                }
+
+                const { data: orderData, error: orderErr } = await supabaseClient
+                    .from('orders')
+                    .insert({
+                        username: state.contactUser || 'не указано',
+                        phone: state.phone || 'не указан',
+                        total_retail: totalRetail,
+                        total_wholesale: totalWholesale,
+                        status: 'in_progress',
+                        user_login: state.login || null,
+                        client_id: state.clientId
+                    })
+                    .select()
+                    .single();
+
+                if (orderErr || !orderData) {
+                    throw orderErr || new Error('Не удалось создать заказ');
+                }
+
+                for (const item of itemsToInsert) {
+                    const { error: itemError } = await supabaseClient
+                        .from('order_items')
+                        .insert({
+                            order_id: orderData.id,
+                            product_name: item.product_name,
+                            variant_name: item.variant_name,
+                            quantity: item.quantity,
+                            price: item.price
+                        });
+
+                    if (itemError) throw itemError;
+                }
+
+                // Удаляем из корзины ТОЛЬКО те позиции, которые были оформлены.
+                const selectedKeys = new Set(
+                    selectedItems.map(i => `${i.productId}:${i.variantId}`)
+                );
+
+                state.cart = state.cart.filter(
+                    item => !selectedKeys.has(`${item.productId}:${item.variantId}`)
+                );
+
+                // После оформления снимаем выделение.
+                state.selectedCartItems.clear();
+
+                await saveCartToDb();
+                await fetchProducts();
+                await fetchOrders();
+
+                switchTab('orders');
+                showToast('Заказ успешно оформлен!');
+            } catch (e) {
+                console.error('Ошибка оформления заказа:', e);
+                showToast(
+                    e?.message || 'Ошибка при оформлении заказа',
+                    'error'
+                );
+
+                // Если создание заказа не удалось после списания склада,
+                // пытаемся вернуть уже списанные выбранные позиции.
+                // Это не затрагивает остальные товары корзины.
+                if (!itemsToInsert.length) {
+                    // Ничего со склада ещё не списывали.
+                }
+
+                if (state.activeTab === 'cart') render();
+            } finally {
+                state.isPlacingOrder = false;
+            }
+        }
+
+        async function cancelOrder(orderId) {
+            showConfirm('Отмена заказа', 'Вы уверены, что хотите отменить этот заказ?', async () => {
+                try {
+                    const order = (state.orders || []).find(o => o.id == orderId);
+                    if (order && order.order_items) {
+                        for (const item of order.order_items) {
+                            // Ищем товар в БД по имени
+                            const { data: prodData } = await supabaseClient
+                                .from('products')
+                                .select('id')
+                                .ilike('name', item.product_name)
+                                .limit(1);
+
+                            if (prodData && prodData.length > 0) {
+                                const productId = prodData[0].id;
+                                // Ищем вариант в БД по product_id и value
+                                const { data: varData } = await supabaseClient
+                                    .from('product_variants')
+                                    .select('id, quantity')
+                                    .eq('product_id', productId)
+                                    .ilike('value', item.variant_name)
+                                    .limit(1);
+
+                                if (varData && varData.length > 0) {
+                                    const newQty = Number(varData[0].quantity || 0) + Number(item.quantity);
+                                    await supabaseClient.from('product_variants').update({ quantity: newQty }).eq('id', varData[0].id);
+                                }
+                            }
+                        }
+                    }
+                    await supabaseClient.from('orders').delete().eq('id', orderId);
+                    await fetchProducts();
+                    await fetchOrders();
+                    render();
+                    showToast('Заказ отменен, товар возвращен на склад');
+                } catch (e) {
+                    console.error(e);
+                    showToast('Ошибка отмены заказа', 'error');
+                }
+            });
+        }
+
+        function renderUserOrders(container) {
+            const myOrders = (state.orders || []).filter(o => {
+                if (o.status === 'archived') return false;
+                if (state.login) return o.user_login === state.login;
+                return o.client_id === state.clientId;
+            });
+            const inProgress = myOrders.filter(o => o.status === 'in_progress');
+            const completed = myOrders.filter(o => o.status === 'completed');
+
+            container.innerHTML = `
+                <div class="space-y-4">
+                    <h2 class="text-lg font-bold">Мои заказы</h2>
+                    
+                    <div class="space-y-3">
+                        <h3 class="text-sm font-semibold text-zinc-400">В работе (${inProgress.length})</h3>
+                        ${inProgress.length === 0 ? '<p class="text-xs text-zinc-600">Нет заказов в работе</p>' : inProgress.map(o => {
+                            const cleanUsername = (o.username || '').replace('@', '');
+                            const hasContact = !!o.phone || (cleanUsername && cleanUsername.toLowerCase() !== 'аноним');
+                            return `
+                            <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-2">
+                                <div class="flex justify-between text-xs text-zinc-400">
+                                    <span>Заказ #${String(o.id).slice(0,6)}</span>
+                                    <span>${new Date(o.created_at).toLocaleDateString()}</span>
+                                </div>
+                                <div class="space-y-1">
+                                    ${(o.order_items || []).map(i => `<div class="text-sm flex justify-between"><span>${i.product_name} (${i.variant_name})</span><span>${i.quantity} шт. x ${i.price} ₽</span></div>`).join('')}
+                                </div>
+                                ${!hasContact ? `
+                                    <div class="bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2 flex items-start space-x-2">
+                                        <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+                                        <p class="text-[11px] text-amber-300 leading-snug">Вы не указали телефон или Telegram, менеджер не сможет с вами связаться. Напишите ему сами, нажав кнопку ниже.</p>
+                                    </div>
+                                ` : ''}
+                                <div class="flex flex-col space-y-2 pt-2 border-t border-zinc-800">
+                                    <div class="flex justify-between items-center">
+                                        <span class="font-bold text-sm text-accent">Итого: ${o.total_retail} ₽</span>
+                                        <button onclick="copyOrderToClipboard('${o.id}')" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-lg transition flex items-center gap-1"><i data-lucide="copy" class="w-3.5 h-3.5"></i>Копировать</button>
+                                            <button onclick="cancelOrder('${o.id}')" class="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs rounded-lg transition">Отменить</button>
+                                    </div>
+                                    <button onclick="openAskManagerModal('${o.id}')" class="w-full ${hasContact ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200' : 'bg-accent hover:bg-accentHover text-white'} py-2 rounded-xl text-xs font-medium transition flex items-center justify-center space-x-1.5">
+                                        <i data-lucide="message-circle" class="w-4 h-4 ${hasContact ? 'text-accent' : 'text-white'}"></i><span>Спросить о заказе</span>
+                                    </button>
+                                </div>
+                            </div>
+                        `}).join('')}
+                    </div>
+
+                    <div class="space-y-3 pt-4">
+                        <h3 class="text-sm font-semibold text-zinc-400">Выполненные (${completed.length})</h3>
+                        ${completed.length === 0 ? '<p class="text-xs text-zinc-600">Нет выполненных заказов</p>' : completed.map(o => `
+                            <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-2 opacity-75">
+                                <div class="flex justify-between text-xs text-zinc-400">
+                                    <span>Заказ #${String(o.id).slice(0,6)}</span>
+                                    <span>${new Date(o.created_at).toLocaleDateString()}</span>
+                                </div>
+                                <div class="space-y-1">
+                                    ${(o.order_items || []).map(i => `<div class="text-sm flex justify-between"><span>${i.product_name} (${i.variant_name})</span><span>${i.quantity} шт.</span></div>`).join('')}
+                                </div>
+                                <div class="flex justify-between items-center pt-2 border-t border-zinc-800">
+                                    <span class="font-bold text-sm text-zinc-300">Итого: ${o.total_retail} ₽</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        function openAskManagerModal(orderId) {
+            state.selectedOrderForAsk = orderId;
+            const labelEl = document.getElementById('ask-order-id-label');
+            if (labelEl) labelEl.textContent = '#' + String(orderId).slice(0, 6);
+
+            const container = document.getElementById('managers-list-container');
+            if (state.managers.length === 0) {
+                container.innerHTML = `<p class="text-xs text-zinc-500 text-center py-4">Менеджеры пока не добавлены</p>`;
+            } else {
+                container.innerHTML = state.managers.map(m => `
+                    <div onclick="contactManager('${m.username}', '${orderId}')" class="bg-zinc-900 border border-zinc-800 hover:border-accent p-3 rounded-xl flex items-center justify-between cursor-pointer transition">
+                        <div>
+                            <h4 class="text-sm font-semibold text-zinc-200">${m.name}</h4>
+                            <p class="text-xs text-accent">@${m.username.replace('@', '')}</p>
+                        </div>
+                        <i data-lucide="send" class="w-4 h-4 text-accent"></i>
+                    </div>
+                `).join('');
+            }
+
+            openModal('modal-select-manager');
+            lucide.createIcons();
+        }
+
+        function contactManager(username, orderId) {
+            const cleanUsername = username.replace('@', '');
+            const shortId = String(orderId).slice(0, 6);
+            const message = encodeURIComponent(`Здравствуйте! Хотел(а) спросить о заказе номер ${shortId}`);
+            const tgUrl = `https://t.me/${cleanUsername}?text=${message}`;
+            
+            closeModal('modal-select-manager');
+            window.open(tgUrl, '_blank');
+        }
+
+        // --- Профиль / Авторизация через Telegram ---
+
+        function renderTelegramLogin() {
+            const container = document.getElementById('telegram-login-container');
+            if (!container) return;
+
+            const params = new URLSearchParams({
+                client_id: TELEGRAM_CLIENT_ID,
+                origin: window.location.origin,
+                return_to: TELEGRAM_REDIRECT,
+                request_access: 'write'
+            });
+
+            container.innerHTML = `
+                <button onclick="loginTelegramOAuth()" class="w-full bg-[#229ED9] hover:bg-[#168ac1] text-white py-3 rounded-xl font-medium">
+                    Войти через Telegram
+                </button>`;
+        }
+
+        function loginTelegramOAuth(){
+            const url = 'https://oauth.telegram.org/auth?' + new URLSearchParams({
+                client_id: TELEGRAM_CLIENT_ID,
+                origin: window.location.origin,
+                return_to: TELEGRAM_REDIRECT,
+                request_access: 'write'
+            });
+            window.location.href = url;
+        }
+
+        async function checkTelegramCallback(){
+            const params = new URLSearchParams(window.location.search);
+            const code = params.get('code');
+            if(!code) return;
+
+            try{
+                const response = await fetch('https://ehrzjvuuvodudlelazhe.supabase.co/functions/v1/telegram-auth',{
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({code})
+                });
+                const result = await response.json();
+                if(!result.success || !result.user) throw new Error(result.error || 'Auth error');
+
+                const u=result.user;
+                state.user=u;
+                state.telegramId=String(u.telegram_id);
+                state.telegramUsername=u.telegram_username ? '@'+u.telegram_username.replace(/^@/,'') : '';
+                state.telegramName=[u.telegram_first_name,u.telegram_last_name].filter(Boolean).join(' ');
+                state.login='tg_'+u.telegram_id;
+
+                localStorage.setItem('reflex_user',JSON.stringify(u));
+                localStorage.setItem('reflex_login',state.login);
+                localStorage.setItem('reflex_telegram_id',state.telegramId);
+                localStorage.setItem('reflex_telegram_username',state.telegramUsername);
+
+                history.replaceState({},document.title,window.location.pathname);
+                await loadCartFromDb();
+                render();
+            }catch(e){
+                console.error(e);
+                showToast('Ошибка входа Telegram','error');
+            }
+        }
+
+        async function onTelegramAuth(){ }
+
+        function renderUserProfile(container) {
+            const isLoggedIn = Boolean(state.telegramId || state.login);
+
+            container.innerHTML = `
+                <div class="space-y-4 max-w-sm mx-auto pt-4">
+                    <h2 class="text-lg font-bold">Профиль аккаунта</h2>
+
+                    ${!isLoggedIn ? `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-5 space-y-4">
+                            <h3 class="text-sm font-bold text-accent">Вход через Telegram</h3>
+
+                            <p class="text-xs text-zinc-400">
+                                Нажмите кнопку ниже. Аккаунт создастся автоматически.
+                            </p>
+
+                            <div id="telegram-login-container" class="flex justify-center"></div>
+                        </div>
+                    ` : `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <div class="text-sm font-bold text-accent">
+                                Telegram подключён
+                            </div>
+
+                            <div class="text-sm">
+                                ${escapeHtml(state.telegramName || '')}
+                            </div>
+
+                            <div class="text-xs text-zinc-400">
+                                ${escapeHtml(state.telegramUsername || 'Username отсутствует')}
+                            </div>
+
+                            <div>
+                                <label class="text-xs text-zinc-400 mb-1 block">Телефон</label>
+                                <input id="profile-phone"
+                                    value="${escapeHtml(state.phone || '')}"
+                                    placeholder="+7..."
+                                    class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-sm">
+                            </div>
+
+                            <button onclick="
+                                state.phone=document.getElementById('profile-phone').value.trim();
+                                localStorage.setItem('reflex_phone', state.phone);
+                                showToast('Телефон сохранён')
+                            "
+                            class="w-full bg-accent py-3 rounded-xl text-sm text-white">
+                                Сохранить телефон
+                            </button>
+
+                            <button onclick="logoutUser()"
+                            class="w-full border border-zinc-700 py-3 rounded-xl text-sm">
+                                Выйти
+                            </button>
+                        </div>
+                    `}
+                </div>
+            `;
+
+            if (!isLoggedIn) renderTelegramLogin();
+            lucide.createIcons();
+        }
+
+        async function submitLogin() {
+            showToast('Используйте вход через Telegram');
+        }
+
+        async function submitRegister() {
+            showToast('Регистрация теперь через Telegram');
+        }
+
+        function logoutUser() {
+            state.login = '';
+            state.telegramId = '';
+            state.telegramUsername = '';
+            state.telegramName = '';
+            state.contactUser = '';
+            state.phone = '';
+            state.role = 'user';
+
+            localStorage.removeItem('reflex_login');
+            localStorage.removeItem('reflex_telegram_id');
+            localStorage.removeItem('reflex_telegram_username');
+            localStorage.removeItem('reflex_telegram_name');
+            localStorage.removeItem('reflex_phone');
+            localStorage.setItem('reflex_role', 'user');
+
+            state.cart = [];
+            render();
+            showToast('Вы вышли из аккаунта');
+        }
+
+        function deleteAccount() {
+            showConfirm('Удаление аккаунта', 'Вы уверены, что хотите удалить свой аккаунт? Это действие необратимо.', async () => {
+                try {
+                    await supabaseClient.from('user').delete().eq('логин', state.login);
+                } catch (e) {}
+
+                logoutUser();
+                showToast('Аккаунт успешно удален');
+            });
+        }
+
+        function openChangePasswordModal() {
+            if (!state.login) {
+                showToast('Смена пароля доступна только при вошедшем аккаунте', 'error');
+                return;
+            }
+            document.getElementById('old-acc-password').value = '';
+            document.getElementById('new-acc-password').value = '';
+            openModal('modal-change-password');
+        }
+
+        async function submitChangePassword() {
+            const oldPass = document.getElementById('old-acc-password').value.trim();
+            const newPass = document.getElementById('new-acc-password').value.trim();
+
+            if (!oldPass || !newPass) {
+                showToast('Заполните оба поля', 'error');
+                return;
+            }
+
+            try {
+                const { data: dbUser } = await supabaseClient.from('user').select('пароль').eq('логин', state.login).maybeSingle();
+                if (!dbUser || dbUser.пароль !== oldPass) {
+                    showToast('Неверный старый пароль!', 'error');
+                    return;
+                }
+
+                await supabaseClient.from('user').update({ пароль: newPass }).eq('логин', state.login);
+                closeModal('modal-change-password');
+                showToast('Пароль успешно изменен!');
+            } catch (e) {
+                showToast('Ошибка смены пароля', 'error');
+            }
+        }
+
+        // --- Вход в админку ---
+        // Версия пароля позволяет глобально инвалидировать старые автологины.
+        async function getAdminPasswordState() {
+            const { data: passwordRow, error: passwordError } = await supabaseClient
+                .from('setting').select('value').eq('key', 'admin_password').maybeSingle();
+            if (passwordError) throw passwordError;
+
+            const { data: versionRow, error: versionError } = await supabaseClient
+                .from('setting').select('value').eq('key', 'admin_password_version').maybeSingle();
+            if (versionError) throw versionError;
+
+            return {
+                password: passwordRow ? passwordRow.value : 'admin',
+                version: versionRow ? String(versionRow.value) : 'legacy'
+            };
+        }
+
+        async function openAdminLoginModal() {
+            if (!state.login) {
+                showToast('Сначала зарегистрируйтесь и войдите в аккаунт!', 'error');
+                switchTab('profile');
+                return;
+            }
+
+            const savedPassword = localStorage.getItem('reflex_admin_password');
+            const savedVersion = localStorage.getItem('reflex_admin_password_version');
+
+            if (savedPassword) {
+                try {
+                    const adminState = await getAdminPasswordState();
+
+                    if (savedVersion && adminState.version !== 'legacy' &&
+                        savedVersion !== adminState.version) {
+                        localStorage.removeItem('reflex_admin_password');
+                        localStorage.removeItem('reflex_admin_password_version');
+                        localStorage.setItem('reflex_role', 'user');
+                        state.role = 'user';
+                        document.getElementById('admin-password-input').value = '';
+                        openModal('modal-admin-login');
+                        showToast('Пароль админки был изменён. Введите новый пароль.', 'error');
+                        return;
+                    }
+
+                    await submitAdminLogin(savedPassword, true, adminState);
+                    return;
+                } catch (e) {
+                    console.error('Ошибка проверки автологина:', e);
+                    localStorage.removeItem('reflex_admin_password');
+                    localStorage.removeItem('reflex_admin_password_version');
+                }
+            }
+
+            document.getElementById('admin-password-input').value = '';
+            openModal('modal-admin-login');
+        }
+
+        async function submitAdminLogin(passwordOverride = null, silent = false, knownAdminState = null) {
+            const adminPassInput = passwordOverride || document.getElementById('admin-password-input').value.trim();
+            if (!adminPassInput) {
+                if (!silent) showToast('Введите пароль администратора', 'error');
+                return;
+            }
+
+            try {
+                const adminState = knownAdminState || await getAdminPasswordState();
+
+                if (adminPassInput !== adminState.password) {
+                    localStorage.removeItem('reflex_admin_password');
+                    localStorage.removeItem('reflex_admin_password_version');
+                    localStorage.setItem('reflex_role', 'user');
+                    state.role = 'user';
+
+                    if (!silent) {
+                        showToast('Неверный пароль администратора!', 'error');
+                    } else {
+                        showToast('Пароль админки изменился — введите новый', 'error');
+                        document.getElementById('admin-password-input').value = '';
+                        openModal('modal-admin-login');
+                    }
+                    return;
+                }
+
+                const { error: roleError } = await supabaseClient
+                    .from('user').update({ роль: 'админ' }).eq('логин', state.login);
+                if (roleError) throw roleError;
+
+                state.role = 'admin';
+                localStorage.setItem('reflex_role', 'admin');
+                localStorage.setItem('reflex_admin_password', adminPassInput);
+
+                if (adminState.version !== 'legacy') {
+                    localStorage.setItem('reflex_admin_password_version', adminState.version);
+                }
+
+                closeModal('modal-admin-login');
+                switchTab('admin_home');
+                showToast(silent ? 'Автовход в админку выполнен' : 'Вы успешно вошли как администратор!');
+            } catch (e) {
+                console.error(e);
+                if (!silent) showToast('Ошибка входа в админку', 'error');
+            }
+        }
+
+        function openChangeAdminPasswordModal() {
+            document.getElementById('old-admin-password').value = '';
+            document.getElementById('new-admin-password').value = '';
+            openModal('modal-change-admin-password');
+        }
+
+        async function submitChangeAdminPassword() {
+            const oldPass = document.getElementById('old-admin-password').value.trim();
+            const newPass = document.getElementById('new-admin-password').value.trim();
+
+            if (!oldPass || !newPass) {
+                showToast('Заполните оба поля', 'error');
+                return;
+            }
+            if (oldPass === newPass) {
+                showToast('Новый пароль должен отличаться от старого', 'error');
+                return;
+            }
+
+            try {
+                const adminState = await getAdminPasswordState();
+
+                if (oldPass !== adminState.password) {
+                    showToast('Неверный текущий пароль администратора!', 'error');
+                    return;
+                }
+
+                const { error: passwordError } = await supabaseClient
+                    .from('setting')
+                    .upsert({ key: 'admin_password', value: newPass }, { onConflict: 'key' });
+                if (passwordError) throw passwordError;
+
+                // Новая версия делает все старые сохранённые автологины недействительными.
+                const newVersion = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+                const { error: versionError } = await supabaseClient
+                    .from('setting')
+                    .upsert({ key: 'admin_password_version', value: newVersion }, { onConflict: 'key' });
+                if (versionError) throw versionError;
+
+                // Сбрасываем всех текущих администраторов.
+                const { error: roleError } = await supabaseClient
+                    .from('user').update({ роль: 'пользователь' }).eq('роль', 'админ');
+                if (roleError) throw roleError;
+
+                // На текущем устройстве тоже удаляем автологин.
+                state.role = 'user';
+                localStorage.setItem('reflex_role', 'user');
+                localStorage.removeItem('reflex_admin_password');
+                localStorage.removeItem('reflex_admin_password_version');
+
+                closeModal('modal-change-admin-password');
+                switchTab('home');
+                showToast('Пароль изменён. Все админские сессии и автологины сброшены.');
+            } catch (e) {
+                console.error('Ошибка смены пароля администратора:', e);
+                showToast('Ошибка смены пароля администратора', 'error');
+            }
+        }
+
+        function logoutAdmin() {
+            if (state.login) {
+                supabaseClient.from('user').update({ роль: 'пользователь' }).eq('логин', state.login).then(() => {});
+            }
+            state.role = 'user';
+            localStorage.setItem('reflex_role', 'user');
+            switchTab('home');
+            showToast('Вы вышли из админки');
+        }
+
+        function toggleAdminMenu() {
+            const dropdown = document.getElementById('admin-dropdown');
+            if (dropdown) dropdown.classList.toggle('hidden');
+        }
+
+        // --- Восстановленная система управления товарами в админке ---
+        function openProductModal(productId = null) {
+            document.getElementById('edit-product-id').value = productId || '';
+            document.getElementById('product-form-title').textContent = productId ? 'Редактировать товар' : 'Добавить товар';
+            document.getElementById('p-name').value = '';
+            document.getElementById('p-category').value = 'жидкость';
+            document.getElementById('p-subcategory').value = '';
+            document.getElementById('p-retail').value = '';
+            document.getElementById('p-wholesale').value = '';
+            document.getElementById('p-image').value = '';
+            document.getElementById('image-preview').src = '';
+            document.getElementById('image-preview-container').classList.add('hidden');
+            document.getElementById('p-featured').checked = true;
+            document.getElementById('variants-rows').innerHTML = '';
+
+            if (productId) {
+                const product = (state.products || []).find(p => p.id === productId);
+                if (product) {
+                    document.getElementById('p-name').value = product.name || '';
+                    document.getElementById('p-category').value = product.category || 'жидкость';
+                    document.getElementById('p-subcategory').value = product.subcategory || '';
+                    document.getElementById('p-retail').value = product.retail_price || '';
+                    document.getElementById('p-wholesale').value = product.wholesale_price || '';
+                    document.getElementById('p-image').value = product.image_url || '';
+                    if (product.image_url) {
+                        document.getElementById('image-preview').src = product.image_url;
+                        document.getElementById('image-preview-container').classList.remove('hidden');
+                    }
+                    document.getElementById('p-featured').checked = product.is_featured !== false;
+                    
+                    if (product.product_variants && product.product_variants.length > 0) {
+                        product.product_variants.forEach(v => {
+                            addVariantRow(v.value, v.quantity);
+                        });
+                    }
+                }
+            } else {
+                addVariantRow('', '');
+            }
+
+            updateVariantLabel();
+            openModal('modal-product-form');
+        }
+
+        function editProduct(id) {
+            openProductModal(id);
+        }
+
+        function addVariantRow(val = '', qty = 1) {
+            const container = document.getElementById('variants-rows');
+            if (!container) return;
+            const row = document.createElement('div');
+            row.className = 'flex items-center space-x-2 variant-row';
+            const category = document.getElementById('p-category').value;
+            const placeholder = category === 'железо' ? 'Цвет' : 'Вкус';
+            row.innerHTML = `
+                <input type="text" placeholder="${placeholder}" value="${val}" class="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent variant-value-input">
+                <input type="number" placeholder="Кол-во" value="${qty}" min="1" class="w-20 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent variant-qty-input">
+                <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-300 p-2"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+            `;
+            container.appendChild(row);
+            lucide.createIcons();
+        }
+
+        function updateVariantLabel() {
+            const category = document.getElementById('p-category').value;
+            const label = document.getElementById('variants-label');
+            if (label) {
+                label.textContent = category === 'железо' ? 'Цвета и количество' : 'Вкусы и количество';
+            }
+        }
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64 = e.target.result;
+                document.getElementById('p-image').value = base64;
+                document.getElementById('image-preview').src = base64;
+                document.getElementById('image-preview-container').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function saveProduct() {
+            const editId = document.getElementById('edit-product-id').value;
+            const name = document.getElementById('p-name').value.trim();
+            const category = document.getElementById('p-category').value;
+            const subcategory = document.getElementById('p-subcategory').value.trim();
+            const retail_price = Number(document.getElementById('p-retail').value);
+            const wholesale_price = Number(document.getElementById('p-wholesale').value);
+            const image_url = document.getElementById('p-image').value;
+            const is_featured = document.getElementById('p-featured').checked;
+
+            if (!name || isNaN(retail_price)) {
+                showToast('Заполните название и розничную цену!', 'error');
+                return;
+            }
+
+            const rowElements = document.querySelectorAll('.variant-row');
+            const variants = [];
+            rowElements.forEach(row => {
+                const val = row.querySelector('.variant-value-input').value.trim();
+                const qty = Number(row.querySelector('.variant-qty-input').value) || 0;
+                if (val) {
+                    variants.push({
+                        type: category === 'железо' ? 'color' : 'flavor',
+                        value: val,
+                        quantity: qty
+                    });
+                }
+            });
+
+            if (variants.length === 0) {
+                showToast('Добавьте хотя бы один вариант (вкус/цвет)!', 'error');
+                return;
+            }
+
+            try {
+                let productId = editId;
+
+                if (editId) {
+                    await supabaseClient.from('products').update({
+                        name, category, subcategory, retail_price, wholesale_price, image_url, is_featured
+                    }).eq('id', editId);
+
+                    await supabaseClient.from('product_variants').delete().eq('product_id', editId);
+                } else {
+                    const { data: newProd, error: prodErr } = await supabaseClient.from('products').insert({
+                        name, category, subcategory, retail_price, wholesale_price, image_url, is_featured
+                    }).select().single();
+
+                    if (prodErr || !newProd) throw prodErr;
+                    productId = newProd.id;
+                }
+
+                for (const v of variants) {
+                    await supabaseClient.from('product_variants').insert({
+                        product_id: productId,
+                        type: v.type,
+                        value: v.value,
+                        quantity: v.quantity
+                    });
+                }
+
+                closeModal('modal-product-form');
+                await fetchProducts();
+                render();
+                showToast(editId ? 'Товар успешно обновлен!' : 'Товар успешно добавлен!');
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка при сохранении товара', 'error');
+            }
+        }
+
+        async function deleteProduct(id) {
+            showConfirm('Удаление товара', 'Вы уверены, что хотите удалить этот товар?', async () => {
+                try {
+                    await supabaseClient.from('product_variants').delete().eq('product_id', id);
+                    await supabaseClient.from('products').delete().eq('id', id);
+                    await fetchProducts();
+                    render();
+                    showToast('Товар удален');
+                } catch (e) {
+                    showToast('Ошибка удаления товара', 'error');
+                }
+            });
+        }
+
+        function openDiscountModal(productId) {
+            const product = (state.products || []).find(p => p.id === productId);
+            if (!product) return;
+
+            document.getElementById('discount-product-id').value = product.id;
+            document.getElementById('discount-old-price-text').textContent = (product.old_price || product.retail_price) + ' ₽';
+            document.getElementById('discount-new-price').value = product.old_price ? product.retail_price : '';
+            openModal('modal-discount-form');
+        }
+
+        async function saveDiscount(remove) {
+            const productId = document.getElementById('discount-product-id').value;
+            const product = (state.products || []).find(p => p.id == productId);
+            if (!product) return;
+
+            if (remove) {
+                const oldPrice = product.old_price || product.retail_price;
+                await supabaseClient.from('products').update({
+                    retail_price: oldPrice,
+                    old_price: null
+                }).eq('id', productId);
+                closeModal('modal-discount-form');
+                await fetchProducts();
+                render();
+                showToast('Акция убрана');
+                return;
+            }
+
+            const newPrice = Number(document.getElementById('discount-new-price').value);
+            if (!newPrice || newPrice <= 0) {
+                showToast('Введите корректную новую цену', 'error');
+                return;
+            }
+
+            const currentOldPrice = product.old_price || product.retail_price;
+            if (newPrice >= currentOldPrice) {
+                showToast('Новая акционная цена должна быть меньше старой', 'error');
+                return;
+            }
+
+            await supabaseClient.from('products').update({
+                old_price: currentOldPrice,
+                retail_price: newPrice
+            }).eq('id', productId);
+
+            closeModal('modal-discount-form');
+            await fetchProducts();
+            render();
+            showToast('Акция успешно установлена!');
+        }
+
+        // --- Админские и остальные вкладки ---
+        function setAdminHomeSubTab(subTab) {
+            state.adminHomeSubTab = subTab;
+            render();
+        }
+
+        function renderAdminHome(container) {
+            container.innerHTML = `
+                <div class="space-y-4">
+                    <div class="flex space-x-1 bg-cardBg p-1 rounded-2xl border border-zinc-800">
+                        <button onclick="setAdminHomeSubTab('stats')" class="flex-1 py-2 rounded-xl text-xs font-medium transition ${state.adminHomeSubTab === 'stats' ? 'bg-accent text-white' : 'text-zinc-400'}">Статистика</button>
+                        <button onclick="setAdminHomeSubTab('product')" class="flex-1 py-2 rounded-xl text-xs font-medium transition ${state.adminHomeSubTab === 'product' ? 'bg-accent text-white' : 'text-zinc-400'}">Товар (Главная)</button>
+                    </div>
+                    <div id="admin-home-subcontent"></div>
+                </div>
+            `;
+            const subContainer = document.getElementById('admin-home-subcontent');
+            if (state.adminHomeSubTab === 'product') renderUserHome(subContainer);
+            else renderAdminStats(subContainer);
+        }
+
+        function renderAdminStats(container) {
+            const filteredOrders = (state.orders || []).filter(o => {
+                if (state.adminStatsFilter === 'today') return new Date(o.created_at).toDateString() === new Date().toDateString();
+                if (state.adminStatsFilter === '7days') return new Date(o.created_at) >= new Date(Date.now() - 7*24*60*60*1000);
+                if (state.adminStatsFilter === '30days') return new Date(o.created_at) >= new Date(Date.now() - 30*24*60*60*1000);
+                return true;
+            });
+
+            const completedOrders = filteredOrders.filter(o => o.status === 'completed' || o.status === 'archived');
+            const inProgressOrders = (state.orders || []).filter(o => o.status === 'in_progress');
+
+            const revenue = completedOrders.reduce((sum, o) => sum + Number(o.total_retail), 0);
+            const wholesaleCost = completedOrders.reduce((sum, o) => sum + Number(o.total_wholesale), 0);
+            const profit = revenue - wholesaleCost;
+            const ordersCount = completedOrders.length;
+            const avgCheck = ordersCount > 0 ? Math.round(revenue / ordersCount) : 0;
+            const uniqueClients = new Set(completedOrders.map(o => o.username)).size;
+
+            container.innerHTML = `
+                <div class="space-y-4">
+                    <div class="flex space-x-1 bg-cardBg p-1 rounded-2xl border border-zinc-800">
+                        <button onclick="setAdminFilter('today')" class="flex-1 py-1.5 rounded-xl text-xs font-medium transition ${state.adminStatsFilter === 'today' ? 'bg-accent text-white' : 'text-zinc-400'}">Сегодня</button>
+                        <button onclick="setAdminFilter('7days')" class="flex-1 py-1.5 rounded-xl text-xs font-medium transition ${state.adminStatsFilter === '7days' ? 'bg-accent text-white' : 'text-zinc-400'}">7 дней</button>
+                        <button onclick="setAdminFilter('30days')" class="flex-1 py-1.5 rounded-xl text-xs font-medium transition ${state.adminStatsFilter === '30days' ? 'bg-accent text-white' : 'text-zinc-400'}">30 дней</button>
+                        <button onclick="setAdminFilter('all')" class="flex-1 py-1.5 rounded-xl text-xs font-medium transition ${state.adminStatsFilter === 'all' ? 'bg-accent text-white' : 'text-zinc-400'}">Всё время</button>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4">
+                            <span class="text-xs text-zinc-400 block mb-1">ВЫРУЧКА</span>
+                            <span class="text-xl font-bold">${revenue} ₽</span>
+                        </div>
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4">
+                            <span class="text-xs text-zinc-400 block mb-1">ПРИБЫЛЬ</span>
+                            <span class="text-xl font-bold text-emerald-400">${profit} ₽</span>
+                        </div>
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4">
+                            <span class="text-xs text-zinc-400 block mb-1">ЗАКАЗОВ</span>
+                            <span class="text-xl font-bold">${ordersCount}</span>
+                        </div>
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4">
+                            <span class="text-xs text-zinc-400 block mb-1">СРЕДНИЙ ЧЕК</span>
+                            <span class="text-xl font-bold">${avgCheck} ₽</span>
+                        </div>
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4">
+                            <span class="text-xs text-zinc-400 block mb-1">ЗАРЕГ. АККАУНТОВ</span>
+                            <span class="text-xl font-bold">${state.registeredAccountsCount}</span>
+                        </div>
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4">
+                            <span class="text-xs text-zinc-400 block mb-1">В РАБОТЕ</span>
+                            <span class="text-xl font-bold text-amber-400">${inProgressOrders.length}</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4">
+                        <h3 class="text-sm font-bold mb-3">Выручка и прибыль</h3>
+                        <canvas id="statsChart" class="w-full h-48"></canvas>
+                    </div>
+                </div>
+            `;
+            initChart(completedOrders);
+            lucide.createIcons();
+        }
+
+        function setAdminFilter(filter) {
+            state.adminStatsFilter = filter;
+            render();
+        }
+
+        function initChart(completedOrders) {
+            try {
+                const canvas = document.getElementById('statsChart');
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                if (state.chartInstance) state.chartInstance.destroy();
+
+                const daysMap = {};
+                completedOrders.forEach(o => {
+                    const date = new Date(o.created_at).toLocaleDateString();
+                    if (!daysMap[date]) daysMap[date] = { rev: 0, prof: 0 };
+                    daysMap[date].rev += Number(o.total_retail);
+                    daysMap[date].prof += Number(o.total_retail) - Number(o.total_wholesale);
+                });
+
+                const labels = Object.keys(daysMap);
+                const revData = labels.map(l => daysMap[l].rev);
+                const profData = labels.map(l => daysMap[l].prof);
+
+                state.chartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels.length ? labels.reverse() : ['Нет данных'],
+                        datasets: [
+                            { label: 'Выручка', data: revData.length ? revData.reverse() : [0], borderColor: '#7c3aed', backgroundColor: 'rgba(124, 58, 237, 0.1)', fill: true, tension: 0.3 },
+                            { label: 'Прибыль', data: profData.length ? profData.reverse() : [0], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.3 }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { labels: { color: '#a1a1aa', font: { size: 10 } } } },
+                        scales: {
+                            x: { ticks: { color: '#71717a' }, grid: { color: '#27272a' } },
+                            y: { ticks: { color: '#71717a' }, grid: { color: '#27272a' } }
+                        }
+                    }
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        function renderAdminOrders(container) {
+            const inProgress = (state.orders || []).filter(o => o.status === 'in_progress');
+            const completed = (state.orders || []).filter(o => o.status === 'completed');
+
+            container.innerHTML = `
+                <div class="space-y-4">
+                    <h2 class="text-lg font-bold">Управление заказами</h2>
+                    <div class="space-y-3">
+                        <h3 class="text-sm font-semibold text-amber-400">В работе (${inProgress.length})</h3>
+                        ${inProgress.length === 0 ? '<p class="text-xs text-zinc-600">Нет заказов в работе</p>' : inProgress.map(o => {
+                            const rawUsername = (o.username || '').trim();
+                            const cleanUsername = rawUsername.replace('@', '');
+                            const isBadUsername = !cleanUsername || cleanUsername === 'не указано' || cleanUsername === 'аноним';
+                            const phoneNum = (o.phone || '').trim();
+                            const isBadPhone = !phoneNum || phoneNum === 'не указан';
+                            const displayLogin = o.user_login || null;
+                            return `
+                                <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-2">
+                                    <div class="flex justify-between text-xs text-zinc-400">
+                                        <span>Заказ #${String(o.id).slice(0,6)} • ${displayLogin ? `<strong class="text-white">${displayLogin}</strong>` : `<span class="text-zinc-500 italic">без аккаунта</span>`}</span>
+                                        <span>${new Date(o.created_at).toLocaleString()}</span>
+                                    </div>
+                                    <div class="bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-800 space-y-1 text-xs">
+                                        <div>Телефон: ${!isBadPhone ? `<a href="tel:${phoneNum}" class="text-accent underline font-medium">${phoneNum}</a>` : '<span class="text-zinc-500">Не указан</span>'}</div>
+                                        <div>Telegram: ${!isBadUsername ? `<a href="https://t.me/${cleanUsername}" target="_blank" class="text-accent underline font-medium">@${cleanUsername}</a>` : '<span class="text-zinc-500">Не указан</span>'}</div>
+                                    </div>
+                                    <div class="space-y-1">
+                                        ${(o.order_items || []).map(i => `<div class="text-sm flex justify-between"><span>${i.product_name} (${i.variant_name})</span><span>${i.quantity} шт. x ${i.price} ₽</span></div>`).join('')}
+                                    </div>
+                                    <div class="pt-3 border-t border-zinc-800 space-y-2.5">
+                                        <div class="flex items-center justify-between">
+                                            <span class="font-bold text-base text-accent">Итого: ${o.total_retail} ₽</span>
+                                        </div>
+                                        <div class="grid grid-cols-3 gap-2">
+                                            <button onclick="copyOrderToClipboard('${o.id}')" class="min-w-0 px-2 py-2.5 bg-zinc-700 hover:bg-zinc-600 active:bg-zinc-600 text-zinc-100 text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-1.5" title="Скопировать заказ">
+                                                <i data-lucide="copy" class="w-4 h-4 shrink-0"></i><span class="truncate">Копировать</span>
+                                            </button>
+                                            <button onclick="cancelOrder('${o.id}')" class="min-w-0 px-2 py-2.5 bg-red-500/20 hover:bg-red-500/30 active:bg-red-500/30 text-red-400 text-xs sm:text-sm rounded-xl transition">Отменить</button>
+                                            <button onclick="completeOrder('${o.id}')" class="min-w-0 px-2 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 active:bg-emerald-500/30 text-emerald-400 text-xs sm:text-sm rounded-xl transition">Выполнить</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+
+                    <div class="space-y-3 pt-4">
+                        <h3 class="text-sm font-semibold text-emerald-400">Выполненные (${completed.length})</h3>
+                        ${completed.length === 0 ? '<p class="text-xs text-zinc-600">Нет выполненных заказов</p>' : completed.map(o => `
+                            <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-2 opacity-75">
+                                <div class="flex justify-between text-xs text-zinc-400">
+                                    <span>Заказ #${String(o.id).slice(0,6)}</span>
+                                    <span>${new Date(o.created_at).toLocaleDateString()}</span>
+                                </div>
+                                <div class="space-y-1">
+                                    ${(o.order_items || []).map(i => `<div class="text-sm flex justify-between"><span>${i.product_name} (${i.variant_name})</span><span>${i.quantity} шт.</span></div>`).join('')}
+                                </div>
+                                <div class="pt-3 border-t border-zinc-800 space-y-2.5">
+                                    <span class="block font-bold text-sm text-zinc-300">Итого: ${o.total_retail} ₽</span>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button onclick="copyOrderToClipboard('${o.id}')" class="min-w-0 px-2 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs rounded-xl transition flex items-center justify-center gap-1.5"><i data-lucide="copy" class="w-4 h-4"></i>Копировать</button>
+                                        <button onclick="deleteCompletedOrder('${o.id}')" class="min-w-0 px-2 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded-xl transition">Удалить из списка</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        async function copyTextReliable(text) {
+            // Основной способ. Работает в HTTPS/localhost.
+            try {
+                if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                }
+            } catch (e) {
+                console.warn('Clipboard API недоступен:', e);
+            }
+
+            // Fallback для content://, file:// и браузеров без Clipboard API.
+            try {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.setAttribute('readonly', '');
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                textarea.style.top = '0';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+                textarea.setSelectionRange(0, textarea.value.length);
+                const ok = document.execCommand('copy');
+                textarea.remove();
+                return ok;
+            } catch (e) {
+                console.error('Fallback копирования не сработал:', e);
+                return false;
+            }
+        }
+
+        async function copyOrderToClipboard(orderId) {
+            const order = (state.orders || []).find(o => o.id == orderId);
+            if (!order) {
+                showToast('Заказ не найден', 'error');
+                return;
+            }
+            const lines = [
+                `Заказ #${String(order.id).slice(0,6)}`,
+                ...(order.user_login ? [`Клиент: ${order.user_login}`] : []),
+                ...(order.phone ? [`Телефон: ${order.phone}`] : []),
+                ...(order.username ? [`Telegram: ${order.username}`] : []),
+                '',
+                ...(order.order_items || []).map(i => `${i.product_name} — ${i.variant_name} — ${i.quantity} шт. x ${i.price} ₽`),
+                '',
+                `Итого: ${order.total_retail} ₽`
+            ];
+            const ok = await copyTextReliable(lines.join('\n'));
+            showToast(ok ? 'Заказ и итоговая цена скопированы' : 'Не удалось скопировать заказ', ok ? 'success' : 'error');
+        }
+
+        async function completeOrder(orderId) {
+            await supabaseClient.from('orders').update({ status: 'completed' }).eq('id', orderId);
+            await fetchOrders();
+            render();
+            showToast('Заказ отмечен как выполненный');
+        }
+
+        async function deleteCompletedOrder(orderId) {
+            await supabaseClient.from('orders').delete().eq('id', orderId);
+            await fetchOrders();
+            render();
+            showToast('Заказ удален');
+        }
+
+        function getAdminProductsResultsHTML() {
+            const q = (state.adminProductSearch || '').toLowerCase().trim();
+            const allProducts = (state.products || []);
+            const activeProducts = allProducts.filter(p => !p.is_archived && (!q || p.name.toLowerCase().includes(q)));
+            const archivedProducts = allProducts.filter(p => p.is_archived && (!q || p.name.toLowerCase().includes(q)));
+            const totalStock = allProducts.filter(p => !p.is_archived).reduce((sum, p) => sum + getProductStock(p), 0);
+            return `
+                    <!-- Итог + быстрый переход к архиву -->
+                    <div class="bg-cardBg border border-zinc-800 rounded-2xl px-4 py-3 flex items-center justify-between">
+                        <div class="text-xs text-zinc-400">
+                            Общий остаток: <span class="text-zinc-100 font-bold text-sm">${totalStock} шт.</span>
+                            <span class="text-zinc-600 mx-1">|</span>
+                            <span class="text-zinc-500">${allProducts.filter(p=>!p.is_archived).length} товаров</span>
+                        </div>
+                        <button onclick="state.showArchive = true; updateAdminProductsList(); document.getElementById('archive-section').scrollIntoView({behavior:'smooth'})" class="text-xs text-zinc-400 hover:text-accent flex items-center space-x-1 transition">
+                            <i data-lucide="archive" class="w-3.5 h-3.5"></i>
+                            <span>Архив (${allProducts.filter(p=>p.is_archived).length})</span>
+                        </button>
+                    </div>
+
+                    <!-- Список активных товаров -->
+                    <div class="space-y-2 mt-1">
+                        ${activeProducts.length === 0 ? `<p class="text-xs text-zinc-500 text-center py-6">${q ? 'По запросу ничего не найдено' : 'Нет активных товаров'}</p>` : activeProducts.map(p => {
+                            const stock = getProductStock(p);
+                            const isDiscount = hasActiveDiscount(p);
+                            return `
+                            <div class="bg-cardBg border ${p.is_pinned ? 'border-amber-500/50' : isDiscount ? 'border-red-500/40' : 'border-zinc-800'} rounded-2xl p-3 flex items-center justify-between gap-2">
+                                <div class="flex items-center space-x-3 min-w-0">
+                                    <img src="${p.image_url || 'https://via.placeholder.com/150'}" class="w-12 h-12 object-cover rounded-xl shrink-0">
+                                    <div class="min-w-0">
+                                        <div class="flex items-center flex-wrap gap-1 mb-0.5">
+                                            ${p.is_pinned ? '<span class="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5"><i data-lucide="pin" class="w-2.5 h-2.5"></i>Закреп</span>' : ''}
+                                            ${isDiscount ? '<span class="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full font-semibold">АКЦИЯ</span>' : ''}
+                                        </div>
+                                        <h4 class="font-semibold text-sm truncate">${p.name}</h4>
+                                        <p class="text-[11px] text-zinc-500">${p.category}${p.subcategory ? ' · ' + p.subcategory : ''}</p>
+                                        <div class="text-xs mt-0.5">
+                                            ${isDiscount
+                                                ? `<span class="text-zinc-500 line-through">${p.old_price} ₽</span> <span class="text-red-400 font-bold">${p.retail_price} ₽</span> <span class="text-zinc-500">| Опт: ${p.wholesale_price} ₽</span>`
+                                                : `<span class="text-accent font-semibold">${p.retail_price} ₽</span> <span class="text-zinc-500">| Опт: ${p.wholesale_price} ₽</span>`
+                                            }
+                                        </div>
+                                        <p class="text-[11px] text-zinc-500 mt-0.5">Остаток: <span class="${stock > 0 ? 'text-zinc-300' : 'text-red-400'} font-medium">${stock} шт.</span></p>
+                                    </div>
+                                </div>
+                                <div class="flex flex-col space-y-1.5 items-center shrink-0">
+                                    <div class="flex space-x-1">
+                                        <button onclick="toggleProductPin(${p.id})" title="${p.is_pinned ? 'Открепить' : 'Закрепить'}" class="w-8 h-8 ${p.is_pinned ? 'bg-amber-500/30 text-amber-400' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} rounded-xl flex items-center justify-center transition">
+                                            <i data-lucide="pin" class="w-4 h-4"></i>
+                                        </button>
+                                        <button onclick="toggleProductArchive(${p.id})" title="В архив" class="w-8 h-8 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 rounded-xl flex items-center justify-center transition">
+                                            <i data-lucide="archive" class="w-4 h-4"></i>
+                                        </button>
+                                    </div>
+                                    <div class="flex space-x-1">
+                                        <button onclick="openDiscountModal(${p.id})" title="Акция" class="w-8 h-8 ${isDiscount ? 'bg-red-500/20 text-red-400' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} rounded-xl flex items-center justify-center transition">
+                                            <i data-lucide="tag" class="w-4 h-4"></i>
+                                        </button>
+                                        <button onclick="editProduct(${p.id})" title="Редактировать" class="w-8 h-8 bg-zinc-800 hover:bg-zinc-700 rounded-xl flex items-center justify-center text-zinc-300 transition">
+                                            <i data-lucide="edit-2" class="w-4 h-4"></i>
+                                        </button>
+                                        <button onclick="deleteProduct(${p.id})" title="Удалить" class="w-8 h-8 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl flex items-center justify-center transition">
+                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `}).join('')}
+                    </div>
+
+                    <!-- Архив -->
+                    <div id="archive-section" class="pt-3">
+                        <button onclick="state.showArchive = !state.showArchive; updateAdminProductsList();" class="w-full flex items-center justify-between bg-cardBg border border-zinc-800 rounded-2xl px-4 py-3 text-sm font-medium text-zinc-300 hover:bg-zinc-800/50 transition">
+                            <span class="flex items-center space-x-2">
+                                <i data-lucide="archive" class="w-4 h-4 text-zinc-400"></i>
+                                <span>Архив</span>
+                                <span class="bg-zinc-700 text-zinc-300 text-[10px] px-2 py-0.5 rounded-full font-bold">${allProducts.filter(p=>p.is_archived).length}</span>
+                            </span>
+                            <i data-lucide="${state.showArchive ? 'chevron-up' : 'chevron-down'}" class="w-4 h-4 text-zinc-400"></i>
+                        </button>
+                        ${state.showArchive ? `
+                            <div class="space-y-2 mt-2">
+                                ${archivedProducts.length === 0 ? `<p class="text-xs text-zinc-500 text-center py-3">${q ? 'По запросу в архиве ничего' : 'Архив пуст'}</p>` : archivedProducts.map(p => `
+                                    <div class="bg-cardBg border border-zinc-800 rounded-2xl p-3 flex items-center justify-between gap-2">
+                                        <div class="flex items-center space-x-3 min-w-0">
+                                            <img src="${p.image_url || 'https://via.placeholder.com/150'}" class="w-12 h-12 object-cover rounded-xl grayscale opacity-60 shrink-0">
+                                            <div class="min-w-0">
+                                                <h4 class="font-semibold text-sm text-zinc-400 truncate">${p.name}</h4>
+                                                <p class="text-[11px] text-zinc-600">${p.category}${p.subcategory ? ' · ' + p.subcategory : ''}</p>
+                                                <p class="text-[11px] text-zinc-600 mt-0.5">${p.retail_price} ₽ | Опт: ${p.wholesale_price} ₽</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex flex-col space-y-1 items-center shrink-0">
+                                            <button onclick="toggleProductArchive(${p.id})" title="Восстановить" class="px-3 py-2 bg-accent/20 hover:bg-accent/30 text-accent rounded-xl text-xs font-medium flex items-center space-x-1 transition">
+                                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i><span>Вернуть</span>
+                                            </button>
+                                            <button onclick="deleteProduct(${p.id})" title="Удалить навсегда" class="w-full px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs flex items-center justify-center space-x-1 transition">
+                                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i><span>Удалить</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+            `;
+        }
+
+        function updateAdminProductsList() {
+            const resultsEl = document.getElementById('admin-products-results');
+            if (resultsEl) {
+                resultsEl.className = 'space-y-4';
+                resultsEl.innerHTML = getAdminProductsResultsHTML();
+                lucide.createIcons();
+            }
+        }
+
+        function renderAdminProducts(container) {
+            container.innerHTML = `
+                <div class="space-y-4">
+                    <!-- Шапка + кнопка добавить -->
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-bold">Товары</h2>
+                        <button onclick="openProductModal()" class="bg-accent hover:bg-accentHover px-4 py-2 rounded-xl text-xs font-medium transition text-white flex items-center space-x-1">
+                            <i data-lucide="plus" class="w-4 h-4"></i><span>Добавить</span>
+                        </button>
+                    </div>
+
+                    <!-- Поиск -->
+                    <div class="relative">
+                        <input type="text" id="admin-product-search-input" oninput="state.adminProductSearch=this.value; updateAdminProductsList(); const cb=document.getElementById('admin-search-clear-btn'); if(cb) cb.classList.toggle('hidden', !this.value.trim());" placeholder="Поиск по названию..." value="${state.adminProductSearch || ''}" class="w-full bg-cardBg border border-zinc-700 rounded-2xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-accent">
+                        <i data-lucide="search" class="w-4 h-4 text-zinc-400 absolute left-3 top-3"></i>
+                        <button id="admin-search-clear-btn" onclick="state.adminProductSearch=''; const inp=document.getElementById('admin-product-search-input'); if(inp) inp.value=''; updateAdminProductsList(); this.classList.add('hidden');" class="absolute right-3 top-3 text-zinc-400 hover:text-white ${(state.adminProductSearch || '').trim() ? '' : 'hidden'}"><i data-lucide="x" class="w-4 h-4"></i></button>
+                    </div>
+
+                    <div id="admin-products-results" class="space-y-4">
+                        ${getAdminProductsResultsHTML()}
+                    </div>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        async function toggleProductArchive(id) {
+            const product = (state.products || []).find(p => p.id === id);
+            if (!product) return;
+            const wasArchived = product.is_archived;
+            try {
+                await supabaseClient.from('products').update({ is_archived: !wasArchived }).eq('id', id);
+                await fetchProducts();
+                // если открыт таб товаров — только обновляем список, не трогая showArchive
+                const resultsEl = document.getElementById('admin-products-results');
+                if (resultsEl) {
+                    updateAdminProductsList();
+                } else {
+                    render();
+                }
+                showToast(!wasArchived ? 'Товар перемещен в архив' : 'Товар восстановлен из архива');
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка архивации товара', 'error');
+            }
+        }
+
+        async function toggleProductPin(id) {
+            const product = (state.products || []).find(p => p.id === id);
+            if (!product) return;
+            try {
+                await supabaseClient.from('products').update({ is_pinned: !product.is_pinned }).eq('id', id);
+                await fetchProducts();
+                render();
+                showToast(!product.is_pinned ? 'Товар закреплен на главной' : 'Товар откреплен');
+            } catch (e) {
+                console.error(e);
+                showToast('Ошибка закрепления товара', 'error');
+            }
+        }
+
+        function renderAdminSettings(container) {
+            const editingAccount = state.accounts.find(a => a.логин === state.editingAccountLogin);
+
+            container.innerHTML = `
+                <div class="space-y-4 max-w-md mx-auto pt-4">
+                    <h2 class="text-lg font-bold">Настройки администратора</h2>
+
+                    <div class="grid grid-cols-3 gap-1 bg-cardBg p-1 rounded-2xl border border-zinc-800">
+                        <button onclick="state.adminSettingsSubTab='general'; state.editingAccountLogin=null; render();"
+                            class="py-2 rounded-xl text-[11px] font-medium transition ${state.adminSettingsSubTab === 'general' ? 'bg-accent text-white' : 'text-zinc-400'}">
+                            Основные
+                        </button>
+                        <button onclick="state.adminSettingsSubTab='accounts'; state.editingAccountLogin=null; fetchAccounts().then(render);"
+                            class="py-2 rounded-xl text-[11px] font-medium transition ${state.adminSettingsSubTab === 'accounts' ? 'bg-accent text-white' : 'text-zinc-400'}">
+                            Аккаунты (${state.accounts.length})
+                        </button>
+                        <button onclick="state.adminSettingsSubTab='managers'; state.editingAccountLogin=null; render();"
+                            class="py-2 rounded-xl text-[11px] font-medium transition ${state.adminSettingsSubTab === 'managers' ? 'bg-accent text-white' : 'text-zinc-400'}">
+                            Менеджеры (${state.managers.length})
+                        </button>
+                    </div>
+
+                    ${state.adminSettingsSubTab === 'general' ? `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <button onclick="openChangeAdminPasswordModal()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
+                                <i data-lucide="key" class="w-4 h-4 text-accent"></i><span>Сменить пароль администратора</span>
+                            </button>
+                            <button onclick="resetSystemToZero()" class="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2 border border-red-500/30">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i><span>Сбросить сайт (Очистить всё)</span>
+                            </button>
+                            <button onclick="logoutAdmin()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-3 rounded-xl font-medium transition text-sm flex items-center justify-center space-x-2">
+                                <i data-lucide="log-out" class="w-4 h-4"></i><span>Выйти из админки</span>
+                            </button>
+                        </div>
+                    ` : state.adminSettingsSubTab === 'accounts' ? `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-sm font-bold">Учётные записи</h3>
+                                    <p class="text-[10px] text-zinc-500 mt-0.5">Логин, номер телефона и Telegram. Пароли в списке не показываются.</p>
+                                </div>
+                                <button onclick="fetchAccounts().then(render)" class="p-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300" title="Обновить">
+                                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+
+                            ${editingAccount ? `
+                                <div class="border border-accent/50 bg-accent/5 rounded-2xl p-3 space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <h3 class="text-sm font-bold">Редактирование аккаунта</h3>
+                                        <button onclick="cancelEditAccount()" class="text-zinc-400 hover:text-white p-1">
+                                            <i data-lucide="x" class="w-4 h-4"></i>
+                                        </button>
+                                    </div>
+
+                                    <input id="account-edit-login" type="text"
+                                        value="${escapeHtml(editingAccount.логин)}"
+                                        placeholder="Логин"
+                                        class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-accent">
+
+                                    <input id="account-edit-phone" type="text"
+                                        value="${escapeHtml(editingAccount.номер || '')}"
+                                        placeholder="Номер телефона"
+                                        class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-accent">
+
+                                    <input id="account-edit-username" type="text"
+                                        value="${escapeHtml(editingAccount.contact_username || '')}"
+                                        placeholder="Telegram / US (@username)"
+                                        class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-accent">
+
+                                    <select id="account-edit-role"
+                                        class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-accent">
+                                        <option value="пользователь" ${editingAccount.роль === 'пользователь' ? 'selected' : ''}>Пользователь</option>
+                                        <option value="админ" ${editingAccount.роль === 'админ' ? 'selected' : ''}>Администратор</option>
+                                    </select>
+
+                                    <input id="account-edit-password" type="password"
+                                        placeholder="Новый пароль (не менять — оставить пустым)"
+                                        class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-accent">
+
+                                    <div class="flex space-x-2">
+                                        <button onclick="saveAccountChanges()" class="flex-1 bg-accent hover:bg-accentHover py-2.5 rounded-xl text-xs font-medium text-white">
+                                            Сохранить
+                                        </button>
+                                        <button onclick="cancelEditAccount()" class="px-4 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl text-xs text-zinc-300">
+                                            Отмена
+                                        </button>
+                                    </div>
+                                </div>
+                            ` : ''}
+
+                            <div class="space-y-2 max-h-[55vh] overflow-y-auto pr-0.5">
+                                ${state.accounts.length === 0 ? `
+                                    <p class="text-xs text-zinc-500 text-center py-8">Учётных записей пока нет</p>
+                                ` : state.accounts.map(account => `
+                                    <div class="bg-zinc-900 border ${account.логин === state.login ? 'border-accent/50' : 'border-zinc-800'} rounded-2xl p-3">
+                                        <div class="flex items-start justify-between gap-2">
+                                            <div class="min-w-0">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="font-semibold text-sm text-zinc-100 truncate">${escapeHtml(account.логин)}</span>
+                                                    <span class="text-[9px] px-1.5 py-0.5 rounded-full ${account.роль === 'админ' ? 'bg-accent/20 text-accent' : 'bg-zinc-800 text-zinc-400'}">
+                                                        ${account.роль === 'админ' ? 'Админ' : 'Пользователь'}
+                                                    </span>
+                                                </div>
+                                                <p class="text-xs text-zinc-400 mt-1">
+                                                    <span class="text-zinc-500">Номер:</span> ${escapeHtml(account.номер || 'не указан')}
+                                                </p>
+                                                <p class="text-xs text-zinc-400 mt-0.5">
+                                                    <span class="text-zinc-500">US:</span> ${escapeHtml(account.contact_username || 'не указан')}
+                                                </p>
+                                            </div>
+                                            <div class="flex items-center gap-1 shrink-0">
+                                                <button onclick="startEditAccount('${escapeHtml(account.логин)}')" class="p-2 rounded-lg text-zinc-400 hover:text-accent hover:bg-zinc-800" title="Изменить">
+                                                    <i data-lucide="edit-2" class="w-4 h-4"></i>
+                                                </button>
+                                                ${account.логин !== state.login ? `
+                                                    <button onclick="deleteAccount('${escapeHtml(account.логин)}')" class="p-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-950/30" title="Удалить">
+                                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                    </button>
+                                                ` : `
+                                                    <span class="text-[9px] text-zinc-600 px-1">Вы</span>
+                                                `}
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="bg-cardBg border border-zinc-800 rounded-2xl p-4 space-y-3">
+                            <h3 class="text-sm font-bold">${state.editingManagerId ? 'Редактировать менеджера' : 'Добавить менеджера'}</h3>
+                            <div class="space-y-2">
+                                <input type="text" id="new-manager-name" placeholder="Имя менеджера" value="${(() => { const m = state.managers.find(x => x.id == state.editingManagerId); return m ? escapeHtml(m.name) : ''; })()}" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
+                                <input type="text" id="new-manager-username" placeholder="Юз телеграм (@username)" value="${(() => { const m = state.managers.find(x => x.id == state.editingManagerId); return m ? escapeHtml(m.username) : ''; })()}" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-accent">
+                                <div class="flex space-x-2">
+                                    <button onclick="saveManager()" class="flex-1 bg-accent hover:bg-accentHover py-2.5 rounded-xl font-medium transition text-xs text-white">${state.editingManagerId ? 'Сохранить изменения' : 'Добавить менеджера'}</button>
+                                    ${state.editingManagerId ? `<button onclick="cancelEditManager()" class="px-4 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl font-medium transition text-xs text-zinc-300">Отмена</button>` : ''}
+                                </div>
+                            </div>
+                            <h3 class="text-sm font-bold pt-3 border-t border-zinc-800">Список менеджеров</h3>
+                            <div class="space-y-2 max-h-48 overflow-y-auto">
+                                ${state.managers.length === 0 ? '<p class="text-xs text-zinc-500 text-center py-2">Менеджеры не добавлены</p>' : state.managers.map(m => `
+                                    <div class="bg-zinc-900 border ${state.editingManagerId == m.id ? 'border-accent' : 'border-zinc-800'} p-2.5 rounded-xl flex items-center justify-between">
+                                        <div>
+                                            <h4 class="text-xs font-semibold text-zinc-200">${escapeHtml(m.name)}</h4>
+                                            <p class="text-[10px] text-accent">@${escapeHtml(m.username).replace('@', '')}</p>
+                                        </div>
+                                        <div class="flex items-center space-x-1">
+                                            <button onclick="startEditManager('${escapeHtml(m.id)}')" class="text-zinc-400 hover:text-accent p-1"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
+                                            <button onclick="deleteManager('${escapeHtml(m.id)}')" class="text-red-400 hover:text-red-300 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `}
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        function startEditAccount(login) {
+            state.editingAccountLogin = login;
+            render();
+        }
+
+        function cancelEditAccount() {
+            state.editingAccountLogin = null;
+            render();
+        }
+
+        async function saveAccountChanges() {
+            const originalLogin = state.editingAccountLogin;
+            if (!originalLogin) return;
+
+            const loginField = document.getElementById('account-edit-login');
+            const phoneField = document.getElementById('account-edit-phone');
+            const usernameField = document.getElementById('account-edit-username');
+            const roleField = document.getElementById('account-edit-role');
+            const passwordField = document.getElementById('account-edit-password');
+
+            if (!loginField || !phoneField || !usernameField || !roleField || !passwordField) return;
+
+            const newLogin = loginField.value.trim();
+            const phone = phoneField.value.trim();
+            let username = usernameField.value.trim();
+            const role = roleField.value;
+            const newPassword = passwordField.value.trim();
+
+            if (!newLogin) {
+                showToast('Логин не может быть пустым', 'error');
+                return;
+            }
+
+            if (username && !username.startsWith('@')) username = '@' + username;
+
+            try {
+                if (newLogin !== originalLogin) {
+                    const { data: existing } = await supabaseClient
+                        .from('user').select('логин').eq('логин', newLogin).maybeSingle();
+
+                    if (existing) {
+                        showToast('Такой логин уже занят', 'error');
+                        return;
+                    }
+
+                    // Переносим корзину на новый логин, чтобы при переименовании
+                    // аккаунта пользователь не потерял сохранённую корзину.
+                    await supabaseClient.from('cart_items')
+                        .update({ user_identifier: newLogin })
+                        .eq('user_identifier', originalLogin);
+                }
+
+                const updateData = {
+                    логин: newLogin,
+                    номер: phone,
+                    contact_username: username,
+                    роль: role
+                };
+                if (newPassword) updateData.пароль = newPassword;
+
+                const { error } = await supabaseClient
+                    .from('user').update(updateData).eq('логин', originalLogin);
+
+                if (error) throw error;
+
+                if (originalLogin === state.login) {
+                    state.login = newLogin;
+                    state.role = role === 'админ' ? 'admin' : 'user';
+                    localStorage.setItem('reflex_login', newLogin);
+                    localStorage.setItem('reflex_role', state.role);
+                    localStorage.setItem('reflex_contact_user', username);
+                    localStorage.setItem('reflex_phone', phone);
+                }
+
+                state.editingAccountLogin = null;
+                await fetchAccounts();
+                render();
+                showToast('Учётная запись обновлена');
+            } catch (e) {
+                console.error('Ошибка изменения учётной записи:', e);
+                showToast('Не удалось изменить учётную запись', 'error');
+            }
+        }
+
+        async function deleteAccount(login) {
+            if (!login || login === state.login) {
+                showToast('Нельзя удалить текущую учётную запись', 'error');
+                return;
+            }
+
+            showConfirm(
+                'Удалить учётную запись?',
+                `Аккаунт "${login}" будет удалён без возможности восстановления.`,
+                async () => {
+                    try {
+                        await supabaseClient.from('cart_items').delete().eq('user_identifier', login);
+                        const { error } = await supabaseClient.from('user').delete().eq('логин', login);
+                        if (error) throw error;
+
+                        if (state.editingAccountLogin === login) state.editingAccountLogin = null;
+                        await fetchAccounts();
+                        await fetchRegisteredAccountsCount();
+                        render();
+                        showToast('Учётная запись удалена');
+                    } catch (e) {
+                        console.error('Ошибка удаления учётной записи:', e);
+                        showToast('Не удалось удалить учётную запись', 'error');
+                    }
+                }
+            );
+        }
+
+        async function saveManager() {
+            const nameField = document.getElementById('new-manager-name');
+            const usernameField = document.getElementById('new-manager-username');
+            if (!nameField || !usernameField) return;
+
+            const name = nameField.value.trim();
+            let username = usernameField.value.trim();
+
+            if (!name || !username) {
+                showToast('Заполните имя и юз менеджера!', 'error');
+                return;
+            }
+
+            if (username.startsWith('@')) username = username.substring(1);
+
+            try {
+                if (state.editingManagerId) {
+                    const { error } = await supabaseClient.from('managers').update({ name, username }).eq('id', state.editingManagerId);
+                    if (error) {
+                        showToast('Ошибка при сохранении менеджера', 'error');
+                        return;
+                    }
+                    state.editingManagerId = null;
+                    await fetchManagers();
+                    render();
+                    showToast('Данные менеджера обновлены!');
+                } else {
+                    const { error } = await supabaseClient.from('managers').insert({ name, username });
+                    if (error) {
+                        showToast('Ошибка при добавлении менеджера', 'error');
+                        return;
+                    }
+                    await fetchManagers();
+                    render();
+                    showToast('Менеджер успешно добавлен!');
+                }
+            } catch (e) {
+                showToast('Ошибка подключения к базе данных', 'error');
+            }
+        }
+
+        function startEditManager(id) {
+            state.editingManagerId = id;
+            render();
+        }
+
+        function cancelEditManager() {
+            state.editingManagerId = null;
+            render();
+        }
+
+        async function deleteManager(id) {
+            if (state.editingManagerId == id) state.editingManagerId = null;
+            await supabaseClient.from('managers').delete().eq('id', id);
+            await fetchManagers();
+            render();
+            showToast('Менеджер удален');
+        }
+    </script>
+</body>
+</html>
+html>
