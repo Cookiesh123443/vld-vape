@@ -1482,7 +1482,38 @@
             if (dropdown) dropdown.classList.toggle('hidden');
         }
 
-        async function openAdminPanel() {
+        
+        // Owner-only administrator management
+        async function setUserAdminRole(userId, makeAdmin = true) {
+            if (!state.isOwner) {
+                showToast('Только владелец может назначать администраторов', 'error');
+                return;
+            }
+
+            try {
+                const { error } = await supabaseClient.rpc('set_user_admin', {
+                    target_user_id: userId,
+                    make_admin: makeAdmin
+                });
+
+                if (error) throw error;
+
+                showToast(makeAdmin ? 'Администратор назначен' : 'Администратор снят');
+                await fetchAccounts(state.adminUserSearch || '');
+            } catch (e) {
+                console.error('set admin error:', e);
+                showToast('Не удалось изменить статус', 'error');
+            }
+        }
+
+
+        function requireTelegramMiniApp() {
+            return !!(window.Telegram &&
+                Telegram.WebApp &&
+                Telegram.WebApp.initData);
+        }
+
+async function openAdminPanel() {
             const dropdown = document.getElementById('admin-dropdown');
             if (dropdown) dropdown.classList.add('hidden');
             if (!state.userId) {
@@ -1495,15 +1526,15 @@
                 const { data, error } = await supabaseClient.rpc('get_my_admin_status');
                 if (error) throw error;
 
-                state.role = data?.db_role || (data?.is_owner ? 'owner' : (data?.is_admin ? 'admin' : 'user'));
-                state.isOwner = !!data?.is_owner;
-                state.role = data?.is_admin ? 'admin' : 'user';
+                state.role = data?.role || (data?.is_owner ? 'owner' : (data?.is_admin ? 'admin' : 'user'));
+                state.isOwner = state.role === 'owner' || !!data?.is_owner;
 
                 if (state.role === 'admin') {
                     state.adminPanelOpen = true;
                     closeModal('modal-worker-access');
                     await fetchAccounts(state.adminUserSearch || '');
-                    switchTab('admin_settings');
+                    state.activeTab = 'admin_home';
+                    switchTab('admin_home');
                     return;
                 }
 
