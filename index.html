@@ -2262,7 +2262,7 @@
         async function refreshCurrentProfile() {
             if (!state.userId) return null;
 
-            const { data, error } = await supabaseClient
+            let { data, error } = await supabaseClient
                 .from('profiles')
                 .select('*')
                 .eq('id', state.userId)
@@ -2270,22 +2270,17 @@
 
             if (error) throw error;
 
+            // Custom OIDC creates auth.users first. A database trigger normally
+            // creates profiles, but this fallback also makes an already-created
+            // OIDC account self-healing. The RPC is SECURITY DEFINER and only
+            // accepts the currently authenticated user.
             if (!data) {
-                // Custom OIDC creates auth.users first and the DB trigger creates
-                // profiles immediately after. Give Postgres a short moment if the
-                // auth redirect completed faster than the trigger became visible.
-                await new Promise(resolve => setTimeout(resolve, 150));
-                const retry = await supabaseClient
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', state.userId)
-                    .maybeSingle();
-                if (retry.error) throw retry.error;
-                if (!retry.data) throw new Error('Профиль Telegram ещё не создан');
-                applyProfileToState(retry.data);
-                return retry.data;
+                const { data: synced, error: syncError } = await supabaseClient.rpc('sync_my_telegram_profile');
+                if (syncError) throw syncError;
+                data = synced;
             }
 
+            if (!data) throw new Error('Профиль Telegram ещё не создан');
             applyProfileToState(data);
             return data;
         }
